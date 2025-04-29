@@ -1,0 +1,25 @@
+package watch
+
+var watchHandle = templ.NewOnceHandle()
+
+templ Watch(path string) {
+	@watchHandle.Once() {
+		<script>
+            function watch(path) {
+                // Set up SSE connection for file watching
+                const evtSource = new EventSource('/watch');
+                evtSource.onmessage = (event) => {
+                    if (event.data === 'reload') {
+                        console.log('reloading...');
+                        window.location.reload();
+                    }
+                };
+                evtSource.onerror = (err) => {
+                    console.error('EventSource failed:', err);
+                    evtSource.close();
+                };
+            }
+		</script>
+	}
+	@templ.JSFuncCall("watch", path)
+}

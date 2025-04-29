@@ -1,0 +1,100 @@
+package keyvalue
+
+import (
+	"fmt"
+	"sort"
+
+	"github.com/ocuroot/ocuroot/ui/components"
+	"github.com/ocuroot/ocuroot/sdk"
+)
+
+type Pair struct {
+	Key   string
+	Value string
+	Link  templ.SafeURL
+}
+
+templ FromMap(data map[string]string) {
+	@Pairs(sortIntoPairs(data))
+}
+
+templ Pairs(in []Pair) {
+	<table>
+		<tbody>
+			for _, pair := range in {
+				<tr>
+					<td class="pr-8 text-left">
+						<span class="font-bold">{ pair.Key }</span>
+					</td>
+					<td>
+						if pair.Link != "" {
+							<a class="text-blue-500 hover:text-blue-700 hover:underline" href={ pair.Link }>{ pair.Value }</a>
+						} else {
+							{ pair.Value }
+						}
+					</td>
+				</tr>
+			}
+		</tbody>
+	</table>
+}
+
+func sortIntoPairs(data map[string]string) []Pair {
+	var pairs []Pair
+	for key, value := range data {
+		pairs = append(pairs, Pair{Key: key, Value: value})
+	}
+	sort.Slice(pairs, func(i, j int) bool {
+		return pairs[i].Key < pairs[j].Key
+	})
+	return pairs
+}
+
+templ FromInputMap(d map[string]sdk.InputDescriptor) {
+	<table>
+		<tbody>
+			for k, v := range d {
+				<tr>
+					<td class="pr-8 text-left">
+						<span class="font-bold">{ k }</span>
+					</td>
+					<td>
+						if v.Value != nil {
+							{ fmt.Sprint(v.Value) }
+							if v.Ref != nil {
+								(" (from: ", v.Ref.String(), ")")
+							}
+						} else if v.Ref != nil {
+							<i>
+								{ v.Ref.String() }
+								if v.Default != nil {
+									(default: { fmt.Sprint(v.Default) })
+								}
+							</i>
+						} else {
+							Unknown
+						}
+					</td>
+				</tr>
+			}
+		</tbody>
+	</table>
+}
+
+
+templ FromVarMap(d map[string]any) {
+	<table>
+		<tbody>
+			for k, v := range d {
+				<tr>
+					<td class="pr-8 text-left">
+						<span class="font-bold">{ k }</span>
+					</td>
+					<td>
+						@components.Var(&v)
+					</td>
+				</tr>
+			}
+		</tbody>
+	</table>
+}

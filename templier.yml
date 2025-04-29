@@ -1,0 +1,121 @@
+# proxy-timeout defines how long to wait for the
+# application server process to start when receiving
+# connection refused errors while proxying.
+proxy-timeout: 10s
+
+# lint enables golangci-lint when true.
+lint: false
+
+# format enables automatic .templ file formatting when true.
+format: true
+
+# templier-host defines what host address to run Templiér on.
+templier-host: "localhost:8081"
+
+log:
+  # level allows you to chose from different log levels:
+  #  "" (empty): same as erronly.
+  #  erronly: error logs only.
+  #  verbose: verbose logging of relevant events and timings.
+  #  debug: verbose debug logging.
+  level: verbose
+
+  # clear-on allows you to specify when, if at all, the console logs should be cleared:
+  #  "" (empty): disables console log clearing.
+  #  "restart": clears console logs only on app server restart.
+  #  "file-change": clears console logs on every file change.
+  clear-on:
+
+  # print-js-debug-logs enables Templiér debug logs in the browser.
+  print-js-debug-logs: true
+
+# debounce defines how long to wait for more file changes
+# after the first one occurred before triggering server rebuild and restart.
+debounce: 50ms
+
+# tls can be set to null to serve HTTP instead of HTTPS.
+tls:
+#   # tls.cert defines the TLS certificate file path.
+#   cert: ./your-application.crt.pem
+
+#   # tls.keys defines the TLS private key file path.
+#   key: ./your-application.key.pem
+
+# compiler defines the optional Go compiler arguments.
+# For more info use `go help build`.
+compiler:
+  # compiler.gcflags provides the -gcflags CLI argument to Go compiler when
+  # compiling the application server executable.
+  gcflags:
+
+  # compiler.ldflags provides the -ldflags CLI argument to Go compiler
+  # to pass on each go tool link invocation.
+  ldflags:
+
+  # compiler.asmflags is equivalent to `-asmflags '[pattern=]arg list'`.
+  asmflags:
+
+  # compiler.trimpath sets `-trimpath` when true.
+  trimpath:
+
+  # compiler.race sets `-race` when true.
+  race:
+
+  # compiler.tags lists additional build tags to
+  # consider satisfied during the build.
+  tags:
+
+  # compiler.p sets the number of programs, such as build commands that can be run in
+  # parallel. The default is GOMAXPROCS, normally the number of CPUs available.
+  p:
+
+  # msan sets `-msan` when true.
+  msan:
+
+  # compiler.env passes environment variables to the Go compiler.
+  env:
+    CGO_ENABLED: 0
+
+app:
+  # app.dir-src-root defines the path to the Go module source root directory.
+  dir-src-root: ./
+
+  # app.exclude defines glob filter expressions relative to app.dir-src-root
+  # to match files exluded from watching.
+  exclude:
+    - .* # all hidden files and directories
+    - "*~" # all temporary files with a tilde (fixes jetbrains IDEs save)
+
+  # app.dir-cmd defines the path to the main package directory
+  # within the app source directory.
+  dir-cmd: ./cmd/server-example/
+
+  # app.dir-work defines the path to the workspace directory
+  # to run the application server executable in.
+  dir-work: ./
+
+  # app.host defines the host address the application server is running on.
+  host: http://localhost:8080
+
+  # app.flags defines the CLI arguments as a string provided
+  # to the application server executable.
+  flags:
+
+# custom-watchers defines custom file change watchers executing arbitrary commands
+# on certain file changes that isn't covered by a standard Templiér setup.
+custom-watchers:
+  - name: "Build Tailwind CSS"
+    cmd: "npx tailwindcss -i ./server/css/input.css -o ./server/css/output.css"
+    include: ["./**/*.templ", "./**/*.css"]
+    exclude: []
+    fail-on-error: true
+    debounce: 50ms
+    requires: restart
+
+  - name: "Restart on config change"
+    cmd: ""
+    include: ["*.yaml", "*.yml", "*.toml", "*.json"]
+    exclude: ["ignore-this.yaml"]
+    fail-on-error: false
+    debounce: 50ms
+    requires: restart

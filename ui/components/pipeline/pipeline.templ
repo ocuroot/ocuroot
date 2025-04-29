@@ -1,0 +1,354 @@
+package pipeline
+
+import (
+	"encoding/json"
+	"fmt"
+	"github.com/ocuroot/ui/components"
+	"github.com/ocuroot/ui/components/icons"
+	"github.com/ocuroot/ocuroot/ui/components/keyvalue"
+	"github.com/ocuroot/ocuroot/ui/components/logs"
+	"github.com/ocuroot/ui/components/progress"
+	"github.com/ocuroot/ocuroot/store/models"
+)
+
+type LogURLFunction func(fc *models.FunctionChainSummary) string
+
+type PipelineProps struct {
+	Summary *models.ReleaseSummary
+	LogURL  LogURLFunction
+}
+
+templ Pipeline(props PipelineProps) {
+	<div class="pipeline-container relative">
+		<style>
+			/* Card sizing - fixed width for all cards */
+			.pipeline-card {
+				width: 220px;	flex: 0 0 220px; /* Fixed width, no growth, no shrink */
+				position: relative; /* Ensure cards are above the dot grid */
+			}
+			/* Custom scrollbar for horizontal overflow */
+			.custom-scrollbar::-webkit-scrollbar {
+				height: 8px;
+			}
+			.custom-scrollbar::-webkit-scrollbar-track {
+				background: #f1f1f1;
+				border-radius: 4px;
+			}
+			.custom-scrollbar::-webkit-scrollbar-thumb {
+				background: #c1c1c1;
+				border-radius: 4px;
+			}
+			.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+				background: #a1a1a1;
+			}
+			/* Dot grid background */
+			.dot-grid {
+				position: absolute;
+				top: 0;
+				left: 0;
+				right: 0;
+				bottom: 0;
+				background-image: radial-gradient(circle, #dadce1 1px, transparent 1px);
+				background-size: 20px 20px;
+				opacity: 0.6;
+				z-index: 0;
+			}
+			/* Mermaid diagram container */
+			.mermaid-wrapper {
+				padding: 5px 0;
+			}
+			.mermaid-wrapper svg {
+				max-width: 100%;
+				height: auto !important;
+			}
+		</style>
+		<div class="dot-grid"></div>
+		<!-- Phases section in horizontal layout -->
+		<div class="flex flex-row gap-5 overflow-x-auto p-8 custom-scrollbar min-h-[300px] relative">
+			for i, phase := range props.Summary.Phases {
+				@RenderPhaseSummary(&phase, props.LogURL)
+				<!-- Arrow between phases -->
+				if i < len(props.Summary.Phases)-1 {
+					<div class="flex items-center text-gray-400 px-1">
+						<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
+							<path fill-rule="evenodd" d="M1 8a.5.5 0 0 1 .5-.5h11.793l-3.147-3.146a.5.5 0 0 1 .708-.708l4 4a.5.5 0 0 1 0 .708l-4 4a.5.5 0 0 1-.708-.708L13.293 8.5H1.5A.5.5 0 0 1 1 8z"></path>
+						</svg>
+					</div>
+				}
+			}
+		</div>
+		<!-- If no phases, show message -->
+		if len(props.Summary.Phases) == 0 {
+			<div class="p-4 border-2 border-dashed border-gray-300 rounded-lg text-center text-gray-500 bg-white relative z-1">
+				<p>No pipeline items found for this release</p>
+			</div>
+		}
+	</div>
+}
+
+// ternary is a helper function to simulate a ternary operator
+func ternary(condition bool, trueVal, falseVal string) string {
+	if condition {
+		return trueVal
+	}
+	return falseVal
+}
+
+// marshalValue converts a value to a string representation
+func marshalValue(value interface{}) string {
+	jsonBytes, err := json.Marshal(value)
+	if err != nil {
+		return "Error marshaling value"
+	}
+	return string(jsonBytes)
+}
+
+// displayVarValue returns a human-readable representation of a Var
+func displayVarValue(v *any) string {
+	// TODO: Handle redacting secrets
+
+	if v == nil {
+		return "N/A"
+	}
+	
+	return fmt.Sprintf("%v", *v)	
+}
+
+// getStatusClass returns the CSS class for a given status
+func getStatusClass(status models.Status) string {
+	switch status {
+	case models.StatusPending:
+		return "px-2 py-1 text-xs font-medium rounded-full bg-gray-100 text-gray-600"
+	case models.StatusRunning:
+		return "px-2 py-1 text-xs font-medium rounded-full bg-blue-100 text-blue-600"
+	case models.StatusComplete:
+		return "px-2 py-1 text-xs font-medium rounded-full bg-green-100 text-green-600"
+	case models.StatusFailed:
+		return "px-2 py-1 text-xs font-medium rounded-full bg-red-100 text-red-600"
+	case models.StatusCancelled:
+		return "px-2 py-1 text-xs font-medium rounded-full bg-gray-100 text-gray-600"
+	default:
+		return "px-2 py-1 text-xs font-medium rounded-full bg-gray-100 text-gray-600"
+	}
+}
+
+// getSummarizedStatusClass returns the CSS class for a given summarized status
+func getSummarizedStatusClass(status models.SummarizedStatus) string {
+	switch status {
+	case models.SummarizedStatusPending:
+		return "px-2 py-1 text-xs font-medium rounded-full bg-gray-100 text-gray-600"
+	case models.SummarizedStatusReady:
+		return "px-2 py-1 text-xs font-medium rounded-full bg-yellow-100 text-yellow-600"
+	case models.SummarizedStatusRunning:
+		return "px-2 py-1 text-xs font-medium rounded-full bg-blue-100 text-blue-600"
+	case models.SummarizedStatusComplete:
+		return "px-2 py-1 text-xs font-medium rounded-full bg-green-100 text-green-600"
+	case models.SummarizedStatusFailed:
+		return "px-2 py-1 text-xs font-medium rounded-full bg-red-100 text-red-600"
+	case models.SummarizedStatusCancelled:
+		return "px-2 py-1 text-xs font-medium rounded-full bg-gray-100 text-gray-600"
+	default:
+		return "px-2 py-1 text-xs font-medium rounded-full bg-gray-100 text-gray-600"
+	}
+}
+
+// getFunctionBorderClass returns the border class for a function based on its status
+func getFunctionBorderClass(status models.Status) string {
+	switch status {
+	case models.StatusPending:
+		return "border-gray-200"
+	case models.StatusRunning:
+		return "border-blue-300"
+	case models.StatusComplete:
+		return "border-green-300"
+	case models.StatusFailed:
+		return "border-red-300"
+	default:
+		return "border-gray-200"
+	}
+}
+
+// statusFromSummarized converts a SummarizedStatus to a Status
+func statusFromSummarized(summarized models.SummarizedStatus) models.Status {
+	switch summarized {
+	case models.SummarizedStatusPending:
+		return models.StatusPending
+	case models.SummarizedStatusReady:
+		return models.StatusPending
+	case models.SummarizedStatusRunning:
+		return models.StatusRunning
+	case models.SummarizedStatusComplete:
+		return models.StatusComplete
+	case models.SummarizedStatusFailed:
+		return models.StatusFailed
+	case models.SummarizedStatusCancelled:
+		return models.StatusCancelled
+	default:
+		return models.StatusPending
+	}
+}
+
+// modalsForChain renders the modals for a chain's functions
+templ modalsForChain(chain *models.FunctionChainSummary, logURL LogURLFunction) {
+	@components.Modal(fmt.Sprintf("modal-chain-logs-%s", chain.ID), fmt.Sprintf("Chain Logs: %s", chain.Name), "full") {
+		if logURL != nil {
+			@logs.LogView(logURL(chain), fmt.Sprintf("chain-logs-%s", chain.ID))
+		} else {
+			<p>No log URL provided</p>
+		}
+	}
+	if len(chain.Functions) > 0 {
+		// First function's inputs
+		@components.Modal(fmt.Sprintf("chain-inputs-%s", chain.ID), "Chain Inputs") {
+			if len(chain.Functions[0].Inputs) > 0 {
+				@keyvalue.FromInputMap(chain.Functions[0].Inputs)
+			} else {
+				<p>No inputs</p>
+			}
+		}
+		// Last function's outputs
+		if chain.Status() == models.SummarizedStatusComplete {
+			@components.Modal(fmt.Sprintf("chain-outputs-%s", chain.ID), "Chain Outputs") {
+				if len(chain.Functions[len(chain.Functions)-1].Outputs) > 0 {
+					@keyvalue.FromVarMap(chain.Functions[len(chain.Functions)-1].Outputs)
+				} else {
+					<p>No outputs</p>
+				}
+			}
+		}
+	}
+}
+
+// MapSummarizedStatusToProgress maps a summarized status to a progress indicator
+templ MapSummarizedStatusToProgress(status models.SummarizedStatus) {
+	switch status {
+		case models.SummarizedStatusPending:
+			@progress.SmallPending()
+		case models.SummarizedStatusRunning:
+			@progress.SmallRunning(0.5)
+		case models.SummarizedStatusComplete:
+			@progress.SmallComplete()
+		case models.SummarizedStatusFailed:
+			@progress.SmallFailed()
+		default:
+			@progress.SmallPending()
+	}
+}
+
+// RenderPhaseProgress renders a progress indicator for a phase based on its status counts
+templ RenderPhaseProgress(counts models.StatusCountMap) {
+	// Determine overall status based on counts
+	if counts[models.SummarizedStatusFailed] > 0 {
+		// If any failed, show failed with completion percentage
+		@progress.Progress(counts.CompletionFraction(), progress.StatusFailed)
+	} else if counts[models.SummarizedStatusRunning] > 0 {
+		// If any running, show running with completion percentage
+		@progress.Progress(counts.CompletionFraction(), progress.StatusRunning)
+	} else if counts.Total() == counts[models.SummarizedStatusComplete] && counts.Total() > 0 {
+		// If all complete, show complete
+		@progress.Progress(1.0, progress.StatusComplete)
+	} else {
+		// Default to pending
+		@progress.Progress(0.0, progress.StatusPending)
+	}
+}
+
+// ChainHeader renders a simplified header for a function chain
+templ WorkHeader(work *models.WorkSummary, logURL LogURLFunction) {
+	@modalsForChain(work.Chain, logURL)
+	<div class="group relative mb-2">
+		<div class="border border-gray-200 rounded overflow-hidden">
+			<div class="bg-gray-50 hover:bg-gray-100 px-3 py-2 transition-all duration-150 ease-in-out cursor-pointer">
+				<div class="flex justify-between items-start">
+					<div class="font-medium">
+						<div class="flex items-center mb-1">
+							if work.Environment != nil {
+								<!-- Environment icon: location pin -->
+								<svg class="h-4 w-4 text-gray-700 mr-1" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+									<circle cx="12" cy="10" r="3"></circle>
+									<path d="M12 21.7C17.3 17 20 13 20 10a8 8 0 1 0-16 0c0 3 2.7 7 8 11.7z"></path>
+								</svg>
+								<span class="text-gray-800">{ work.Environment.Name }</span>
+							} else {
+								<!-- Call icon: fast-forward arrow -->
+								<svg class="h-4 w-4 text-gray-700 mr-1" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+									<polygon points="13 19 22 12 13 5 13 19"></polygon>
+									<polygon points="2 19 11 12 2 5 2 19"></polygon>
+								</svg>
+								<span class="font-semibold text-gray-800">Call</span>
+							}
+						</div>
+						<div class="text-xs text-gray-500">{ work.Chain.Name }</div>
+					</div>
+					<div class="flex items-center gap-2">
+						@MapSummarizedStatusToProgress(work.Chain.Status())
+					</div>
+				</div>
+			</div>
+			<!-- Action drawer - slides down on hover -->
+			<div class="h-0 group-hover:h-10 overflow-hidden transition-all duration-150 ease-in-out">
+				<div class="bg-gray-200 px-3 py-2 flex items-center justify-end gap-1 border-t border-gray-200">
+					@ChainActionIcons(work.Chain)
+				</div>
+			</div>
+		</div>
+	</div>
+}
+
+// ChainActionIcons renders the action icons for a chain
+templ ChainActionIcons(chain *models.FunctionChainSummary) {
+	if len(chain.Functions) > 0 {
+		<button
+			class="p-1 hover:bg-gray-300 rounded"
+			title="View inputs"
+			onclick={ components.OpenModal(fmt.Sprintf("chain-inputs-%s", chain.ID)) }
+		>
+			@icons.Inputs()
+		</button>
+		if chain.Status() == models.SummarizedStatusComplete {
+			<button
+				class="p-1 hover:bg-gray-300 rounded"
+				title="View outputs"
+				onclick={ components.OpenModal(fmt.Sprintf("chain-outputs-%s", chain.ID)) }
+			>
+				@icons.Outputs()
+			</button>
+		}
+		if chain.Status() != models.SummarizedStatusComplete {
+			<button
+				class="p-1 opacity-50 cursor-not-allowed rounded"
+				title="Outputs not available until chain is complete"
+				disabled
+			>
+				@icons.Outputs()
+			</button>
+		}
+		<button class="p-1 hover:bg-gray-300 rounded" title="View links">
+			@icons.Links()
+		</button>
+		<button class="p-1 hover:bg-gray-300 rounded" title="View logs" onclick={ components.OpenModal(fmt.Sprintf("modal-chain-logs-%s", chain.ID)) }>
+			@icons.Logs()
+		</button>
+	}
+	<button class="p-1 hover:bg-gray-300 rounded" title="View dependencies">
+		@icons.Dependencies()
+	</button>
+}
+
+// RenderPhaseSummary renders a phase summary with its chains
+templ RenderPhaseSummary(phase *models.PhaseSummary, logURL LogURLFunction) {
+	<div class="pipeline-card border rounded p-2 bg-white relative">
+		<div class="flex justify-between items-center mb-2">
+			<h3 class="text-sm font-semibold flex items-center">{ phase.Name }</h3>
+			<div class="flex items-center">
+				<span class="text-xs text-gray-600 mr-2">{ fmt.Sprintf("%d/%d", phase.StatusCounts()[models.SummarizedStatusComplete], phase.StatusCounts().Total()) }</span>
+			</div>
+		</div>
+		<div class="space-y-2">
+			<!-- Loop through all work items in the phase -->
+			for _, work := range phase.Work {
+				@WorkHeader(&work, logURL)
+			}
+		</div>
+	</div>
+}

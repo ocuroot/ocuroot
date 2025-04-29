@@ -1,0 +1,179 @@
+package pipeline
+
+import (
+	"fmt"
+	"github.com/ocuroot/ocuroot/ui/components"
+	"github.com/ocuroot/ui/components/icons"
+	"github.com/ocuroot/ocuroot/ui/components/keyvalue"
+	"github.com/ocuroot/ocuroot/store/models"
+)
+
+type PreviewPipelineProps struct {
+	Summary *models.ReleaseSummary
+}
+
+templ PreviewPipeline(props PreviewPipelineProps) {
+	<div class="pipeline-container relative">
+		<style>
+			/* Card sizing - fixed width for all cards */
+			.pipeline-card {
+				width: 220px;	flex: 0 0 220px; /* Fixed width, no growth, no shrink */
+				position: relative; /* Ensure cards are above the dot grid */
+			}
+			/* Custom scrollbar for horizontal overflow */
+			.custom-scrollbar::-webkit-scrollbar {
+				height: 8px;
+			}
+			.custom-scrollbar::-webkit-scrollbar-track {
+				background: #f1f1f1;
+				border-radius: 4px;
+			}
+			.custom-scrollbar::-webkit-scrollbar-thumb {
+				background: #c1c1c1;
+				border-radius: 4px;
+			}
+			.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+				background: #a1a1a1;
+			}
+			/* Dot grid background */
+			.dot-grid {
+				position: absolute;
+				top: 0;
+				left: 0;
+				right: 0;
+				bottom: 0;
+				background-image: radial-gradient(circle, #dadce1 1px, transparent 1px);
+				background-size: 20px 20px;
+				opacity: 0.6;
+				z-index: 0;
+			}
+			/* Mermaid diagram container */
+			.mermaid-wrapper {
+				padding: 5px 0;
+			}
+			.mermaid-wrapper svg {
+				max-width: 100%;
+				height: auto !important;
+			}
+		</style>
+		<div class="dot-grid"></div>
+		<!-- Phases section in horizontal layout -->
+		<div class="flex flex-row gap-5 overflow-x-auto p-8 custom-scrollbar min-h-[300px] relative">
+			for i, phase := range props.Summary.Phases {
+				@PreviewRenderPhaseSummary(&phase)
+				<!-- Arrow between phases -->
+				if i < len(props.Summary.Phases)-1 {
+					<div class="flex items-center text-gray-400 px-1">
+						<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
+							<path fill-rule="evenodd" d="M1 8a.5.5 0 0 1 .5-.5h11.793l-3.147-3.146a.5.5 0 0 1 .708-.708l4 4a.5.5 0 0 1 0 .708l-4 4a.5.5 0 0 1-.708-.708L13.293 8.5H1.5A.5.5 0 0 1 1 8z"></path>
+						</svg>
+					</div>
+				}
+			}
+		</div>
+		<!-- If no phases, show message -->
+		if len(props.Summary.Phases) == 0 {
+			<div class="p-4 border-2 border-dashed border-gray-300 rounded-lg text-center text-gray-500 bg-white relative z-1">
+				<p>No pipeline items found for this release</p>
+			</div>
+		}
+	</div>
+}
+
+// ternary is a helper function to simulate a ternary operator
+// modalsForChain renders the modals for a chain's functions
+templ previewModalsForChain(chain *models.FunctionChainSummary) {
+	if len(chain.Functions) > 0 {
+		// First function's inputs
+		@components.Modal(fmt.Sprintf("chain-inputs-%s", chain.ID), "Chain Inputs") {
+			if len(chain.Functions[0].Inputs) > 0 {
+				@keyvalue.FromInputMap(chain.Functions[0].Inputs)
+			} else {
+				<p>No inputs</p>
+			}
+		}
+		// Last function's outputs
+		if chain.Status() == models.SummarizedStatusComplete {
+			@components.Modal(fmt.Sprintf("chain-outputs-%s", chain.ID), "Chain Outputs") {
+				if len(chain.Functions[len(chain.Functions)-1].Outputs) > 0 {
+					@keyvalue.FromVarMap(chain.Functions[len(chain.Functions)-1].Outputs)
+				} else {
+					<p>No outputs</p>
+				}
+			}
+		}
+	}
+}
+
+// ChainHeader renders a simplified header for a function chain
+templ PreviewWorkHeader(work *models.WorkSummary) {
+	@previewModalsForChain(work.Chain)
+	<div class="group relative mb-2">
+		<div class="border border-gray-200 rounded overflow-hidden">
+			<div class="bg-gray-50 hover:bg-gray-100 px-3 py-2 transition-all duration-150 ease-in-out cursor-pointer">
+				<div class="flex justify-between items-start">
+					<div class="font-medium">
+						<div class="flex items-center mb-1">
+							if work.Environment != nil {
+								<!-- Environment icon: location pin -->
+								<svg class="h-4 w-4 text-gray-700 mr-1" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+									<circle cx="12" cy="10" r="3"></circle>
+									<path d="M12 21.7C17.3 17 20 13 20 10a8 8 0 1 0-16 0c0 3 2.7 7 8 11.7z"></path>
+								</svg>
+								<span class="text-gray-800">{ work.Environment.Name }</span>
+							} else {
+								<!-- Call icon: fast-forward arrow -->
+								<svg class="h-4 w-4 text-gray-700 mr-1" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+									<polygon points="13 19 22 12 13 5 13 19"></polygon>
+									<polygon points="2 19 11 12 2 5 2 19"></polygon>
+								</svg>
+								<span class="font-semibold text-gray-800">Call</span>
+							}
+						</div>
+						<div class="text-xs text-gray-500">{ work.Chain.Name }</div>
+					</div>
+					// <div class="flex items-center gap-2">
+					// 	@MapSummarizedStatusToProgress(work.Chain.Status())
+					// </div>
+				</div>
+			</div>
+			<!-- Action drawer - slides down on hover -->
+			<div class="h-0 group-hover:h-10 overflow-hidden transition-all duration-150 ease-in-out">
+				<div class="bg-gray-200 px-3 py-2 flex items-center justify-end gap-1 border-t border-gray-200">
+					@PreviewChainActionIcons(work.Chain)
+				</div>
+			</div>
+		</div>
+	</div>
+}
+
+// PreviewChainActionIcons renders the action icons for a chain
+templ PreviewChainActionIcons(chain *models.FunctionChainSummary) {
+	if len(chain.Functions) > 0 {
+		<button
+			class="p-1 hover:bg-gray-300 rounded"
+			title="View inputs"
+			onclick={ components.OpenModal(fmt.Sprintf("chain-inputs-%s", chain.ID)) }
+		>
+			@icons.Inputs()
+		</button>
+	}
+	<button class="p-1 hover:bg-gray-300 rounded" title="View dependencies">
+		@icons.Dependencies()
+	</button>
+}
+
+// PreviewRenderPhaseSummary renders a phase summary with its chains
+templ PreviewRenderPhaseSummary(phase *models.PhaseSummary) {
+	<div class="pipeline-card border rounded p-2 bg-white relative">
+		<div class="flex justify-between items-center mb-2">
+			<h3 class="text-sm font-semibold flex items-center">{ phase.Name }</h3>
+		</div>
+		<div class="space-y-2">
+			<!-- Loop through all work items in the phase -->
+			for _, work := range phase.Work {
+				@PreviewWorkHeader(&work)
+			}
+		</div>
+	</div>
+}

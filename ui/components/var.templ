@@ -1,0 +1,13 @@
+package components
+
+import (
+	"fmt"
+)
+
+templ Var(v *any) {
+	if v == nil {
+		{ "N/A" }
+	} else {
+		{ fmt.Sprint(*v) }
+	}
+}

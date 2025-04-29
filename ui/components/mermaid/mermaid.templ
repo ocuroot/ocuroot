@@ -1,0 +1,318 @@
+package mermaid
+
+import (
+	"fmt"
+	"github.com/ocuroot/ocuroot/store/models"
+	"github.com/ocuroot/ocuroot/sdk"
+	"strings"
+)
+
+// FunctionChainDiagram renders a mermaid diagram for a function chain
+// If showOnlyActive is true, it will only show functions that are in progress or pending
+templ FunctionChainDiagram(chain *models.FunctionChainSummary, showOnlyActive bool) {
+	<style>
+		/* Mermaid diagram container */
+		.mermaid-wrapper {
+			padding: 5px 0;
+		}
+		.mermaid-wrapper svg {
+			max-width: 100%;
+			height: auto !important;
+		}
+	</style>
+	<!-- Load and initialize Mermaid -->
+	<script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+	<script>
+		document.addEventListener('DOMContentLoaded', async function() {
+			mermaid.initialize({ 
+				startOnLoad: false,
+				theme: 'neutral',
+				flowchart: {
+					useMaxWidth: true,
+					htmlLabels: true,
+					curve: 'basis',
+					rankSpacing: 15,
+					nodeSpacing: 15
+				},
+				securityLevel: 'loose'
+			});
+
+			const elements = document.querySelectorAll('.mermaid');
+			for (const element of elements) {
+				try {
+					const source = element.getAttribute('data-source');
+					await mermaid.parse(source);
+					await mermaid.init(undefined, element);
+				} catch (error) {
+					console.error('Mermaid rendering error:', error);
+					console.error('Failed diagram source:', element.getAttribute('data-source'));
+					element.className = 'mermaid-error';
+					element.innerHTML = `<pre style="color: red; white-space: pre-wrap;">Error rendering diagram:
+${error.message}</pre>`;
+				}
+			}
+		});
+	</script>
+	<div class="mermaid-wrapper overflow-x-auto overflow-y-hidden w-full">
+		<div class="mermaid w-full" style="max-width: 100%;" data-source={ chainToMermaidLR(chain, showOnlyActive) }>
+			{ chainToMermaidLR(chain, showOnlyActive) }
+		</div>
+	</div>
+}
+
+// chainToMermaidLR converts a FunctionChainSummary to a mermaid graph in LR (left-to-right) format
+func chainToMermaidLR(chain *models.FunctionChainSummary, showOnlyActive bool) string {
+	var out strings.Builder
+	out.WriteString("graph LR\n")
+
+	// Add initial node
+	out.WriteString("start((Start))\n")
+
+	// Track nodes we've seen to avoid duplicates
+	addedNodes := make(map[string]bool)
+
+	// Add edges from the graph
+	for _, edge := range chain.Graph {
+		// Skip if we're only showing active functions and the source function is complete
+		if showOnlyActive {
+			fromFn := getFunctionByName(chain, edge.From)
+			if fromFn == nil && edge.From != "" {
+				panic("function " + edge.From + " not found in chain")
+			}
+			if fromFn != nil && fromFn.Status == models.SummarizedStatusComplete {
+				continue
+			}
+		}
+
+		// Handle the empty start node
+		if edge.From == "" {
+			if !addedNodes[edge.To] {
+				nodeId := EscapeMermaidNodeId(edge.To)
+				out.WriteString(fmt.Sprintf("%s[\"%s\"]\n", nodeId, edge.To))
+				addedNodes[edge.To] = true
+			}
+			out.WriteString(fmt.Sprintf("start --> %s\n", EscapeMermaidNodeId(edge.To)))
+			continue
+		}
+
+		// Handle the empty end node
+		if edge.To == "" {
+			out.WriteString(fmt.Sprintf("%s --> done\n", EscapeMermaidNodeId(edge.From)))
+			continue
+		}
+
+		// Add nodes if we haven't seen them yet
+		if !addedNodes[edge.From] {
+			nodeId := EscapeMermaidNodeId(edge.From)
+			out.WriteString(fmt.Sprintf("%s[\"%s\"]\n", nodeId, edge.From))
+			addedNodes[edge.From] = true
+		}
+
+		if !addedNodes[edge.To] {
+			nodeId := EscapeMermaidNodeId(edge.To)
+			out.WriteString(fmt.Sprintf("%s[\"%s\"]\n", nodeId, edge.To))
+			addedNodes[edge.To] = true
+		}
+
+		// Prepare from and to nodes
+		from := EscapeMermaidNodeId(edge.From)
+		to := EscapeMermaidNodeId(edge.To)
+
+		// Add diamond for waits
+		if edge.Delay != "" {
+			// Create wait diamond node
+			waitNodeId := fmt.Sprintf("%s_wait", edge.To)
+			out.WriteString(fmt.Sprintf("%s{Wait %s}\n", waitNodeId, edge.Delay))
+
+			// Connect through wait node
+			out.WriteString(fmt.Sprintf("%s --> %s\n", from, waitNodeId))
+			out.WriteString(fmt.Sprintf("%s --> %s\n", waitNodeId, to))
+			continue
+		}
+
+		// Add diamond for approvals
+		if edge.NeedsApproval {
+			// Create approval diamond node
+			approvalNodeId := fmt.Sprintf("%s_approval", edge.To)
+			out.WriteString(fmt.Sprintf("%s{Approval required}\n", approvalNodeId))
+
+			// Connect through approval node
+			out.WriteString(fmt.Sprintf("%s --> %s\n", from, approvalNodeId))
+			out.WriteString(fmt.Sprintf("%s --> %s\n", approvalNodeId, to))
+			continue
+		}
+
+		// Regular edge with optional annotation
+		if edge.Annotation != "" {
+			// Shorten long annotations
+			annotation := edge.Annotation
+			if len(annotation) > 10 {
+				annotation = annotation[:8] + "..."
+			}
+			out.WriteString(fmt.Sprintf("%s -- %s --> %s\n", from, annotation, to))
+		} else {
+			out.WriteString(fmt.Sprintf("%s --> %s\n", from, to))
+		}
+	}
+
+	// Add done node if we had any nodes
+	if len(addedNodes) > 0 {
+		out.WriteString("done((Done))\n")
+	}
+
+	return out.String()
+}
+
+// Helper function to find a function by name in the chain
+func getFunctionByName(chain *models.FunctionChainSummary, name string) *models.FunctionSummary {
+	for _, fn := range chain.Functions {
+		if fn.Fn.Name == sdk.FunctionName(name) {
+			return fn
+		}
+	}
+	return nil
+}
+
+// HandoffGraph renders a mermaid diagram for a handoff graph
+templ HandoffGraph(edges []sdk.HandoffEdge) {
+	<style>
+		/* Mermaid diagram container */
+		.mermaid-wrapper {
+			padding: 5px 0;
+		}
+		.mermaid-wrapper svg {
+			max-width: 100%;
+			height: auto !important;
+		}
+	</style>
+	<!-- Load and initialize Mermaid -->
+	<script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+	<script>
+		document.addEventListener('DOMContentLoaded', async function() {
+			mermaid.initialize({ 
+				startOnLoad: false,
+				theme: 'neutral',
+				flowchart: {
+					useMaxWidth: true,
+					htmlLabels: true,
+					curve: 'basis',
+					rankSpacing: 15,
+					nodeSpacing: 15
+				},
+				securityLevel: 'loose'
+			});
+
+			const elements = document.querySelectorAll('.mermaid');
+			for (const element of elements) {
+				try {
+					const source = element.getAttribute('data-source');
+					await mermaid.parse(source);
+					await mermaid.init(undefined, element);
+				} catch (error) {
+					console.error('Mermaid rendering error:', error);
+					console.error('Failed diagram source:', element.getAttribute('data-source'));
+					element.className = 'mermaid-error';
+					element.innerHTML = `<pre style="color: red; white-space: pre-wrap;">Error rendering diagram:
+${error.message}</pre>`;
+				}
+			}
+		});
+	</script>
+	<div class="mermaid-wrapper overflow-x-auto overflow-y-hidden w-full">
+		<div class="mermaid w-full" style="max-width: 100%;" data-source={ handoffToMermaidLR(edges) }>
+			{ handoffToMermaidLR(edges) }
+		</div>
+	</div>
+}
+
+// handoffToMermaidLR converts a slice of HandoffEdge to a mermaid graph in LR (left-to-right) format
+func handoffToMermaidLR(edges []sdk.HandoffEdge) string {
+	var out strings.Builder
+	out.WriteString("graph LR\n")
+
+	// Add start and end nodes
+	out.WriteString("start((Start))\n")
+	out.WriteString("done((Done))\n")
+
+	// Track nodes we've seen to avoid duplicates
+	addedNodes := make(map[string]bool)
+
+	// Add edges from the graph
+	for _, edge := range edges {
+		// Handle empty start node
+		if edge.From == "" {
+			if !addedNodes[edge.To] {
+				nodeId := EscapeMermaidNodeId(edge.To)
+				out.WriteString(fmt.Sprintf("%s[\"%s\"]\n", nodeId, edge.To))
+				addedNodes[edge.To] = true
+			}
+			out.WriteString(fmt.Sprintf("start --> %s\n", EscapeMermaidNodeId(edge.To)))
+			continue
+		}
+
+		// Handle empty end node
+		if edge.To == "" {
+			if !addedNodes[edge.From] {
+				nodeId := EscapeMermaidNodeId(edge.From)
+				out.WriteString(fmt.Sprintf("%s[\"%s\"]\n", nodeId, edge.From))
+				addedNodes[edge.From] = true
+			}
+			out.WriteString(fmt.Sprintf("%s --> done\n", EscapeMermaidNodeId(edge.From)))
+			continue
+		}
+
+		// Add nodes if we haven't seen them yet
+		if !addedNodes[edge.From] {
+			nodeId := EscapeMermaidNodeId(edge.From)
+			out.WriteString(fmt.Sprintf("%s[\"%s\"]\n", nodeId, edge.From))
+			addedNodes[edge.From] = true
+		}
+		if !addedNodes[edge.To] {
+			nodeId := EscapeMermaidNodeId(edge.To)
+			out.WriteString(fmt.Sprintf("%s[\"%s\"]\n", nodeId, edge.To))
+			addedNodes[edge.To] = true
+		}
+
+		// Prepare from and to nodes
+		from := EscapeMermaidNodeId(edge.From)
+		to := EscapeMermaidNodeId(edge.To)
+
+		// Add diamond for waits
+		if edge.Delay != "" {
+			// Create wait diamond node with rhombus shape
+			waitNodeId := fmt.Sprintf("%s_wait", to)
+			out.WriteString(fmt.Sprintf("%s>Wait %s]\n", waitNodeId, edge.Delay))
+
+			// Connect through wait node
+			out.WriteString(fmt.Sprintf("%s --> %s\n", from, waitNodeId))
+			out.WriteString(fmt.Sprintf("%s --> %s\n", waitNodeId, to))
+			continue
+		}
+
+		// Add diamond for approvals
+		if edge.NeedsApproval {
+			// Create approval diamond node with rhombus shape
+			approvalNodeId := fmt.Sprintf("%s_approval", to)
+			out.WriteString(fmt.Sprintf("%s>Approval required]\n", approvalNodeId))
+
+			// Connect through approval node
+			out.WriteString(fmt.Sprintf("%s --> %s\n", from, approvalNodeId))
+			out.WriteString(fmt.Sprintf("%s --> %s\n", approvalNodeId, to))
+			continue
+		}
+
+		// Regular edge with optional annotation
+		if edge.Annotation != "" {
+			// Shorten long annotations
+			annotation := edge.Annotation
+			if len(annotation) > 10 {
+				annotation = annotation[:8] + "..."
+			}
+			out.WriteString(fmt.Sprintf("%s -- %s --> %s\n", from, annotation, to))
+		} else {
+			out.WriteString(fmt.Sprintf("%s --> %s\n", from, to))
+		}
+	}
+
+	return out.String()
+}

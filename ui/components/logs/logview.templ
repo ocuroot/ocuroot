@@ -1,0 +1,57 @@
+package logs
+
+templ LogContainer(id string) {
+	<div
+		id={ id }
+		class="bg-black p-4 text-white overflow-auto h-[70vh] w-full border-l border-gray-700"
+	>
+		{ children... }
+	</div>
+}
+
+// LogView renders a log viewer component that can auto-refresh logs
+// The view has a fixed height of 70vh with scrolling.
+templ LogView(logURL string, containerID string) {
+	<script>
+		function setupScrolling(containerID) {
+			// Set up scroll event listener on the log container
+			document.addEventListener('DOMContentLoaded', () => {
+				const logContainer = document.getElementById(containerID);
+				if (!logContainer) return;
+
+				// Flag to track if user has manually scrolled up
+				let userScrolledUp = false;
+				
+				// Function to handle automatic scrolling to bottom
+				autoScrollLogs = function() {
+					// Only auto-scroll if user hasn't manually scrolled up
+					if (!userScrolledUp) {
+						logContainer.scrollTop = logContainer.scrollHeight;
+					}
+				}
+				
+				logContainer.addEventListener('scroll', () => {
+					// Check if user is at the bottom of the container
+					const isAtBottom = logContainer.scrollHeight - logContainer.scrollTop <= logContainer.clientHeight + 50; // Adding a small threshold
+					
+					// Update the scrolled flag based on position
+					userScrolledUp = !isAtBottom;
+				});
+				
+				// Initial scroll to bottom
+				autoScrollLogs();
+			});
+		}
+	</script>
+	@LogContainer(containerID) {
+		<div
+			id={ containerID + "-content" }
+			hx-get={ logURL }
+			hx-trigger="every 1s"
+			hx-swap="innerHTML"
+			hx-target="this"
+			hx-on:htmx:after-swap="autoScrollLogs()"
+		></div>
+		@templ.JSFuncCall("setupScrolling", containerID)
+	}
+}

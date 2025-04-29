@@ -1,0 +1,140 @@
+package components
+
+import "fmt"
+
+// Modal is a generic modal component that can accept child content and size
+// Size options: 'sm', 'md', 'lg', 'xl', 'full'
+templ Modal(id string, title string, size ...string) {
+	@ModalScript()
+	<div
+		id={ id }
+		class="fixed inset-0 bg-black bg-opacity-50 z-50 hidden"
+		role="dialog"
+		aria-modal="true"
+	>
+		<div class={ fmt.Sprintf("bg-white rounded-lg shadow-xl p-6 absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 %s", getModalSizeClass(sizeFromVariadic(size...))) }>
+			<div class="flex justify-between items-center mb-4">
+				<h2 class="text-lg font-semibold text-gray-800">
+					{ title }
+				</h2>
+				<button
+					onclick={ CloseModal(id) }
+					class="text-gray-500 hover:text-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-300 rounded-full p-1"
+					aria-label="Close modal"
+				>
+					<svg
+						xmlns="http://www.w3.org/2000/svg"
+						class="h-6 w-6"
+						fill="none"
+						viewBox="0 0 24 24"
+						stroke="currentColor"
+					>
+						<path
+							stroke-linecap="round"
+							stroke-linejoin="round"
+							stroke-width="2"
+							d="M6 18L18 6M6 6l12 12"
+						></path>
+					</svg>
+				</button>
+			</div>
+			<div
+				id={ fmt.Sprintf("%s-content", id) }
+				class="space-y-2 max-h-[80vh] overflow-y-auto"
+			>
+				{ children... }
+			</div>
+		</div>
+	</div>
+}
+
+func OpenModal(id string) templ.ComponentScript {
+	return templ.JSFuncCall("OpenModal", id)
+}
+
+func CloseModal(id string) templ.ComponentScript {
+	return templ.JSFuncCall("CloseModal", id)
+}
+
+var modalHandle = templ.NewOnceHandle()
+
+templ ModalScript() {
+	@modalHandle.Once() {
+		<script lang="javascript">
+		function OpenModal(modalId) {
+			const modal = document.getElementById(modalId);
+			if (modal === null) {
+				console.error("Modal not found: " + modalId);
+				return;
+			}
+			modal.classList.remove('hidden');
+			modal.classList.add('flex');
+			
+			// Add click outside to close
+			const closeHandler = function(e) {
+				if (e.target === modal) {
+					CloseModal(modalId);
+				}
+			};
+			modal.addEventListener('click', closeHandler);
+
+			// Add escape key to close
+			const escapeHandler = function(e) {
+				if (e.key === 'Escape') {
+					CloseModal(modalId);
+				}
+			};
+			document.addEventListener('keydown', escapeHandler);
+		}
+		
+		function CloseModal(modalId) {
+			const modal = document.getElementById(modalId);
+			if (modal === null) {
+				console.error("Modal not found: " + modalId);
+				return;
+			}
+			modal.classList.remove('flex');
+			modal.classList.add('hidden');
+			
+			// Remove event listeners
+			modal.removeEventListener('click', function(e) {
+				if (e.target === modal) {
+					CloseModal(modalId);
+				}
+			});
+
+			document.removeEventListener('keydown', function(e) {
+				if (e.key === 'Escape') {
+					CloseModal(modalId);
+				}
+			});
+		}
+	
+	</script>
+	}
+}
+
+func sizeFromVariadic(size ...string) string {
+	if len(size) > 0 {
+		return size[0]
+	}
+	return "lg"
+}
+
+// getModalSizeClass returns the appropriate CSS classes for modal sizing
+func getModalSizeClass(size string) string {
+	switch size {
+	case "sm":
+		return "w-full max-w-sm"
+	case "md":
+		return "w-full max-w-md"
+	case "lg":
+		return "w-full max-w-lg"
+	case "xl":
+		return "w-full max-w-xl"
+	case "full":
+		return "w-[calc(100%-4rem)] h-[calc(100%-4rem)] max-w-[calc(100%-4rem)] max-h-[calc(100%-4rem)] top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 p-8 bg-white rounded-lg shadow-xl"
+	default:
+		return "w-full max-w-lg"
+	}
+}
