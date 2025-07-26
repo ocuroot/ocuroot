@@ -64,14 +64,7 @@ func getTrackerConfigNoRef() (release.TrackerConfig, error) {
 	}
 
 	// Create a backend that is just enough for loading repo config
-	be := &local.BackendOutputs{}
-	backend := sdk.Backend{
-		Http:  &local.HTTPBackend{},
-		Repo:  &local.RepoBackend{Outputs: be},
-		Store: &local.StoreBackend{Outputs: be},
-		Host:  &local.HostBackend{},
-		Debug: &local.DebugBackend{},
-	}
+	backend, be := local.BackendForRepo()
 
 	data, err := sdk.LoadRepo(
 		sdk.NewFSResolver(os.DirFS(repoRootPath)),
@@ -122,14 +115,7 @@ func execRepoFileFromStore(ctx context.Context, readOnlyStore refstore.Store, re
 		return nil, fmt.Errorf("failed to get repo config: %w", err)
 	}
 
-	be := &local.BackendOutputs{}
-	backend := sdk.Backend{
-		Http:  &local.HTTPBackend{},
-		Repo:  &local.RepoBackend{Outputs: be},
-		Store: &local.StoreBackend{Outputs: be},
-		Host:  &local.HostBackend{},
-		Debug: &local.DebugBackend{},
-	}
+	backend, be := local.BackendForRepo()
 
 	_, err := sdk.LoadRepoFromBytes(
 		sdk.NewNullResolver(),
@@ -225,14 +211,7 @@ func getReadOnlyStore() (refstore.Store, error) {
 
 func loadStoreFromRepoRoot(repoRootPath string) (refstore.Store, error) {
 	// Create a backend that is just enough for loading repo config
-	be := &local.BackendOutputs{}
-	backend := sdk.Backend{
-		Http:  &local.HTTPBackend{},
-		Repo:  &local.RepoBackend{Outputs: be},
-		Store: &local.StoreBackend{Outputs: be},
-		Host:  &local.HostBackend{},
-		Debug: &local.DebugBackend{},
-	}
+	backend, be := local.BackendForRepo()
 
 	_, err := sdk.LoadRepo(
 		sdk.NewFSResolver(os.DirFS(repoRootPath)),
@@ -292,14 +271,7 @@ func getTrackerConfig(cmd *cobra.Command, args []string) (release.TrackerConfig,
 	}
 
 	// Create a backend that is just enough for loading repo config
-	be := &local.BackendOutputs{}
-	backend := sdk.Backend{
-		Http:  &local.HTTPBackend{},
-		Repo:  &local.RepoBackend{Outputs: be},
-		Store: &local.StoreBackend{Outputs: be},
-		Host:  &local.HostBackend{},
-		Debug: &local.DebugBackend{},
-	}
+	backend, be := local.BackendForRepo()
 
 	data, err := sdk.LoadRepo(
 		sdk.NewFSResolver(os.DirFS(repoRootPath)),

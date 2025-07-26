@@ -33,7 +33,6 @@ def up(ctx):
     for i in range(1,5):
         host.shell("sleep 0.01")
         print("Starlark print: " + str(i))
-    host.shell("./output.sh")
 
     return next(up_stage2, inputs=outputs)
 

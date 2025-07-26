@@ -20,6 +20,8 @@ type Config struct {
 	doWorkFunc *starlark.Function
 
 	Package *Package
+
+	Backend Backend
 }
 
 type FunctionContext struct {
@@ -42,7 +44,9 @@ func LoadConfig(
 		resolver: resolver,
 		print:    print,
 	}
-	out := &Config{}
+	out := &Config{
+		Backend: backend,
+	}
 	out.globalFuncs = map[string]*starlark.Function{}
 
 	builtinsByVersion, err := c.LoadBuiltinsForAllVersion()
@@ -93,7 +97,7 @@ func LoadConfig(
 	thread := &starlark.Thread{
 		Name:  filename,
 		Load:  loader.Load,
-		Print: print,
+		Print: backend.WrapPrint(print),
 	}
 	globals, err := mod.Init(thread, builtins)
 	if err != nil {
@@ -134,14 +138,19 @@ func LoadConfig(
 	return out, nil
 }
 
-func (c *Config) Run(ctx context.Context, f FunctionDef, logger Logger, functionContext FunctionContext) (WorkResult, error) {
+func (c *Config) Run(
+	ctx context.Context,
+	f FunctionDef,
+	logger Logger,
+	functionContext FunctionContext,
+) (WorkResult, error) {
 	if _, exists := c.globalFuncs[f.String()]; !exists {
 		return WorkResult{}, fmt.Errorf("function %s not found", f.String())
 	}
 
 	thread := &starlark.Thread{
 		Name: string(f.Name),
-		Print: func(thread *starlark.Thread, msg string) {
+		Print: c.Backend.WrapPrint(func(thread *starlark.Thread, msg string) {
 			cf := thread.CallFrame(1)
 			logger(
 				Log{
@@ -155,7 +164,7 @@ func (c *Config) Run(ctx context.Context, f FunctionDef, logger Logger, function
 					},
 				},
 			)
-		},
+		}),
 	}
 
 	// Set the context as a local variable so it can be accessed from within the function

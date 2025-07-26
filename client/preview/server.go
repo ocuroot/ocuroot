@@ -141,7 +141,7 @@ func makeWatchHandler(rootPath string, packageFilePaths []string) http.HandlerFu
 
 func MakeServePreview(tc release.TrackerConfig) func(w http.ResponseWriter, r *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
-		backend, _ := local.NewBackend(tc.Ref, nil)
+		backend, _ := local.NewBackend(tc.Ref)
 		backend.Environments = &release.EnvironmentBackend{
 			Store: tc.Store,
 		}

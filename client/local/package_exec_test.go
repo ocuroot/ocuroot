@@ -14,7 +14,6 @@ func TestPackageExec(t *testing.T) {
 		refs.Ref{
 			Filename: ".",
 		},
-		NewBlockingKVStore[string, string](),
 	)
 
 	config, err := ExecutePackage(

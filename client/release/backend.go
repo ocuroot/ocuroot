@@ -20,16 +20,20 @@ func NewBackend(tc TrackerConfig) (sdk.Backend, *local.BackendOutputs) {
 	packageDir := filepath.Join(wd, filepath.Dir(tc.Ref.Filename))
 
 	be := &local.BackendOutputs{}
+
+	sb := &local.SecretsBackend{}
+
 	return sdk.Backend{
 		AllowPackageRegistration: true,
 		Http:                     &local.HTTPBackend{},
-		Secrets:                  &local.SecretsBackend{SecretStore: NewSecretStore()},
+		Secrets:                  sb,
 		Host:                     &local.HostBackend{WorkingDirectory: packageDir},
 		Store:                    &local.StoreBackend{Outputs: be},
 		Debug:                    &local.DebugBackend{},
 		Refs:                     sdk.NewRefBackend(tc.Ref),
 		Environments:             &EnvironmentBackend{Store: tc.Store, Outputs: be},
 		Repo:                     &local.RepoBackend{Outputs: be},
+		Print:                    &local.PrintBackend{Secrets: sb},
 	}, be
 }
 

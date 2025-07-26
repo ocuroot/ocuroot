@@ -18,6 +18,20 @@ type Backend struct {
 	Host                     HostBackend
 	Store                    StoreBackend
 	Debug                    DebugBackend
+	Print                    PrintBackend
+}
+
+func (b Backend) WrapPrint(next func(thread *starlark.Thread, msg string)) func(thread *starlark.Thread, msg string) {
+	if b.Print == nil {
+		return next
+	}
+	return func(thread *starlark.Thread, msg string) {
+		b.Print.Print(thread, msg, next)
+	}
+}
+
+type PrintBackend interface {
+	Print(thread *starlark.Thread, msg string, next func(thread *starlark.Thread, msg string))
 }
 
 func NewRefBackend(parentRef refs.Ref) RefsBackend {
@@ -114,7 +128,6 @@ type HTTPBackend interface {
 
 type SecretsBackend interface {
 	Register(value string)
-	Load(ctx context.Context, name string) (string, error)
 }
 
 type Store struct {

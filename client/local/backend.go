@@ -20,6 +20,21 @@ import (
 	"go.starlark.net/starlark"
 )
 
+func BackendForRepo() (sdk.Backend, *BackendOutputs) {
+	be := &BackendOutputs{}
+	sb := &SecretsBackend{}
+	backend := sdk.Backend{
+		Secrets: sb,
+		Http:    &HTTPBackend{},
+		Repo:    &RepoBackend{Outputs: be},
+		Store:   &StoreBackend{Outputs: be},
+		Host:    &HostBackend{},
+		Debug:   &DebugBackend{},
+		Print:   &PrintBackend{Secrets: sb},
+	}
+	return backend, be
+}
+
 type BackendOutputs struct {
 	RepoAlias    string
 	RepoTrigger  *starlark.Function
@@ -27,7 +42,7 @@ type BackendOutputs struct {
 	Store        *sdk.Store
 }
 
-func NewBackend(parentRef refs.Ref, secretStore KVStore[string, string]) (sdk.Backend, *BackendOutputs) {
+func NewBackend(parentRef refs.Ref) (sdk.Backend, *BackendOutputs) {
 	wd, err := os.Getwd()
 	if err != nil {
 		log.Error("failed to get working directory", "error", err)
@@ -36,17 +51,33 @@ func NewBackend(parentRef refs.Ref, secretStore KVStore[string, string]) (sdk.Ba
 	packageDir := filepath.Join(wd, filepath.Dir(parentRef.Filename))
 
 	be := &BackendOutputs{}
+
+	sb := &SecretsBackend{}
+
 	return sdk.Backend{
 		AllowPackageRegistration: true,
 		Http:                     &HTTPBackend{},
-		Secrets:                  &SecretsBackend{SecretStore: secretStore},
+		Secrets:                  sb,
 		Host:                     &HostBackend{WorkingDirectory: packageDir},
 		Store:                    &StoreBackend{Outputs: be},
 		Debug:                    &DebugBackend{},
 		Refs:                     sdk.NewRefBackend(parentRef),
 		Environments:             &EnvironmentBackend{Outputs: be},
 		Repo:                     &RepoBackend{Outputs: be},
+		Print:                    &PrintBackend{Secrets: sb},
 	}, be
+}
+
+type PrintBackend struct {
+	Secrets *SecretsBackend
+}
+
+// Print implements sdk.PrintBackend.
+func (p *PrintBackend) Print(thread *starlark.Thread, msg string, next func(thread *starlark.Thread, msg string)) {
+	for _, secret := range p.Secrets.Values {
+		msg = strings.ReplaceAll(msg, secret, "<secret>")
+	}
+	next(thread, msg)
 }
 
 type RepoBackend struct {
@@ -163,28 +194,12 @@ func (h *HTTPBackend) Post(ctx context.Context, req sdk.HTTPPostRequest) (sdk.HT
 }
 
 type SecretsBackend struct {
-	SecretStore KVStore[string, string]
+	Values []string
 }
 
 // Register implements sdk.SecretsBackend.
 func (s *SecretsBackend) Register(value string) {
-	s.SecretStore.Set(value, value)
-}
-
-// Load implements sdk.SecretsBackend.
-func (s *SecretsBackend) Load(ctx context.Context, name string) (string, error) {
-	_, span := tracer.Start(ctx, "load secret")
-	defer span.End()
-
-	span.SetAttributes(
-		attribute.String("name", name),
-	)
-
-	value, ok := s.SecretStore.Get(name)
-	if !ok {
-		return "", fmt.Errorf("secret %s not set", name)
-	}
-	return value, nil
+	s.Values = append(s.Values, value)
 }
 
 type HostBackend struct {

@@ -49,10 +49,6 @@ func (m *mockHTTPBackend) Post(ctx context.Context, req HTTPPostRequest) (HTTPRe
 type mockSecretsBackend struct {
 }
 
-func (m *mockSecretsBackend) Load(ctx context.Context, ref string) (string, error) {
-	return "", nil
-}
-
 func (m *mockSecretsBackend) Register(value string) {
 }
 

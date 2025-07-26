@@ -114,7 +114,7 @@ func previewHandler(ctx context.Context, request mcp.CallToolRequest) (*mcp.Call
 		return nil, err
 	}
 
-	backend, _ := local.NewBackend(ref, nil)
+	backend, _ := local.NewBackend(ref)
 	backend.Environments = &release.EnvironmentBackend{
 		Store: tc.Store,
 	}

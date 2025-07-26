@@ -236,14 +236,7 @@ func triggerWork(ctx context.Context, readOnlyStore refstore.Store, configRef st
 		return fmt.Errorf("failed to get repo config: %w", err)
 	}
 
-	be := &local.BackendOutputs{}
-	backend := sdk.Backend{
-		Http:  &local.HTTPBackend{},
-		Repo:  &local.RepoBackend{Outputs: be},
-		Store: &local.StoreBackend{Outputs: be},
-		Host:  &local.HostBackend{},
-		Debug: &local.DebugBackend{},
-	}
+	backend, be := local.BackendForRepo()
 
 	_, err := sdk.LoadRepoFromBytes(
 		sdk.NewNullResolver(),

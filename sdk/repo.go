@@ -63,7 +63,7 @@ func LoadRepo(
 	thread := &starlark.Thread{
 		Name:  filename,
 		Load:  loader.Load,
-		Print: print,
+		Print: backend.WrapPrint(print),
 	}
 	_, err = mod.Init(thread, builtins)
 	if err != nil {
@@ -123,7 +123,7 @@ func LoadRepoFromBytes(
 	thread := &starlark.Thread{
 		Name:  filename,
 		Load:  loader.Load,
-		Print: print,
+		Print: backend.WrapPrint(print),
 	}
 	_, err = mod.Init(thread, builtins)
 	if err != nil {

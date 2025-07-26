@@ -194,10 +194,8 @@ func (c *configLoader) secretBuiltins(backend Backend) starlark.Value {
 			secretsBackend.Register(value)
 			return nil, nil
 		})
-		secretsBuiltins["get"] = JSONBuiltin("secrets.get", secretsBackend.Load)
 	} else {
 		secretsBuiltins["secret"] = unimplementedFunction("secrets.secret")
-		secretsBuiltins["get"] = unimplementedFunction("secrets.get")
 	}
 	return starlarkstruct.FromStringDict(starlark.String("secrets"), secretsBuiltins)
 }
