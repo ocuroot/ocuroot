@@ -56,18 +56,26 @@ def build(ctx):
     host.shell("GOOS={os} GOARCH={arch} go build -o {output} ./cmd/ocuroot".format(os=os, arch=arch, output=output))
     
     # Upload to R2
+    bucket_path = "ocuroot_binaries:client-binaries/ocuroot/{version}/{os}-{arch}".format(
+        os=os, 
+        arch=arch, 
+        version=version
+    )
     host.shell(
-        "rclone copy {output} ocuroot_binaries:client-binaries/ocuroot/{version}/{os}-{arch}".format(
-            os=os, 
-            arch=arch, 
+        "rclone copy {output} {bucket_path}".format(
             output=output, 
-            version=version,    
+            bucket_path=bucket_path,    
         )
     )
 
     # Output the URL for future use
     url = "https://downloads.ocuroot.com/ocuroot/{version}/{os}-{arch}/ocuroot".format(os=os, arch=arch, version=version)
-    return done(outputs={"download_url": url})
+    return done(
+        outputs={
+            "download_url": url,
+            "bucket_path": bucket_path,
+        }
+    )
 
 phase(
     name="build",
@@ -113,7 +121,20 @@ phase(
 def release(ctx):
     version = ctx.inputs.prerelease.split("-")[0]
 
-    # TODO: Implement release logic
+    for os in oses:
+        for arch in arches:
+            source_path = getattr(ctx.inputs, "bucket_path_{os}_{arch}".format(os=os, arch=arch))
+            dest_path = "ocuroot_binaries:client-binaries/ocuroot/{version}/{os}-{arch}".format(
+                os=os, 
+                arch=arch, 
+                version=version
+            )
+            host.shell(
+                "rclone copy {source_path} {dest_path}".format(
+                    source_path=source_path, 
+                    dest_path=dest_path,    
+                )
+            )
 
     return done(
         outputs={
@@ -122,15 +143,25 @@ def release(ctx):
         tags=[version],
     )
 
+def release_inputs():
+    inputs = {
+        "prerelease": input(ref="./@/call/increment_version#output/prerelease"),
+    }
+
+    for os in oses:
+        for arch in arches:
+            key = "bucket_path_{os}_{arch}".format(os=os, arch=arch)
+            inputs[key] = ref("./call/build_{os}_{arch}#output/bucket_path".format(os=os, arch=arch))
+
+    return inputs
+
 phase(
     name="release",
     work=[
         call(
             release,
             name="release",
-            inputs={
-                "prerelease": input(ref="./@/call/increment_version#output/prerelease"),
-            },
+            inputs=release_inputs(),
         ),
     ],
 )
