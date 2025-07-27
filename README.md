@@ -1,7 +1,8 @@
 # ocuroot
 
-The Ocuroot client. The client is a command line tool that manages state for releases and environments of your
-applications and cloud resources. It is provided as a standalone tool that runs on top of existing CI services.
+The Ocuroot client. The client is a command line tool that manages state for
+releases and environments of your applications and cloud resources. It is provided
+as a standalone tool that runs on top of existing CI services.
 
 ## About Ocuroot
 
@@ -14,8 +15,9 @@ applications and resources. Intent represents the desired state that you want Oc
 GitOps-like workflows.
 
 There are 4 key elements in state:
+
 * *Releases* define a process to build and deploy your applications and resources
-* *Environments* define target locations where your applications and resources are deployed
+* *Environments* define locations where releases are deployed
 * *Deployments* represent a specific release being deployed to an environment
 * *Custom state* allows you to pass data into releases and deployments without having to modify code
 
@@ -30,7 +32,35 @@ go install github.com/ocuroot/ocuroot@latest
 ## Configuration
 
 All configuration written in imperative [Starlark](https://github.com/bazelbuild/starlark),
-a dialect of Python. Ocuroot uses the `.ocu.star` suffix to distinguish its configuration files from other source.
+a dialect of Python. Ocuroot uses the `.ocu.star` suffix to distinguish its
+configuration files from other source.
+
+### State
+
+All state managed by Ocuroot is stored as JSON documents and organized by Reference, a URI-compatible string
+that describes config files within source repos, Releases, Deployments, Environments and Custom configuration.
+
+References are of the form:
+
+```
+<repo>/-/<path>/@<release>/<subpath>#<fragment>
+```
+
+* <repo>: Is the URL or alias of a Git repo.
+* <path>: Is the path to a file within the repo, usually a *.ocu.star file.
+* <release>: Is a release identifier. If blank, the most recent release is implied.
+* <subpath>: A path to a document within the release, such as a deployment to a specific environment.
+* <fragment>: An optional path to a field within the document.
+
+For example, `github.com/ocuroot/example/-/frontend/release.ocu.star/@1.0.0/call/build#output/image` would
+refer to the container image for the 1.0.0 release of the frontend in an example repo.
+
+Intent References are dented by the use of `+` instead of `@` for the release. So
+`github.com/ocuroot/example/-/frontend/release.ocu.star/+/deploy/production` would
+refer to the desired state for deploying the frontend to the production environment.
+
+State can be queried and manipulated using the `ocuroot state` commands. Run `ocuroot state --help` for more
+information
 
 ### The SDK
 
@@ -42,7 +72,7 @@ At the top of each `.ocu.star` file, you specify the version of the SDK you want
 ocuroot("0.3.0")
 ```
 
-A full set of stubs for the 0.3.0 SDK can be found at [sdk/sdk/0.3.0](sdk/sdk/0.3.0).   
+A full set of stubs for the 0.3.0 SDK can be found at [sdk/sdk/0.3.0](sdk/sdk/0.3.0).
 
 ### repo.ocu.star
 
@@ -170,3 +200,4 @@ You can find examples of Ocuroot configuration in the [examples](examples) direc
 There are also complete example repos that can be cloned and experimented with:
 
 * [k8s-demo](https://github.com/ocuroot/k8s-demo)
+
