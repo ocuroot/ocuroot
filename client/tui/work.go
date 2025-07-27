@@ -154,7 +154,7 @@ func (m WorkModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		task.Logs = append(task.Logs, msg.Log)
 	case DoneEvent:
-		currentView := m.View()
+		currentView := m.view(true)
 		currentView = strings.TrimRight(currentView, "\n")
 
 		m.Done = true
@@ -171,6 +171,10 @@ func (m WorkModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m WorkModel) View() string {
+	return m.view(false)
+}
+
+func (m WorkModel) view(finished bool) string {
 	if m.Done {
 		return ""
 	}
@@ -182,7 +186,6 @@ func (m WorkModel) View() string {
 	var s string
 
 	// Sort tasks to put pending tasks last
-	var hasRunning bool
 	sort.Slice(m.Tasks, func(i, j int) bool {
 		if m.Tasks[i].Status == WorkStatusPending && m.Tasks[j].Status != WorkStatusPending {
 			return false
@@ -190,14 +193,17 @@ func (m WorkModel) View() string {
 		if m.Tasks[i].Status != WorkStatusPending && m.Tasks[j].Status == WorkStatusPending {
 			return true
 		}
+		if m.Tasks[i].Status == WorkStatusRunning && m.Tasks[j].Status != WorkStatusRunning {
+			return true
+		}
+		if m.Tasks[i].Status != WorkStatusRunning && m.Tasks[j].Status == WorkStatusRunning {
+			return false
+		}
 		return m.Tasks[i].Name < m.Tasks[j].Name
 	})
 
 	// Iterate over incomplete tasks
 	for _, task := range m.Tasks {
-		if task.Status == WorkStatusRunning {
-			hasRunning = true
-		}
 		var prefix any = pendingMark.String() + " "
 		if task.Status == WorkStatusDone {
 			prefix = checkMark.String() + " "
@@ -212,7 +218,10 @@ func (m WorkModel) View() string {
 		if task.Error != nil {
 			s += fmt.Sprintf("  %s\n", task.Error)
 		}
-		if task.Message != "" && (!hasRunning || task.Status == WorkStatusDone || task.Status == WorkStatusFailed) {
+		if task.Status == WorkStatusPending && !finished {
+			continue
+		}
+		if task.Message != "" {
 			for _, line := range strings.Split(task.Message, "\n") {
 				s += fmt.Sprintf("  %s\n", line)
 			}
