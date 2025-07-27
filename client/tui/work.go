@@ -3,6 +3,7 @@ package tui
 import (
 	"bytes"
 	"fmt"
+	"sort"
 	"strings"
 
 	"github.com/charmbracelet/bubbles/spinner"
@@ -31,10 +32,11 @@ var (
 )
 
 type TaskEvent struct {
-	ID     string
-	Name   string
-	Status WorkStatus
-	Error  error
+	ID      string
+	Name    string
+	Status  WorkStatus
+	Error   error
+	Message string // Message to be shown below the task
 }
 
 type LogEvent struct {
@@ -69,12 +71,12 @@ const (
 )
 
 type Task struct {
-	ID     string
-	Name   string
-	Status WorkStatus
-	Error  error
-
-	Logs []string
+	ID      string
+	Name    string
+	Status  WorkStatus
+	Error   error
+	Message string
+	Logs    []string
 }
 
 type WorkModel struct {
@@ -137,6 +139,13 @@ func (m WorkModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 
 		task.Status = msg.Status
+		if msg.Message != "" {
+			if task.Message == "" {
+				task.Message = msg.Message
+			} else {
+				task.Message = strings.Join([]string{task.Message, msg.Message}, "\n")
+			}
+		}
 		task.Error = msg.Error
 	case LogEvent:
 		task, ok := m.GetTaskByID(msg.TaskID)
@@ -172,6 +181,17 @@ func (m WorkModel) View() string {
 
 	var s string
 
+	// Sort tasks to put pending tasks last
+	sort.Slice(m.Tasks, func(i, j int) bool {
+		if m.Tasks[i].Status == WorkStatusPending && m.Tasks[j].Status != WorkStatusPending {
+			return false
+		}
+		if m.Tasks[i].Status != WorkStatusPending && m.Tasks[j].Status == WorkStatusPending {
+			return true
+		}
+		return m.Tasks[i].Name < m.Tasks[j].Name
+	})
+
 	// Iterate over incomplete tasks
 	for _, task := range m.Tasks {
 		var prefix any = pendingMark.String() + " "
@@ -188,7 +208,11 @@ func (m WorkModel) View() string {
 		if task.Error != nil {
 			s += fmt.Sprintf("  %s\n", task.Error)
 		}
-
+		if task.Message != "" {
+			for _, line := range strings.Split(task.Message, "\n") {
+				s += fmt.Sprintf("  %s\n", line)
+			}
+		}
 		if task.Status == WorkStatusDone {
 			continue
 		}

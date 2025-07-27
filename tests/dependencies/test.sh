@@ -37,7 +37,6 @@ test_releases_with_continue() {
     assert_deployed "frontend/package.ocu.star" "production"
     assert_deployed "frontend/package.ocu.star" "production2"
 
-    ocuroot state get "./-/backend/package.ocu.star/@/deploy/staging"
     assert_ref_equals "./-/backend/package.ocu.star/@/deploy/staging#output/credential" "abcd"
     assert_ref_equals "./-/frontend/package.ocu.star/@/deploy/staging#output/backend_credential" "abcd"
 

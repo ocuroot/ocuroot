@@ -8,7 +8,6 @@ import (
 	"strings"
 
 	"github.com/charmbracelet/log"
-	"github.com/ocuroot/ocuroot/client"
 	"github.com/ocuroot/ocuroot/client/release"
 	"github.com/ocuroot/ocuroot/client/state"
 	"github.com/ocuroot/ocuroot/client/tui"
@@ -61,15 +60,16 @@ func watchForChainUpdates(store refstore.Store, tuiUpdate func(tea.Msg)) refstor
 
 func tuiStateChange(store refstore.Store, tuiUpdate func(tea.Msg)) func(ref refs.Ref) {
 	return func(ref refs.Ref) {
+		ctx := context.Background()
 		chainRef := librelease.ChainRefFromFunctionRef(ref)
-		chainStatus, err := librelease.GetFunctionChainStatusFromFunctions(context.Background(), store, chainRef)
+		wr, err := librelease.WorkRefFromChainRef(chainRef)
 		if err != nil {
-			log.Error("failed to get function chain status", "error", err)
+			log.Error("failed to get work ref", "error", err)
 			return
 		}
-
-		// Ignore pending chains for the sake of tracking active work
-		if chainStatus == models.SummarizedStatusPending {
+		chainStatus, err := librelease.GetFunctionChainStatusFromFunctions(ctx, store, chainRef)
+		if err != nil {
+			log.Error("failed to get function chain status", "error", err)
 			return
 		}
 
@@ -92,10 +92,54 @@ func tuiStateChange(store refstore.Store, tuiUpdate func(tea.Msg)) func(ref refs
 			name = fmt.Sprintf("deploy to %s", name)
 		}
 
+		var message string
+		if status == tui.WorkStatusDone || status == tui.WorkStatusPending {
+
+			// Get chain outputs and render as a message
+			var chainWork models.Work
+			if err := store.Get(ctx, chainRef.String(), &chainWork); err != nil {
+				log.Error("failed to get chain work", "error", err)
+				return
+			}
+
+			if status == tui.WorkStatusDone && len(chainWork.Outputs) > 0 {
+				message = "Outputs\n"
+				var lines []string
+				for k, v := range chainWork.Outputs {
+					lines = append(lines, fmt.Sprintf("* %s#output/%s\n\t%v", wr.String(), k, v))
+				}
+				message += strings.Join(lines, "\n")
+			}
+
+			if status == tui.WorkStatusPending {
+				var fn librelease.FunctionState
+				if err := store.Get(ctx, chainWork.Entrypoint.String(), &fn); err != nil {
+					log.Error("failed to get function summary", "error", err)
+					return
+				}
+				var lines []string
+				for _, v := range fn.Current.Inputs {
+					retrieved, err := librelease.RetrieveInput(ctx, store, v)
+					if err != nil {
+						log.Error("failed to retrieve input", "error", err)
+						return
+					}
+					if retrieved.Default == nil && retrieved.Value == nil {
+						if message == "" {
+							message = "Pending Inputs\n"
+						}
+						lines = append(lines, fmt.Sprintf("* %s", v.Ref))
+					}
+				}
+				message += strings.Join(lines, "\n")
+			}
+		}
+
 		event := tui.TaskEvent{
-			ID:     chainRef.String(),
-			Name:   name,
-			Status: status,
+			ID:      wr.String(),
+			Name:    name,
+			Status:  status,
+			Message: message,
 		}
 
 		tuiUpdate(event)
@@ -185,7 +229,7 @@ var NewReleaseCmd = &cobra.Command{
 			return err
 		}
 
-		return reportOnFinalReleaseState(ctx, tracker)
+		return checkFinalReleaseState(ctx, tracker)
 	},
 }
 
@@ -242,11 +286,11 @@ var ContinueReleaseCmd = &cobra.Command{
 			return err
 		}
 
-		return reportOnFinalReleaseState(ctx, tracker)
+		return checkFinalReleaseState(ctx, tracker)
 	},
 }
 
-func reportOnFinalReleaseState(
+func checkFinalReleaseState(
 	ctx context.Context,
 	tracker *librelease.ReleaseTracker,
 ) error {
@@ -258,78 +302,7 @@ func reportOnFinalReleaseState(
 	if status == models.SummarizedStatusFailed {
 		return fmt.Errorf("release failed")
 	}
-	if status == models.SummarizedStatusCancelled {
-		fmt.Println("Release cancelled")
-		return nil
-	}
-	if status == models.SummarizedStatusComplete {
-		fmt.Println("Release complete")
-		return nil
-	}
 
-	tags, err := tracker.GetTags(ctx)
-	if err != nil {
-		return err
-	}
-
-	filteredNextFunctions, err := tracker.FilteredNextFunctions(ctx)
-	if err != nil {
-		return err
-	}
-
-	if len(filteredNextFunctions) != 0 {
-		fmt.Println("Release ready to continue")
-		fmt.Println()
-		fmt.Println("You can continue the release with the below command:")
-		fmt.Printf("  %v release continue %v\n", client.Command(), tracker.ReleaseRef)
-		fmt.Println()
-		if len(tags) > 0 {
-			fmt.Println("Or by using tags:")
-			tref := tracker.ReleaseRef
-			for _, tag := range tags {
-				tref.ReleaseOrIntent.Value = tag
-				fmt.Printf("  %v release continue %s\n", client.Command(), tref)
-			}
-		}
-		return nil
-	}
-
-	nextFunctions, err := tracker.UnfilteredNextFunctions(ctx)
-	if err != nil {
-		return err
-	}
-
-	if len(nextFunctions) > 0 {
-		fmt.Println()
-		fmt.Println("The following functions are blocked waiting for inputs:")
-		for fr, fn := range nextFunctions {
-			fmt.Println(fr)
-			missingInputs, err := tracker.PopulateInputs(ctx, fr, fn)
-			if err != nil {
-				return err
-			}
-			for _, input := range missingInputs {
-				fmt.Printf("\t%v\n", input.Ref)
-				if input.Doc != nil {
-					fmt.Printf("\t%v\n", *input.Doc)
-				}
-				fmt.Println()
-			}
-		}
-		fmt.Println()
-		fmt.Println("Once the above inputs have been satisfied, you can resume this release by running:")
-		fmt.Printf("  %v release continue %v\n", client.Command(), tracker.ReleaseRef)
-		fmt.Println()
-		if len(tags) > 0 {
-			fmt.Println("Or by using tags:")
-			tref := tracker.ReleaseRef
-			for _, tag := range tags {
-				tref.ReleaseOrIntent.Value = tag
-				fmt.Printf("  %v release continue %v\n", client.Command(), tref)
-			}
-		}
-		return nil
-	}
 	return nil
 }
 

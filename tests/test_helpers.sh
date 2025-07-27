@@ -25,7 +25,7 @@ assert_file_exists() {
 assert_ref_equals() {
     local ref_path="$1"
     local expected_value="$2"
-    local actual_value=$(ocuroot state get "$ref_path" | jq -r '.')
+    local actual_value=$(ocuroot state get "$ref_path" 2>/dev/null | jq -r '.')
     local error_message="${3:-"Ref $ref_path does not match expected value, expected $expected_value, got $actual_value"}"
 
     if [ "$actual_value" != "$expected_value" ]; then

@@ -1,8 +1,6 @@
 package release
 
 import (
-	"strings"
-
 	libglob "github.com/gobwas/glob"
 	"github.com/ocuroot/ocuroot/refs"
 	"github.com/ocuroot/ocuroot/store/models"
@@ -28,7 +26,15 @@ func WorkRefFromChainRef(ref refs.Ref) (refs.Ref, error) {
 }
 
 func ChainRefFromFunctionRef(ref refs.Ref) refs.Ref {
-	return ref.SetSubPath(strings.Split(ref.SubPath, "/functions/")[0])
+	wr, err := refs.Reduce(ref.String(), GlobChain)
+	if err != nil {
+		return ref
+	}
+	out, err := refs.Parse(wr)
+	if err != nil {
+		return ref
+	}
+	return out
 }
 
 func FunctionRefFromChainRef(ref refs.Ref, fn *models.FunctionSummary) refs.Ref {
