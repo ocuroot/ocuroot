@@ -29,9 +29,13 @@ var ReleaseCmd = &cobra.Command{
 
 func tuiLogger(tuiUpdate func(tea.Msg)) func(fnRef refs.Ref, msg sdk.Log) {
 	return func(fnRef refs.Ref, msg sdk.Log) {
-		chainRef := librelease.ChainRefFromFunctionRef(fnRef)
-		log.Info("function log", "ref", fnRef, "msg", msg)
-		tuiUpdate(tui.FunctionLogToEvent(chainRef, msg))
+		wr, err := librelease.WorkRefFromChainRef(fnRef)
+		if err != nil {
+			log.Error("failed to get work ref", "error", err)
+			return
+		}
+		log.Info("function log", "ref", wr.String(), "msg", msg)
+		tuiUpdate(tui.FunctionLogToEvent(wr, msg))
 	}
 }
 

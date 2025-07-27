@@ -3,7 +3,6 @@ package tui
 import (
 	"bytes"
 	"fmt"
-	"sort"
 	"strings"
 
 	"github.com/charmbracelet/bubbles/spinner"
@@ -185,25 +184,11 @@ func (m WorkModel) view(finished bool) string {
 
 	var s string
 
-	// Sort tasks to put pending tasks last
-	sort.Slice(m.Tasks, func(i, j int) bool {
-		if m.Tasks[i].Status == WorkStatusPending && m.Tasks[j].Status != WorkStatusPending {
-			return false
-		}
-		if m.Tasks[i].Status != WorkStatusPending && m.Tasks[j].Status == WorkStatusPending {
-			return true
-		}
-		if m.Tasks[i].Status == WorkStatusRunning && m.Tasks[j].Status != WorkStatusRunning {
-			return true
-		}
-		if m.Tasks[i].Status != WorkStatusRunning && m.Tasks[j].Status == WorkStatusRunning {
-			return false
-		}
-		return m.Tasks[i].Name < m.Tasks[j].Name
-	})
-
 	// Iterate over incomplete tasks
 	for _, task := range m.Tasks {
+		if task.Status == WorkStatusPending && !finished {
+			continue
+		}
 		var prefix any = pendingMark.String() + " "
 		if task.Status == WorkStatusDone {
 			prefix = checkMark.String() + " "
@@ -217,9 +202,6 @@ func (m WorkModel) view(finished bool) string {
 		s += fmt.Sprintf("%v%s\n", prefix, task.Name)
 		if task.Error != nil {
 			s += fmt.Sprintf("  %s\n", task.Error)
-		}
-		if task.Status == WorkStatusPending && !finished {
-			continue
 		}
 		if task.Message != "" {
 			for _, line := range strings.Split(task.Message, "\n") {
