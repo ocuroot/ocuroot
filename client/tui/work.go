@@ -182,6 +182,7 @@ func (m WorkModel) View() string {
 	var s string
 
 	// Sort tasks to put pending tasks last
+	var hasRunning bool
 	sort.Slice(m.Tasks, func(i, j int) bool {
 		if m.Tasks[i].Status == WorkStatusPending && m.Tasks[j].Status != WorkStatusPending {
 			return false
@@ -194,6 +195,9 @@ func (m WorkModel) View() string {
 
 	// Iterate over incomplete tasks
 	for _, task := range m.Tasks {
+		if task.Status == WorkStatusRunning {
+			hasRunning = true
+		}
 		var prefix any = pendingMark.String() + " "
 		if task.Status == WorkStatusDone {
 			prefix = checkMark.String() + " "
@@ -208,7 +212,7 @@ func (m WorkModel) View() string {
 		if task.Error != nil {
 			s += fmt.Sprintf("  %s\n", task.Error)
 		}
-		if task.Message != "" {
+		if task.Message != "" && (!hasRunning || task.Status == WorkStatusDone || task.Status == WorkStatusFailed) {
 			for _, line := range strings.Split(task.Message, "\n") {
 				s += fmt.Sprintf("  %s\n", line)
 			}
