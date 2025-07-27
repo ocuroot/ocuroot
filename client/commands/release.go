@@ -7,6 +7,8 @@ import (
 	"os"
 	"strings"
 
+	"github.com/charmbracelet/lipgloss/tree"
+
 	"github.com/charmbracelet/log"
 	"github.com/ocuroot/ocuroot/client/release"
 	"github.com/ocuroot/ocuroot/client/state"
@@ -107,12 +109,15 @@ func tuiStateChange(store refstore.Store, tuiUpdate func(tea.Msg)) func(ref refs
 			}
 
 			if status == tui.WorkStatusDone && len(chainWork.Outputs) > 0 {
-				message = "Outputs\n"
-				var lines []string
+				outputs := tree.Root("Outputs")
 				for k, v := range chainWork.Outputs {
-					lines = append(lines, fmt.Sprintf("* %s#output/%s\n\t%v", wr.String(), k, v))
+					outputs = outputs.Child(
+						tree.Root(
+							fmt.Sprintf("%s#output/%s", wr.String(), k),
+						).Child(v),
+					)
 				}
-				message += strings.Join(lines, "\n")
+				message += outputs.String()
 			}
 
 			if status == tui.WorkStatusPending {
@@ -121,21 +126,24 @@ func tuiStateChange(store refstore.Store, tuiUpdate func(tea.Msg)) func(ref refs
 					log.Error("failed to get function summary", "error", err)
 					return
 				}
-				var lines []string
+
+				hasPending := false
+				pendingInputs := tree.Root("Pending Inputs")
 				for _, v := range fn.Current.Inputs {
 					retrieved, err := librelease.RetrieveInput(ctx, store, v)
 					if err != nil {
 						log.Error("failed to retrieve input", "error", err)
 						return
 					}
+
 					if retrieved.Default == nil && retrieved.Value == nil {
-						if message == "" {
-							message = "Pending Inputs\n"
-						}
-						lines = append(lines, fmt.Sprintf("* %s", v.Ref))
+						hasPending = true
+						pendingInputs = pendingInputs.Child(v.Ref)
 					}
 				}
-				message += strings.Join(lines, "\n")
+				if hasPending {
+					message += pendingInputs.String()
+				}
 			}
 		}
 
