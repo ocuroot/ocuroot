@@ -286,6 +286,10 @@ func (w *releaseStore) InitializeFunction(
 		return fmt.Errorf("failed to update function state: %w", err)
 	}
 
+	if workState.Entrypoint.String() == "" {
+		workState.Entrypoint = functionRef
+	}
+
 	if err := w.Store.Set(ctx, functionChainRef.String(), workState); err != nil {
 		return fmt.Errorf("failed to set work state: %w", err)
 	}

@@ -196,13 +196,10 @@ var WorkTriggerCommand = &cobra.Command{
 }
 
 func continueRelease(ctx context.Context, tc release.TrackerConfig, logMode bool) error {
-	tuiUpdate, tuiCleanup, err := tui.StartWorkTui(logMode)
-	if err != nil {
-		return err
-	}
-	defer tuiCleanup()
+	workTui := tui.StartWorkTui(logMode)
+	defer workTui.Cleanup()
 
-	tc.Store = watchForChainUpdates(tc.Store, tuiUpdate)
+	tc.Store = watchForChainUpdates(tc.Store, workTui)
 
 	tracker, err := release.TrackerForExistingRelease(ctx, tc)
 	if err != nil {
@@ -215,7 +212,7 @@ func continueRelease(ctx context.Context, tc release.TrackerConfig, logMode bool
 
 	err = tracker.RunToPause(
 		ctx,
-		tuiLogger(tuiUpdate),
+		tuiLogger(workTui),
 	)
 	if err != nil {
 		return err

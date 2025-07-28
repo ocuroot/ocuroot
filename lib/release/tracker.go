@@ -407,6 +407,9 @@ func (r *ReleaseTracker) Run(
 	if err := r.updateIntent(ctx, fnRef, fn); err != nil {
 		return sdk.WorkResult{}, fmt.Errorf("failed to update intent state: %w", err)
 	}
+	if err := r.stateStore.Store.CommitTransaction(ctx, "function started\n\n"+fnRef.String()); err != nil {
+		log.Error("failed to commit transaction", "error", err)
+	}
 
 	fnCtx := sdk.FunctionContext{
 		WorkID: sdk.WorkID(fn.ID),
@@ -418,10 +421,6 @@ func (r *ReleaseTracker) Run(
 		} else {
 			fnCtx.Inputs[k] = v.Value
 		}
-	}
-
-	if err := r.stateStore.Store.CommitTransaction(ctx, "function started\n\n"+fnRef.String()); err != nil {
-		log.Error("failed to commit transaction", "error", err)
 	}
 
 	if err := r.stateStore.Store.StartTransaction(ctx); err != nil {

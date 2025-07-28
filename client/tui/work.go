@@ -2,7 +2,7 @@ package tui
 
 import (
 	"bytes"
-	"fmt"
+	"sort"
 	"strings"
 
 	"github.com/charmbracelet/bubbles/spinner"
@@ -10,10 +10,10 @@ import (
 	"github.com/charmbracelet/lipgloss"
 )
 
-func NewWorkModel() WorkModel {
+func NewWorkModel() *WorkModel {
 	buf := new(bytes.Buffer)
 
-	return WorkModel{
+	return &WorkModel{
 		Spinner: func() spinner.Model {
 			s := spinner.New()
 			s.Spinner = spinner.Dot
@@ -24,65 +24,22 @@ func NewWorkModel() WorkModel {
 	}
 }
 
-var (
-	checkMark   = lipgloss.NewStyle().Foreground(lipgloss.Color("42")).SetString("✓")
-	errorMark   = lipgloss.NewStyle().Foreground(lipgloss.Color("160")).SetString("✗")
-	pendingMark = lipgloss.NewStyle().Foreground(lipgloss.Color("208")).SetString("›")
-)
-
 type TaskEvent struct {
-	ID      string
-	Name    string
-	Status  WorkStatus
-	Error   error
-	Message string // Message to be shown below the task
-}
-
-type LogEvent struct {
-	TaskID string
-	Log    string
+	Task Task
 }
 
 type DoneEvent struct{}
 
-type WorkStatus int
-
-func (w WorkStatus) String() string {
-	switch w {
-	case WorkStatusPending:
-		return "pending"
-	case WorkStatusRunning:
-		return "running"
-	case WorkStatusFailed:
-		return "failed"
-	case WorkStatusDone:
-		return "done"
-	default:
-		return "unknown"
-	}
-}
-
-const (
-	WorkStatusPending WorkStatus = iota
-	WorkStatusRunning
-	WorkStatusFailed
-	WorkStatusDone
-)
-
-type Task struct {
-	ID      string
-	Name    string
-	Status  WorkStatus
-	Error   error
-	Message string
-	Logs    []string
+type Task interface {
+	ID() string
+	SortKey() int64
+	Render(spinner spinner.Model, final bool) string
 }
 
 type WorkModel struct {
-	Tasks []*Task
+	Tasks []Task
 
 	// Shared Spinner
-	// TODO: Separate spinners could be tracked by ID
 	Spinner spinner.Model
 
 	Done bool
@@ -92,26 +49,25 @@ type WorkModel struct {
 	logMode bool
 }
 
-func (w *WorkModel) GetTaskByID(id string) (*Task, bool) {
+func (w *WorkModel) GetTaskByID(id string) (Task, bool) {
 	for _, task := range w.Tasks {
-		if task.ID == id {
+		if task.ID() == id {
 			return task, true
 		}
 	}
 	return nil, false
 }
 
-func (m WorkModel) Init() tea.Cmd {
+func (m *WorkModel) Init() tea.Cmd {
 	return m.Spinner.Tick
 }
 
-func (m WorkModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+func (m *WorkModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	switch msg := msg.(type) {
 
 	// Is it a key press?
 	case tea.KeyMsg:
-
 		// Cool, what was the actual key pressed?
 		switch msg.String() {
 
@@ -124,30 +80,16 @@ func (m WorkModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, tea.Quit
 		}
 	case TaskEvent:
-		task, ok := m.GetTaskByID(msg.ID)
-		if !ok {
-			task = &Task{
-				ID:     msg.ID,
-				Name:   msg.Name,
-				Status: msg.Status,
-				Error:  msg.Error,
+		// Replace existing task with new value if exists
+		for index, task := range m.Tasks {
+			if task.ID() == msg.Task.ID() {
+				m.Tasks[index] = msg.Task
+				return m, nil
 			}
-			m.Tasks = append(m.Tasks, task)
-		} else if task.Status == msg.Status {
-			return m, nil
 		}
 
-		task.Status = msg.Status
-		if msg.Message != "" {
-			task.Message = msg.Message
-		}
-		task.Error = msg.Error
-	case LogEvent:
-		task, ok := m.GetTaskByID(msg.TaskID)
-		if !ok {
-			return m, nil
-		}
-		task.Logs = append(task.Logs, msg.Log)
+		// Add new task
+		m.Tasks = append(m.Tasks, msg.Task)
 	case DoneEvent:
 		currentView := m.view(true)
 		currentView = strings.TrimRight(currentView, "\n")
@@ -165,11 +107,11 @@ func (m WorkModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-func (m WorkModel) View() string {
+func (m *WorkModel) View() string {
 	return m.view(false)
 }
 
-func (m WorkModel) view(finished bool) string {
+func (m *WorkModel) view(finished bool) string {
 	if m.Done {
 		return ""
 	}
@@ -178,44 +120,16 @@ func (m WorkModel) view(finished bool) string {
 		return m.logBuf.String()
 	}
 
+	// Sort tasks by sort key
+	sort.Slice(m.Tasks, func(i, j int) bool {
+		return m.Tasks[i].SortKey() < m.Tasks[j].SortKey()
+	})
+
 	var s string
 
 	// Iterate over incomplete tasks
 	for _, task := range m.Tasks {
-		if task.Status == WorkStatusPending && !finished {
-			continue
-		}
-		var prefix any = pendingMark.String() + " "
-		if task.Status == WorkStatusDone {
-			prefix = checkMark.String() + " "
-		}
-		if task.Error != nil || task.Status == WorkStatusFailed {
-			prefix = errorMark.String() + " "
-		}
-		if task.Status == WorkStatusRunning {
-			prefix = m.Spinner.View()
-		}
-		s += fmt.Sprintf("%v%s\n", prefix, task.Name)
-		if task.Error != nil {
-			s += fmt.Sprintf("  %s\n", task.Error)
-		}
-		if task.Message != "" {
-			for _, line := range strings.Split(task.Message, "\n") {
-				s += fmt.Sprintf("  %s\n", line)
-			}
-		}
-		if task.Status == WorkStatusDone {
-			continue
-		}
-
-		logs := task.Logs
-		if task.Status != WorkStatusFailed && len(logs) > 4 {
-			logs = logs[len(logs)-4:]
-		}
-		for _, log := range logs {
-			s += fmt.Sprintf("  %s\n", log)
-		}
-
+		s += task.Render(m.Spinner, finished)
 	}
 
 	// Send the UI for rendering
