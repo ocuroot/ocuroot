@@ -139,11 +139,7 @@ func (m WorkModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		task.Status = msg.Status
 		if msg.Message != "" {
-			if task.Message == "" {
-				task.Message = msg.Message
-			} else {
-				task.Message = strings.Join([]string{task.Message, msg.Message}, "\n")
-			}
+			task.Message = msg.Message
 		}
 		task.Error = msg.Error
 	case LogEvent:
