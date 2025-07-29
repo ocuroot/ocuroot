@@ -323,6 +323,7 @@ var ContinueReleaseCmd = &cobra.Command{
 		cmd.SilenceUsage = true
 
 		workTui := tui.StartWorkTui(logMode)
+		defer workTui.Cleanup()
 
 		tc.Store = watchForChainUpdates(tc.Store, workTui)
 

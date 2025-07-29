@@ -31,13 +31,18 @@ start_ci_server() {
     CI_SERVER_PID=$!
     
     # Give the server a moment to start up
-    sleep 1
-    
-    # Check if server is running
-    if ! kill -0 $CI_SERVER_PID 2>/dev/null; then
-        echo "Failed to start CI server"
-        exit 1
-    fi
+    START_TIME=$(date +%s.%N)
+    while ! lsof -Pi :$CI_PORT -t >/dev/null; do
+        NOW=$(date +%s.%N)
+        if [ $(echo "$NOW - $START_TIME > 30" | bc -l) -eq 1 ]; then
+            echo "CI server failed to start within 30s"
+            exit 1
+        fi
+        sleep 0.01
+    done
+    END_TIME=$(date +%s.%N)
+    DELTA=$(echo "$END_TIME - $START_TIME" | bc -l)
+    echo "CI server took $DELTA seconds to start up"
     
     echo "CI server running with PID: $CI_SERVER_PID"
 }
@@ -228,7 +233,7 @@ wait_for_all_jobs() {
         if [ "$all_complete" = true ]; then
             break
         fi
-        sleep 2
+        sleep 1
         attempts=$((attempts + 1))
     done
     

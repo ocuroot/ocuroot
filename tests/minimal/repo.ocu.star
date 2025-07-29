@@ -11,11 +11,6 @@ store.set(
 def do_trigger(commit):
     print("Triggering work for repo at commit " + commit)
 
-    res = http.get("https://httpstat.us/200")
-    if res["status_code"] != 200:
-        print("Failed to make call: " + res["body"])
-        return
-
     host.shell(
         "cd ~/src/github.com/ocuroot/ocuroot/examples/minimal && ocuroot work continue",
         env = {

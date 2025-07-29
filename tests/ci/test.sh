@@ -151,8 +151,11 @@ build_ocuroot
 
 # Run tests
 pushd "$(dirname "$0")" > /dev/null
+
 test_ocuroot_release
 test_ocuroot_release_deps
 test_ocuroot_release_deps_commits
-echo "All tests completed"
+
 popd > /dev/null
+
+echo "All tests completed"
