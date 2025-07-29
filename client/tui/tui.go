@@ -39,7 +39,6 @@ func (w *WorkTui) Cleanup() error {
 func StartWorkTui(startInLogMode bool) *WorkTui {
 	if !isatty.IsTerminal(os.Stdout.Fd()) {
 		startInLogMode = true
-		log.SetLevel(log.ErrorLevel)
 	}
 
 	model := NewWorkModel()
