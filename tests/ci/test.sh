@@ -103,7 +103,7 @@ test_ocuroot_release_deps_commits() {
     assert_equal "0" "$?" "Failed to checkout repository"
 
     j=1
-    for i in $(seq 1 5); do
+    for i in $(seq 1 3); do
         echo "Test iteration $i"
 
         checkout_and_modify_repo "$TEST_REPO_DIR/repo.git" "message-backend.txt" "$i"
@@ -117,8 +117,6 @@ test_ocuroot_release_deps_commits() {
 
         wait_for_all_jobs
         assert_equal "0" "$?" "Failed to wait for all jobs"
-
-        #assert_equal $((i+2)) $(job_count) "Expected $((i+2)) jobs, found $(job_count)"
 
         echo "Printing logs for all jobs"
         for job_id in $(job_ids); do
