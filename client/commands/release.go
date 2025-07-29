@@ -29,7 +29,7 @@ var ReleaseCmd = &cobra.Command{
 	Long:  `Manage releases of a package, including creating new releases, viewing release state and and resuming paused releases.`,
 }
 
-func tuiLogger(tuiWork *tui.WorkTui) func(fnRef refs.Ref, msg sdk.Log) {
+func tuiLogger(tuiWork tui.Tui) func(fnRef refs.Ref, msg sdk.Log) {
 	return func(fnRef refs.Ref, msg sdk.Log) {
 		wr, err := librelease.WorkRefFromChainRef(fnRef)
 		if err != nil {
@@ -55,7 +55,7 @@ func tuiLogger(tuiWork *tui.WorkTui) func(fnRef refs.Ref, msg sdk.Log) {
 	}
 }
 
-func watchForChainUpdates(store refstore.Store, tuiWork *tui.WorkTui) refstore.Store {
+func watchForChainUpdates(store refstore.Store, tuiWork tui.Tui) refstore.Store {
 	updater := tuiStateChange(store, tuiWork)
 
 	store, err := refstore.ListenToStateChanges(
@@ -84,7 +84,7 @@ func watchForChainUpdates(store refstore.Store, tuiWork *tui.WorkTui) refstore.S
 	return store
 }
 
-func tuiStateChange(store refstore.Store, tuiWork *tui.WorkTui) func(ref refs.Ref) {
+func tuiStateChange(store refstore.Store, tuiWork tui.Tui) func(ref refs.Ref) {
 	return func(ref refs.Ref) {
 		ctx := context.Background()
 		chainRef := librelease.ChainRefFromFunctionRef(ref)

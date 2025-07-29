@@ -9,6 +9,12 @@ import (
 	"github.com/mattn/go-isatty"
 )
 
+type Tui interface {
+	GetTaskByID(id string) (Task, bool)
+	UpdateTask(task Task)
+	Cleanup() error
+}
+
 type WorkTui struct {
 	model   *WorkModel
 	program *tea.Program
@@ -36,9 +42,23 @@ func (w *WorkTui) Cleanup() error {
 	return w.program.ReleaseTerminal()
 }
 
-func StartWorkTui(startInLogMode bool) *WorkTui {
+type NullTui struct {
+}
+
+func (n *NullTui) GetTaskByID(id string) (Task, bool) {
+	return nil, false
+}
+
+func (n *NullTui) UpdateTask(task Task) {
+}
+
+func (n *NullTui) Cleanup() error {
+	return nil
+}
+
+func StartWorkTui(startInLogMode bool) Tui {
 	if !isatty.IsTerminal(os.Stdout.Fd()) {
-		startInLogMode = true
+		return &NullTui{}
 	}
 
 	model := NewWorkModel()
