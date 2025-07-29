@@ -9,25 +9,20 @@ REL_DIR="$(dirname "$0")"
 TEST_CONTENT_DIR="$(readlink -f "$REL_DIR")"
 
 cleanup_dangling_ci() {
-    if lsof -Pi :$CI_PORT -t >/dev/null; then
-        if [ "$(lsof -Pi :$CI_PORT -t | xargs ps -o comm= -p | grep -c minici)" -eq 1 ]; then
-            echo "Killing dangling minici process on port $CI_PORT"
-            lsof -Pi :$CI_PORT -t | xargs kill
-        else
-            echo "There is a process listening on port $CI_PORT but it is not minici, command is:"
-            lsof -Pi :$CI_PORT -t | xargs ps -o comm= -p
-            exit 1
-        fi
-    fi
-    
-    # Also kill any other minici processes that might be running
+    # Kill any minici processes that might be running
     pkill -f "minici" 2>/dev/null || true
+
+    if lsof -Pi :$CI_PORT -t >/dev/null; then
+        echo "There is a process listening on port $CI_PORT but it is not minici, command is:"
+        lsof -Pi :$CI_PORT -t | xargs ps -o comm= -p
+        exit 1
+    fi
 }
 
 # Build and start the CI server
 start_ci_server() {    
     echo "Starting CI server on port $CI_PORT in background..."
-    go run github.com/ocuroot/minici/cmd/minici@latest -port "$CI_PORT" &
+    go run github.com/ocuroot/minici/cmd/minici@v0.0.1 -port "$CI_PORT" &
     CI_SERVER_PID=$!
     
     # Give the server a moment to start up
@@ -207,81 +202,8 @@ job_detail() {
 }
 
 wait_for_all_jobs() {
-    local max_attempts=30
-    local attempts=0
-    local all_successful=true
-    local all_failed=true
-    local all_complete=true
-    
-    while [ $attempts -lt $max_attempts ]; do
-        local jobs=($(job_ids))
-        all_successful=true
-        all_failed=true
-        all_complete=true
-        for job_id in "${jobs[@]}"; do
-            local job_status=$(curl -s "http://localhost:$CI_PORT/api/jobs/$job_id" | jq -r '.status')
-            if [ "$job_status" = "success" ]; then
-                all_failed=false
-            elif [ "$job_status" = "failure" ]; then
-                all_successful=false
-            else
-                all_successful=false
-                all_failed=false
-                all_complete=false
-            fi
-        done
-        if [ "$all_complete" = true ]; then
-            break
-        fi
-        sleep 1
-        attempts=$((attempts + 1))
-    done
-    
-    if [ "$all_successful" = true ]; then
-        echo "All jobs succeeded"
-    elif [ "$all_failed" = true ]; then
-        echo "All jobs failed"
-    elif [ "$all_complete" = true ]; then
-        echo "All jobs completed, some may have failed"
-    else
-        echo "Timed out waiting for all jobs to complete" >&2
-        echo "Total jobs: $(job_count)"
-
-        for job_id in $(job_ids); do
-            echo "Job detail: $(job_detail $job_id)"
-            echo "Job logs: $(job_logs $job_id)"
-        done
-
-        return 1
-    fi
-}
-
-wait_for_job() {
-    local job_id=$1
-    local max_attempts=30
-    local attempts=0
-    local job_status="pending"
-    
-    while [ "$job_status" != "success" ] && [ "$job_status" != "failure" ] && [ $attempts -lt $max_attempts ]; do
-        sleep 2
-        local status_response=$(curl -s "http://localhost:$CI_PORT/api/jobs/$job_id")
-        job_status=$(echo $status_response | jq -r '.status')
-        echo "Current job status: $job_status (attempt $attempts/$max_attempts)" >&2
-        attempts=$((attempts + 1))
-    done
-
-    if [ "$job_status" = "success" ]; then
-        echo $job_status
-    else
-        echo "Job failed or timed out" >&2
-        
-        # Get job logs to see the issue
-        echo "Fetching job logs:"
-        job_logs $job_id
-        
-        # For the test script, we'll continue rather than fail
-        echo "Continuing test script despite job status: $job_status" >&2
-    fi
+    curl "http://localhost:$CI_PORT/api/wait"
+    assert_equal "0" "$?" "Failed to wait for all jobs with CURL"
 }
 
 schedule_job() {

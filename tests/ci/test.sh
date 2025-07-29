@@ -18,7 +18,6 @@ test_ocuroot_release() {
     assert_equal "0" "$?" "Failed to schedule job"
 
     wait_for_all_jobs
-    assert_equal "0" "$?" "Failed to wait for all jobs"
 
     assert_equal 1 $(job_count) "Expected one job, found $(job_count)"
 
@@ -54,7 +53,6 @@ test_ocuroot_release_deps() {
     assert_equal "0" "$?" "Failed to schedule job"
 
     wait_for_all_jobs
-    assert_equal "0" "$?" "Failed to wait for all jobs"
 
     assert_equal 2 $(job_count) "Expected two jobs, found $(job_count)"
 
@@ -116,7 +114,6 @@ test_ocuroot_release_deps_commits() {
         assert_equal "0" "$?" "Failed to schedule job"
 
         wait_for_all_jobs
-        assert_equal "0" "$?" "Failed to wait for all jobs"
 
         echo "Printing logs for all jobs"
         for job_id in $(job_ids); do
