@@ -6,7 +6,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/charmbracelet/lipgloss/tree"
 	"github.com/charmbracelet/log"
 	"github.com/ocuroot/ocuroot/client/tui"
 	"github.com/ocuroot/ocuroot/refs"
@@ -17,7 +16,7 @@ import (
 	librelease "github.com/ocuroot/ocuroot/lib/release"
 )
 
-func initEvent(ref refs.Ref, t tui.Tui) *TaskEvent {
+func initEvent(ref refs.Ref, t tui.Tui, store refstore.Store) *TaskEvent {
 	wr, err := librelease.WorkRefFromChainRef(ref)
 	if err != nil {
 		log.Error("failed to get work ref", "error", err)
@@ -35,6 +34,11 @@ func initEvent(ref refs.Ref, t tui.Tui) *TaskEvent {
 	if out.Old != nil {
 		newTask := *out.Old
 		out.New = &newTask
+
+		if store != nil {
+			out.Old.Store = store
+			out.New.Store = store
+		}
 	}
 	if out.New == nil {
 		name := strings.Split(chainRef.SubPath, "/")[0]
@@ -43,9 +47,13 @@ func initEvent(ref refs.Ref, t tui.Tui) *TaskEvent {
 		}
 
 		out.New = &Task{
-			TaskID: wr.String(),
-			Name:   name,
-			Status: WorkStatusPending,
+			TaskID:       wr.String(),
+			Name:         name,
+			Status:       WorkStatusPending,
+			CreationTime: time.Now(),
+
+			Store:    store,
+			ChainRef: chainRef,
 		}
 	}
 
@@ -86,7 +94,7 @@ func TuiLogger(tuiWork tui.Tui) func(fnRef refs.Ref, msg sdk.Log) {
 		}
 		log.Info("function log", "ref", wr.String(), "msg", msg)
 
-		out := initEvent(fnRef, tuiWork)
+		out := initEvent(fnRef, tuiWork, nil)
 		out.New.Logs = append(out.New.Logs, msg.Message)
 
 		tuiWork.UpdateTask(out)
@@ -103,11 +111,6 @@ func WatchForChainUpdates(store refstore.Store, tuiWork tui.Tui) refstore.Store 
 				log.Error("failed to parse ref", "error", err)
 				return
 			}
-
-			// Ignore deleted refs
-			// if err := store.Get(ctx, ref, nil); err == refstore.ErrRefNotFound {
-			// 	return
-			// }
 
 			updater(r)
 		},
@@ -126,64 +129,9 @@ func tuiStateChange(store refstore.Store, tuiWork tui.Tui) func(ref refs.Ref) {
 	return func(ref refs.Ref) {
 		ctx := context.Background()
 		chainRef := librelease.ChainRefFromFunctionRef(ref)
-		wr, err := librelease.WorkRefFromChainRef(chainRef)
-		if err != nil {
-			log.Error("failed to get work ref", "ref", ref.String(), "error", err)
-			return
-		}
 
-		out := initEvent(chainRef, tuiWork)
+		out := initEvent(chainRef, tuiWork, store)
 		updateStatus(ctx, store, chainRef, out)
-
-		var message string
-		if out.New.Status == WorkStatusDone || out.New.Status == WorkStatusPending {
-
-			// Get chain outputs and render as a message
-			var chainWork models.Work
-			if err := store.Get(ctx, chainRef.String(), &chainWork); err != nil {
-				log.Error("failed to get chain work", "ref", chainRef.String(), "error", err)
-				return
-			}
-
-			if out.New.Status == WorkStatusDone && len(chainWork.Outputs) > 0 {
-				outputs := tree.Root("Outputs")
-				for k, v := range chainWork.Outputs {
-					outputs = outputs.Child(
-						tree.Root(
-							fmt.Sprintf("%s#output/%s", wr.String(), k),
-						).Child(v),
-					)
-				}
-				message += outputs.String()
-			}
-
-			if out.New.Status == WorkStatusPending {
-				var fn librelease.FunctionState
-				if err := store.Get(ctx, chainWork.Entrypoint.String(), &fn); err != nil {
-					log.Error("failed to get function summary", "chainRef", chainRef.String(), "entrypoint", chainWork.Entrypoint.String(), "error", err)
-					return
-				}
-
-				hasPending := false
-				pendingInputs := tree.Root("Pending Inputs")
-				for _, v := range fn.Current.Inputs {
-					retrieved, err := librelease.RetrieveInput(ctx, store, v)
-					if err != nil {
-						log.Error("failed to retrieve input", "ref", v.Ref.String(), "error", err)
-						return
-					}
-
-					if retrieved.Default == nil && retrieved.Value == nil {
-						hasPending = true
-						pendingInputs = pendingInputs.Child(v.Ref)
-					}
-				}
-				if hasPending {
-					message += pendingInputs.String()
-				}
-			}
-			out.New.Message = message
-		}
 
 		if out.New.Status == WorkStatusRunning {
 			if out.Old == nil || out.Old.Status != WorkStatusRunning {

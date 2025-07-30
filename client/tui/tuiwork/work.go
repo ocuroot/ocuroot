@@ -1,13 +1,22 @@
 package tuiwork
 
 import (
+	"context"
 	"fmt"
+	"sort"
 	"strings"
 	"time"
 
 	"github.com/charmbracelet/bubbles/spinner"
 	"github.com/charmbracelet/lipgloss"
+	"github.com/charmbracelet/lipgloss/tree"
+	"github.com/charmbracelet/log"
 	"github.com/ocuroot/ocuroot/client/tui"
+	"github.com/ocuroot/ocuroot/refs"
+	"github.com/ocuroot/ocuroot/refs/refstore"
+	"github.com/ocuroot/ocuroot/store/models"
+
+	librelease "github.com/ocuroot/ocuroot/lib/release"
 )
 
 var (
@@ -47,14 +56,17 @@ var _ tui.Task = (*Task)(nil)
 type Task struct {
 	TaskID string
 
-	StartTime time.Time
-	EndTime   time.Time
+	CreationTime time.Time
+	StartTime    time.Time
+	EndTime      time.Time
 
-	Name    string
-	Status  WorkStatus
-	Error   error
-	Message string
-	Logs    []string
+	Name   string
+	Status WorkStatus
+	Error  error
+	Logs   []string
+
+	Store    refstore.Store
+	ChainRef refs.Ref
 }
 
 func (t *Task) SortKey() string {
@@ -70,7 +82,13 @@ func (t *Task) SortKey() string {
 		statusSort = 0
 	}
 
-	return fmt.Sprintf("%d-%d", statusSort, t.StartTime.UnixNano())
+	var keyTime string
+	if t.StartTime.IsZero() {
+		keyTime = fmt.Sprintf("%d", t.CreationTime.UnixNano())
+	} else {
+		keyTime = fmt.Sprintf("%d", t.StartTime.UnixNano())
+	}
+	return fmt.Sprintf("%d-%s", statusSort, keyTime)
 }
 
 func (t *Task) ID() string {
@@ -108,8 +126,9 @@ func (task *Task) Render(spinner spinner.Model, final bool) string {
 	if task.Error != nil {
 		s += fmt.Sprintf("  %s\n", task.Error)
 	}
-	if task.Message != "" {
-		for _, line := range strings.Split(task.Message, "\n") {
+	msg := task.message()
+	if msg != "" {
+		for _, line := range strings.Split(msg, "\n") {
 			s += fmt.Sprintf("  %s\n", line)
 		}
 	}
@@ -125,6 +144,71 @@ func (task *Task) Render(spinner spinner.Model, final bool) string {
 		s += fmt.Sprintf("  %s\n", log)
 	}
 	return s
+}
+
+func (t *Task) message() string {
+	var message string
+	if t.Status != WorkStatusDone && t.Status != WorkStatusPending {
+		return ""
+	}
+
+	// Get chain outputs and render as a message
+	var chainWork models.Work
+	if err := t.Store.Get(context.Background(), t.ChainRef.String(), &chainWork); err != nil {
+		log.Error("failed to get chain work", "ref", t.ChainRef.String(), "error", err)
+		return "failed to get chain work"
+	}
+
+	if t.Status == WorkStatusDone && len(chainWork.Outputs) > 0 {
+		outputs := tree.Root("Outputs")
+		keys := make([]string, 0, len(chainWork.Outputs))
+		for k := range chainWork.Outputs {
+			keys = append(keys, k)
+		}
+		sort.Strings(keys)
+		for _, k := range keys {
+			v := chainWork.Outputs[k]
+			outputs = outputs.Child(
+				tree.Root(
+					fmt.Sprintf("%s#output/%s", t.TaskID, k),
+				).Child(v),
+			)
+		}
+		message += outputs.String()
+	}
+
+	if t.Status == WorkStatusPending {
+		var fn librelease.FunctionState
+		if err := t.Store.Get(context.Background(), chainWork.Entrypoint.String(), &fn); err != nil {
+			log.Error("failed to get function summary", "chainRef", t.ChainRef.String(), "entrypoint", chainWork.Entrypoint.String(), "error", err)
+			return "failed to get function summary"
+		}
+
+		hasPending := false
+		pendingInputs := tree.Root("Pending Inputs")
+		keys := make([]string, 0, len(fn.Current.Inputs))
+		for k := range fn.Current.Inputs {
+			keys = append(keys, k)
+		}
+		sort.Strings(keys)
+		for _, k := range keys {
+			v := fn.Current.Inputs[k]
+			retrieved, err := librelease.RetrieveInput(context.Background(), t.Store, v)
+			if err != nil {
+				log.Error("failed to retrieve input", "ref", v.Ref.String(), "error", err)
+				return "failed to retrieve input"
+			}
+
+			if retrieved.Default == nil && retrieved.Value == nil {
+				hasPending = true
+				pendingInputs = pendingInputs.Child(v.Ref)
+			}
+		}
+		if hasPending {
+			message += pendingInputs.String()
+		}
+	}
+	return message
 }
 
 type WorkStatus int
