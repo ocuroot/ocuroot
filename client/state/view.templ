@@ -1,0 +1,76 @@
+package state
+
+import (
+	"encoding/json"
+	"fmt"
+	"github.com/ocuroot/ui/components"
+    "github.com/ocuroot/ui/components/navbar"
+    "github.com/ocuroot/ui/js"
+)
+
+templ ViewBody(){
+    @components.Body(){
+		@navbar.Navbar(navbar.NavbarConfig{
+			BrandName:       "Ocuroot",
+			BrandURL:        "/",
+			LogoURL:         "/static/logo.svg",
+			Items: []navbar.NavItem{
+				navbar.NavLink{
+					Name: "Root",
+					URL:  "/",
+				},
+			},
+			ShowThemeToggle: true,
+		})
+        @components.Container(){
+		    { children... }
+        }
+		@js.UnifiedJSScript()
+	}
+}
+
+type ViewPageProps struct {
+    Ref string
+    ResolvedRef string
+
+    Content any
+    ChildRefs []string
+}
+
+templ ViewPage(props ViewPageProps) {
+	@ViewBody(){
+        if props.Ref != "" {
+            <h1>{ props.Ref }</h1>
+            if props.ResolvedRef != "" {
+                <p class="subtitle">{ props.ResolvedRef }</p>
+            }
+        } else {
+            <h1>All State</h1>
+        }
+
+        if props.Content != nil {
+            <h2>State</h2>
+            @components.Card() {
+                <pre>{ toJson(props.Content) }</pre>
+            }
+        }
+        <hr/>
+
+        if len(props.ChildRefs) > 0 {
+            <h2>Children</h2>
+            <ul class="list-style-circle">
+                for _, ref := range props.ChildRefs {
+                    <li><a href={ fmt.Sprintf("/ref/%s", ref) }>{ ref }</a></li>
+                }
+            </ul>
+        }
+	}
+}
+
+func toJson(content any) string {
+	j, err := json.MarshalIndent(content, "", "  ")
+	if err != nil {
+		return ""
+	}
+	return string(j)
+}

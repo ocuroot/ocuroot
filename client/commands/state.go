@@ -226,6 +226,25 @@ var StateApplyIntentCmd = &cobra.Command{
 	},
 }
 
+var StateViewCmd = &cobra.Command{
+	Use:   "view",
+	Short: "View state in a web browser.",
+	Long:  `View state in a web browser.`,
+	Args:  cobra.ExactArgs(0),
+	RunE: func(cmd *cobra.Command, args []string) error {
+		tc, err := getTrackerConfigNoRef()
+		if err != nil {
+			return fmt.Errorf("failed to get tracker config: %w", err)
+		}
+		cmd.SilenceUsage = true
+
+		if err := state.View(cmd.Context(), tc.Store); err != nil {
+			return fmt.Errorf("failed to view state: %w", err)
+		}
+		return nil
+	},
+}
+
 func init() {
 	RootCmd.AddCommand(StateCmd)
 	AddRefFlags(StateCmd, true)
@@ -239,4 +258,6 @@ func init() {
 
 	StateCmd.AddCommand(StateApplyIntentCmd)
 	StateCmd.AddCommand(StateDeleteIntentCmd)
+
+	StateCmd.AddCommand(StateViewCmd)
 }
