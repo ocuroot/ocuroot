@@ -24,15 +24,16 @@ func NewWorkModel() *WorkModel {
 	}
 }
 
-type TaskEvent struct {
-	Task Task
+type TaskEvent interface {
+	Task() Task
+	Description() (string, bool)
 }
 
 type DoneEvent struct{}
 
 type Task interface {
 	ID() string
-	SortKey() int64
+	SortKey() string
 	Render(spinner spinner.Model, final bool) string
 }
 
@@ -82,14 +83,14 @@ func (m *WorkModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case TaskEvent:
 		// Replace existing task with new value if exists
 		for index, task := range m.Tasks {
-			if task.ID() == msg.Task.ID() {
-				m.Tasks[index] = msg.Task
+			if task.ID() == msg.Task().ID() {
+				m.Tasks[index] = msg.Task()
 				return m, nil
 			}
 		}
 
 		// Add new task
-		m.Tasks = append(m.Tasks, msg.Task)
+		m.Tasks = append(m.Tasks, msg.Task())
 	case DoneEvent:
 		currentView := m.view(true)
 		currentView = strings.TrimRight(currentView, "\n")

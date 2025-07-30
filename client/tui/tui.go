@@ -2,6 +2,7 @@ package tui
 
 import (
 	"fmt"
+	"io"
 	"os"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -11,7 +12,7 @@ import (
 
 type Tui interface {
 	GetTaskByID(id string) (Task, bool)
-	UpdateTask(task Task)
+	UpdateTask(ev TaskEvent)
 	Cleanup() error
 }
 
@@ -25,8 +26,8 @@ func (w *WorkTui) GetTaskByID(id string) (Task, bool) {
 	return w.model.GetTaskByID(id)
 }
 
-func (w *WorkTui) UpdateTask(task Task) {
-	w.program.Send(TaskEvent{Task: task})
+func (w *WorkTui) UpdateTask(ev TaskEvent) {
+	w.program.Send(ev)
 }
 
 func (w *WorkTui) Cleanup() error {
@@ -42,6 +43,28 @@ func (w *WorkTui) Cleanup() error {
 	return w.program.ReleaseTerminal()
 }
 
+type NonTTYTui struct {
+	tasks map[string]Task
+}
+
+func (n *NonTTYTui) GetTaskByID(id string) (Task, bool) {
+	t, found := n.tasks[id]
+	return t, found
+}
+
+func (n *NonTTYTui) UpdateTask(ev TaskEvent) {
+	description, show := ev.Description()
+	if show {
+		fmt.Println(description)
+	}
+
+	n.tasks[ev.Task().ID()] = ev.Task()
+}
+
+func (n *NonTTYTui) Cleanup() error {
+	return nil
+}
+
 type NullTui struct {
 }
 
@@ -49,7 +72,7 @@ func (n *NullTui) GetTaskByID(id string) (Task, bool) {
 	return nil, false
 }
 
-func (n *NullTui) UpdateTask(task Task) {
+func (n *NullTui) UpdateTask(ev TaskEvent) {
 }
 
 func (n *NullTui) Cleanup() error {
@@ -58,7 +81,11 @@ func (n *NullTui) Cleanup() error {
 
 func StartWorkTui(startInLogMode bool) Tui {
 	if !isatty.IsTerminal(os.Stdout.Fd()) {
-		return &NullTui{}
+		if startInLogMode {
+			return &NullTui{}
+		}
+		log.SetOutput(io.Discard)
+		return &NonTTYTui{tasks: make(map[string]Task)}
 	}
 
 	model := NewWorkModel()

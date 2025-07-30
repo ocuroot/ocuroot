@@ -16,6 +16,32 @@ var (
 	pendingMark = lipgloss.NewStyle().Foreground(lipgloss.Color("208")).SetString("›")
 )
 
+type TaskEvent struct {
+	Old *Task
+	New *Task
+}
+
+func (e *TaskEvent) Task() tui.Task {
+	return e.New
+}
+
+func (e *TaskEvent) Description() (string, bool) {
+	if e.Old == nil {
+		return fmt.Sprintf("%v: %v", e.New.Name, e.New.Status), true
+	}
+	if e.New.Status != e.Old.Status {
+		if e.New.Status == WorkStatusDone {
+			return fmt.Sprintf("%v> %v -> %v (%v)", e.New.Name, e.Old.Status, e.New.Status, e.New.EndTime.Sub(e.New.StartTime)), true
+		} else {
+			return fmt.Sprintf("%v: %v -> %v", e.New.Name, e.Old.Status, e.New.Status), true
+		}
+	}
+	if len(e.New.Logs) > len(e.Old.Logs) {
+		return fmt.Sprintf("%v> %v", e.New.Name, e.New.Logs[len(e.New.Logs)-1]), true
+	}
+	return "", false
+}
+
 var _ tui.Task = (*Task)(nil)
 
 type Task struct {
@@ -31,8 +57,20 @@ type Task struct {
 	Logs    []string
 }
 
-func (t *Task) SortKey() int64 {
-	return t.StartTime.UnixNano()
+func (t *Task) SortKey() string {
+	var statusSort = 0
+	switch t.Status {
+	case WorkStatusPending:
+		statusSort = 2
+	case WorkStatusRunning:
+		statusSort = 1
+	case WorkStatusFailed:
+		statusSort = 0
+	case WorkStatusDone:
+		statusSort = 0
+	}
+
+	return fmt.Sprintf("%d-%d", statusSort, t.StartTime.UnixNano())
 }
 
 func (t *Task) ID() string {
@@ -111,4 +149,5 @@ const (
 	WorkStatusRunning
 	WorkStatusFailed
 	WorkStatusDone
+	WorkStatusUnknown
 )

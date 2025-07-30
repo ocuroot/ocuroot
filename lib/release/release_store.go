@@ -218,35 +218,37 @@ func GetFunctionChainStatusFromFunctions(ctx context.Context, store refstore.Sto
 		return "", err
 	}
 
-	// Return pending iff all functions are pending
+	var statusCounts map[string]int
 	for _, match := range resultMatches {
-		if !strings.HasSuffix(match, "/pending") {
-			continue
+		status := path.Base(match)
+		if statusCounts == nil {
+			statusCounts = make(map[string]int)
 		}
-		return models.SummarizedStatusPending, nil
+		statusCounts[status]++
 	}
 
-	// Return complete iff all functions are complete
-	for _, match := range resultMatches {
-		if !strings.HasSuffix(match, "/complete") {
-			continue
-		}
+	if statusCounts[string(models.SummarizedStatusPending)] == len(resultMatches) {
+		return models.SummarizedStatusPending, nil
+	}
+	if statusCounts[string(models.SummarizedStatusComplete)] == len(resultMatches) {
 		return models.SummarizedStatusComplete, nil
 	}
 
-	for _, match := range resultMatches {
-		if strings.HasSuffix(match, "/running") {
-			return models.SummarizedStatusRunning, nil
-		}
-		if strings.HasSuffix(match, "/failed") {
-			return models.SummarizedStatusFailed, nil
-		}
-		if strings.HasSuffix(match, "/cancelled") {
-			return models.SummarizedStatusCancelled, nil
-		}
-		if strings.HasSuffix(match, "/ready") {
-			return models.SummarizedStatusReady, nil
-		}
+	if statusCounts[string(models.SummarizedStatusRunning)] > 0 {
+		return models.SummarizedStatusRunning, nil
+	}
+	if statusCounts[string(models.SummarizedStatusFailed)] > 0 {
+		return models.SummarizedStatusFailed, nil
+	}
+	if statusCounts[string(models.SummarizedStatusCancelled)] > 0 {
+		return models.SummarizedStatusCancelled, nil
+	}
+	if statusCounts[string(models.SummarizedStatusReady)] > 0 {
+		return models.SummarizedStatusReady, nil
+	}
+
+	if statusCounts[string(models.SummarizedStatusPending)] > 0 && statusCounts[string(models.SummarizedStatusComplete)] > 0 {
+		return models.SummarizedStatusRunning, nil
 	}
 
 	// Default to pending

@@ -13,6 +13,7 @@ import (
 	"github.com/ocuroot/ocuroot/client/local"
 	"github.com/ocuroot/ocuroot/client/release"
 	"github.com/ocuroot/ocuroot/client/tui"
+	"github.com/ocuroot/ocuroot/client/tui/tuiwork"
 	librelease "github.com/ocuroot/ocuroot/lib/release"
 	"github.com/ocuroot/ocuroot/refs"
 	"github.com/ocuroot/ocuroot/refs/refstore"
@@ -199,7 +200,7 @@ func continueRelease(ctx context.Context, tc release.TrackerConfig, logMode bool
 	workTui := tui.StartWorkTui(logMode)
 	defer workTui.Cleanup()
 
-	tc.Store = watchForChainUpdates(tc.Store, workTui)
+	tc.Store = tuiwork.WatchForChainUpdates(tc.Store, workTui)
 
 	tracker, err := release.TrackerForExistingRelease(ctx, tc)
 	if err != nil {
@@ -212,7 +213,7 @@ func continueRelease(ctx context.Context, tc release.TrackerConfig, logMode bool
 
 	err = tracker.RunToPause(
 		ctx,
-		tuiLogger(workTui),
+		tuiwork.TuiLogger(workTui),
 	)
 	if err != nil {
 		return err
