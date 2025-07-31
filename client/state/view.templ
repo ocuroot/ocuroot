@@ -6,6 +6,7 @@ import (
 	"github.com/ocuroot/ui/components"
     "github.com/ocuroot/ui/components/navbar"
     "github.com/ocuroot/ui/js"
+    "github.com/ocuroot/ui/components/layout"
 )
 
 templ ViewBody(){
@@ -41,7 +42,7 @@ templ ViewPage(props ViewPageProps) {
 	@ViewBody(){
         if props.Ref != "" {
             <h1>{ props.Ref }</h1>
-            if props.ResolvedRef != "" {
+            if props.ResolvedRef != "" && props.ResolvedRef != props.Ref {
                 <p class="subtitle">{ props.ResolvedRef }</p>
             }
         } else {
@@ -49,21 +50,62 @@ templ ViewPage(props ViewPageProps) {
         }
 
         if props.Content != nil {
-            <h2>State</h2>
-            @components.Card() {
-                <pre>{ toJson(props.Content) }</pre>
+            @layout.Row() {
+                @layout.Column() {
+                    <div style="width: 100%">
+                        <h2>State</h2>
+                        @components.Card() {
+                            <pre><code class="language-json">{ toJson(props.Content) }</code></pre>
+                        }
+                    </div>
+                }
+                @layout.Sidebar() {
+                    <h2>Children</h2>
+                    <ul class="list-style-circle">
+                        for _, ref := range props.ChildRefs {
+                            <li><a href={ fmt.Sprintf("/ref/%s", ref) }>{ normalizeRef(props.ResolvedRef,ref) }</a></li>
+                        }
+                    </ul>
+                }
             }
-        }
-        <hr/>
-
-        if len(props.ChildRefs) > 0 {
-            <h2>Children</h2>
+        } else {
+            <h2>Refs</h2>
             <ul class="list-style-circle">
                 for _, ref := range props.ChildRefs {
                     <li><a href={ fmt.Sprintf("/ref/%s", ref) }>{ ref }</a></li>
                 }
             </ul>
         }
+        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.11.1/styles/default.min.css">
+        <style>
+            .hljs, .hljs-subst {
+                background-color: var(--bg-surface);
+                color: var(--text-primary);
+            }
+
+            .hljs-punctuation {
+                color: var(--primary-color);
+            }
+
+            .hljs-attr {
+                color: var(--text-secondary);
+            }
+
+            .hljs-string {
+                color: var(--link-color);
+            }
+
+            .hljs-literal {
+                color: var(--link-color);
+            }
+        </style>
+        
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.11.1/highlight.min.js"></script>
+
+        <!-- and it's easy to individually load additional languages -->
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.11.1/languages/json.min.js"></script>
+
+        <script>hljs.highlightAll();</script>
 	}
 }
 

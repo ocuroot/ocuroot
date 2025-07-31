@@ -19,7 +19,7 @@ full_bin = "APP_ENV=dev APP_USER=air ./tmp/ocuroot"
 # Add additional arguments when running binary (bin/full_bin). Will run './tmp/ocuroot hello world'.
 args_bin = ["preview", "examples/one_package/release.ocu.star"]
 # Watch these filename extensions.
-include_ext = ["go", "tpl", "tmpl", "html", "star"]
+include_ext = ["go", "templ", "css", "js", "html", "star"]
 # Ignore these filename extensions or directories.
 exclude_dir = ["assets", "tmp", "vendor", "frontend/node_modules", "examples"]
 # Watch these directories if you specified.

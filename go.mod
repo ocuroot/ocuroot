@@ -18,7 +18,7 @@ require (
 	github.com/mark3labs/mcp-go v0.28.0
 	github.com/mattn/go-isatty v0.0.20
 	github.com/ocuroot/gittools v0.0.8
-	github.com/ocuroot/ui v0.0.2
+	github.com/ocuroot/ui v0.0.3
 	github.com/oklog/ulid/v2 v2.1.1
 	github.com/spf13/cobra v1.9.1
 	github.com/spf13/pflag v1.0.6

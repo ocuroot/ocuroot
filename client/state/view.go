@@ -114,6 +114,10 @@ func findAvailablePort(start, end int) (int, error) {
 	return 0, fmt.Errorf("no available ports found in range %d-%d", start, end)
 }
 
+func normalizeRef(parent string, ref string) string {
+	return strings.TrimPrefix(ref, parent+"/")
+}
+
 func collapseRefs(refs []string) []string {
 	var refSet = make(map[string]struct{})
 	for _, ref := range refs {
