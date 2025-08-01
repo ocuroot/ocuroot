@@ -7,6 +7,11 @@ import (
     "github.com/ocuroot/ui/components/navbar"
     "github.com/ocuroot/ui/js"
     "github.com/ocuroot/ui/components/layout"
+    "github.com/ocuroot/ocuroot/store/models"
+    "github.com/ocuroot/ocuroot/lib/release"
+    "github.com/ocuroot/ocuroot/ui/components/pipeline"
+    "github.com/ocuroot/ocuroot/sdk"
+    "github.com/ocuroot/ocuroot/ui/components/logs"
 )
 
 templ ViewBody(){
@@ -50,23 +55,22 @@ templ ViewPage(props ViewPageProps) {
         }
 
         if props.Content != nil {
-            @layout.Row() {
-                @layout.Column() {
-                    <div style="width: 100%">
-                        <h2>State</h2>
-                        @components.Card() {
-                            <pre><code class="language-json">{ toJson(props.Content) }</code></pre>
-                        }
-                    </div>
-                }
-                @layout.Sidebar() {
+            if len(props.ChildRefs) > 0 {
+                @layout.Row() {
+                    @layout.Column() {
+                        @StateContent(props.Content)
+                    }
+                    @layout.Sidebar() {
                     <h2>Children</h2>
-                    <ul class="list-style-circle">
-                        for _, ref := range props.ChildRefs {
-                            <li><a href={ fmt.Sprintf("/ref/%s", ref) }>{ normalizeRef(props.ResolvedRef,ref) }</a></li>
-                        }
-                    </ul>
+                        <ul class="list-style-circle">
+                            for _, ref := range props.ChildRefs {
+                                <li><a href={ fmt.Sprintf("/ref/%s", ref) }>{ normalizeRef(props.ResolvedRef,ref) }</a></li>
+                            }
+                        </ul>
+                    }
                 }
+            } else {
+                @StateContent(props.Content)
             }
         } else {
             <h2>Refs</h2>
@@ -107,6 +111,63 @@ templ ViewPage(props ViewPageProps) {
 
         <script>hljs.highlightAll();</script>
 	}
+}
+
+templ StateContent(content any) {
+    <div style="width: 100%">
+        switch c := content.(type) {
+            case release.ReleaseInfo:
+                <h2>Release</h2>
+                @ReleaseCard(c)
+            case models.Work:
+                <h2>Work</h2>
+                @components.Card() {
+                    <pre><code class="language-json">{ toJson(c) }</code></pre>
+                }
+            case models.Intent:
+                <h2>Intent</h2>
+                @components.Card() {
+                    <pre><code class="language-json">{ toJson(c) }</code></pre>
+                }
+            case []sdk.Log:
+                <h2>Logs</h2>
+                @Logs(c)
+            case release.FunctionState:
+                <h2>Function State</h2>
+                @components.Card() {
+                    <pre><code class="language-json">{ toJson(c) }</code></pre>
+                }
+            default:
+                <h2>State</h2>
+                @components.Card() {
+                    <pre><code class="language-json">{ toJson(content) }</code></pre>
+                }
+        }
+    </div>
+}
+
+templ ReleaseCard(release release.ReleaseInfo) {
+    <p class="subtitle">Commit: <a href="#">{ release.Commit }</a></p>
+    @components.Card() {
+        @pipeline.PreviewPipeline(pipeline.PreviewPipelineProps{
+			Summary: ReleasePreview(release),
+		})
+    }
+}
+
+func ReleasePreview(release release.ReleaseInfo) *models.ReleaseSummary {
+    summary := models.SDKPackageToReleaseSummary(
+		models.ReleaseID("preview"),
+		"preview",
+		release.Package,
+	)
+    return summary
+}
+
+templ Logs(l []sdk.Log) {
+    @components.Card() {
+        @logs.LogRenderSDK(l, "")
+    }
 }
 
 func toJson(content any) string {

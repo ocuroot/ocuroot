@@ -4,6 +4,7 @@ import (
 	"github.com/ocuroot/ocuroot/store/models"
 	"regexp"
 	"strings"
+	"github.com/ocuroot/ocuroot/sdk"
 )
 
 // ANSI color and style codes
@@ -150,4 +151,39 @@ templ LogRender(logs []models.Log, extraColumns ...string) {
 			</span>
 		</div>
 	}
+}
+
+// LogRender renders individual log entries with ANSI color support
+templ LogRenderSDK(logs []sdk.Log, extraColumns ...string) {
+	<div class="log-container">
+		for _, log := range logs {
+			<div class="log-entry" data-stream={ StreamName(log.Stream) }>
+				<span class="log-timestamp text-gray-500 pr-4 mr-4 border-r border-gray-300 text-right min-w-[120px] flex-shrink-0">{ log.Timestamp.Format("2006-01-02 15:04:05") }</span>
+				for _, extraColumn := range extraColumns {
+					<span class="log-extra-column text-gray-500 pr-4 mr-4 border-r border-gray-300 text-right min-w-[120px] flex-shrink-0">{ log.Attributes[extraColumn] }</span>
+				}
+				<span class="log-content">
+					@ColoredLogContent(log.Message)
+				</span>
+			</div>
+		}
+	</div>
+	<style>
+		.log-container {
+			overflow-x: scroll;
+			width: 100%;
+		}
+
+		.log-entry {
+			display: flex;
+			font-family: "Roboto Mono", "Fira Code", "Fira Mono", "Lucida Console", Monaco, monospace;
+			align-items: baseline;
+			white-space: nowrap;
+		}
+
+		.log-content {
+			flex-grow: 1;
+			margin-left: 1rem;
+		}
+	</style>
 }

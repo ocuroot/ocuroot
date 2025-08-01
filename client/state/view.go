@@ -9,6 +9,8 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/ocuroot/ocuroot/lib/release"
+	"github.com/ocuroot/ocuroot/refs"
 	"github.com/ocuroot/ocuroot/refs/refstore"
 	"github.com/ocuroot/ui/assets"
 	"github.com/ocuroot/ui/css"
@@ -63,11 +65,17 @@ func StartViewServer(ctx context.Context, store refstore.Store, port int) error 
 		}
 		childRefs = collapseRefs(childRefs)
 
-		var doc any
-		if err := store.Get(ctx, resolvedRef, &doc); err != nil {
+		finalRef, err := refs.Parse(resolvedRef)
+		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
+		doc, err := release.LoadRef(ctx, store, finalRef)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+
 		content := ViewPage(ViewPageProps{
 			Ref:         refStr,
 			ResolvedRef: resolvedRef,

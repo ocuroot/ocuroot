@@ -1,16 +1,29 @@
 package release
 
 import (
+	"context"
+
 	libglob "github.com/gobwas/glob"
 	"github.com/ocuroot/ocuroot/refs"
+	"github.com/ocuroot/ocuroot/refs/refstore"
+	"github.com/ocuroot/ocuroot/sdk"
 	"github.com/ocuroot/ocuroot/store/models"
 )
 
 var (
-	GlobRelease  = libglob.MustCompile("**/{@,+}*", '/')
-	GlobWork     = libglob.MustCompile("**/{@,+}*/{call,deploy}/*", '/')
-	GlobChain    = libglob.MustCompile("**/{@,+}*/{call,deploy}/*/*", '/')
-	GlobFunction = libglob.MustCompile("**/{@,+}*/{call,deploy}/*/*/functions/*", '/')
+	GlobPackage                 = libglob.MustCompile(`**/[^@+]+/**`, '/')
+	GlobRelease                 = libglob.MustCompile("**/{@,+}*", '/')
+	GlobWork                    = libglob.MustCompile("**/@*/{call,deploy}/*", '/')
+	GlobDeploymentState         = libglob.MustCompile("**/@*/deploy/*", '/')
+	GlobDeploymentIntent        = libglob.MustCompile("**/+*/deploy/*", '/')
+	GlobDeploymentStateOrIntent = libglob.MustCompile("**/{@,+}*/deploy/*", '/')
+	GlobCall                    = libglob.MustCompile("**/{@,+}*/call/*", '/')
+	GlobChain                   = libglob.MustCompile("**/{@,+}*/{call,deploy}/*/*", '/')
+	GlobFunction                = libglob.MustCompile("**/{@,+}*/{call,deploy}/*/*/functions/*", '/')
+	GlobLog                     = libglob.MustCompile("**/{@,+}*/{call,deploy}/*/*/logs", '/')
+	GlobCustomState             = libglob.MustCompile("**/@*/custom/*", '/')
+	GlobCustomIntent            = libglob.MustCompile("**/+*/custom/*", '/')
+	GlobCustomStateOrIntent     = libglob.MustCompile("**/{@,+}*/custom/*", '/')
 )
 
 func WorkRefFromChainRef(ref refs.Ref) (refs.Ref, error) {
@@ -39,4 +52,32 @@ func ChainRefFromFunctionRef(ref refs.Ref) refs.Ref {
 
 func FunctionRefFromChainRef(ref refs.Ref, fn *models.FunctionSummary) refs.Ref {
 	return ref.JoinSubPath("functions", string(fn.ID))
+}
+
+type Custom any
+
+// LoadRef loads the document at a reference and
+func LoadRef(ctx context.Context, store refstore.Store, ref refs.Ref) (any, error) {
+	switch {
+	case GlobRelease.Match(ref.String()):
+		return LoadRefOfType[ReleaseInfo](ctx, store, ref)
+	case GlobWork.Match(ref.String()):
+		return LoadRefOfType[models.Work](ctx, store, ref)
+	case GlobDeploymentIntent.Match(ref.String()):
+		return LoadRefOfType[models.Intent](ctx, store, ref)
+	case GlobLog.Match(ref.String()):
+		return LoadRefOfType[[]sdk.Log](ctx, store, ref)
+	case GlobFunction.Match(ref.String()):
+		return LoadRefOfType[FunctionState](ctx, store, ref)
+	default:
+		return LoadRefOfType[any](ctx, store, ref)
+	}
+}
+
+func LoadRefOfType[T any](ctx context.Context, store refstore.Store, ref refs.Ref) (T, error) {
+	var out T
+	if err := store.Get(ctx, ref.String(), &out); err != nil {
+		return out, err
+	}
+	return out, nil
 }

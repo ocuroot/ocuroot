@@ -58,7 +58,7 @@ templ PreviewPipeline(props PreviewPipelineProps) {
 		</style>
 		<div class="dot-grid"></div>
 		<!-- Phases section in horizontal layout -->
-		<div class="flex flex-row gap-5 overflow-x-auto p-8 custom-scrollbar min-h-[300px] relative">
+		<div class="flex flex-row gap-5 p-8 custom-scrollbar min-h-[300px] relative" style="width: 100%; overflow-x: auto;">
 			for i, phase := range props.Summary.Phases {
 				@PreviewRenderPhaseSummary(&phase)
 				<!-- Arrow between phases -->
