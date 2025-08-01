@@ -176,7 +176,7 @@ templ RefList(prefix string, refs RefMap) {
     <ul class="list-style-circle">
     for _, key := range refs.OrderedKeys() {
         <li>
-            <a href={ fmt.Sprintf("/ref/%s%s", prefix, key) }>{ strings.TrimPrefix(key, prefix) }</a>
+            <a href={ fmt.Sprintf("/ref/%s", key) }>{ strings.TrimPrefix(key, prefix) }</a>
             @RefList(key, refs[key])
         </li>
     }

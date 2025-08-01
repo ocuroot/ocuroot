@@ -680,9 +680,9 @@ func RefList(prefix string, refs RefMap) templ.Component {
 				return templ_7745c5c3_Err
 			}
 			var templ_7745c5c3_Var26 templ.SafeURL
-			templ_7745c5c3_Var26, templ_7745c5c3_Err = templ.JoinURLErrs(fmt.Sprintf("/ref/%s%s", prefix, key))
+			templ_7745c5c3_Var26, templ_7745c5c3_Err = templ.JoinURLErrs(fmt.Sprintf("/ref/%s", key))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `client/state/view.templ`, Line: 179, Col: 59}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `client/state/view.templ`, Line: 179, Col: 49}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var26))
 			if templ_7745c5c3_Err != nil {
@@ -695,7 +695,7 @@ func RefList(prefix string, refs RefMap) templ.Component {
 			var templ_7745c5c3_Var27 string
 			templ_7745c5c3_Var27, templ_7745c5c3_Err = templ.JoinStringErrs(strings.TrimPrefix(key, prefix))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `client/state/view.templ`, Line: 179, Col: 95}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `client/state/view.templ`, Line: 179, Col: 85}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var27))
 			if templ_7745c5c3_Err != nil {
