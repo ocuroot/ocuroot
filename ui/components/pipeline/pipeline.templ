@@ -256,6 +256,7 @@ templ RenderPhaseProgress(counts models.StatusCountMap) {
 // ChainHeader renders a simplified header for a function chain
 templ WorkHeader(work *models.WorkSummary, logURL LogURLFunction) {
 	@modalsForChain(work.Chain, logURL)
+	<a href={ fmt.Sprintf("/ref/%s", work.Chain.ID) }>
 	<div class="group relative mb-2">
 		<div class="border border-gray-200 rounded overflow-hidden">
 			<div class="bg-gray-50 hover:bg-gray-100 px-3 py-2 transition-all duration-150 ease-in-out cursor-pointer">
@@ -286,13 +287,14 @@ templ WorkHeader(work *models.WorkSummary, logURL LogURLFunction) {
 				</div>
 			</div>
 			<!-- Action drawer - slides down on hover -->
-			<div class="h-0 group-hover:h-10 overflow-hidden transition-all duration-150 ease-in-out">
-				<div class="bg-gray-200 px-3 py-2 flex items-center justify-end gap-1 border-t border-gray-200">
-					@ChainActionIcons(work.Chain)
-				</div>
-			</div>
+			// <div class="h-0 group-hover:h-10 overflow-hidden transition-all duration-150 ease-in-out">
+			// 	<div class="bg-gray-200 px-3 py-2 flex items-center justify-end gap-1 border-t border-gray-200">
+			// 		@ChainActionIcons(work.Chain)
+			// 	</div>
+			// </div>
 		</div>
 	</div>
+	</a>
 }
 
 // ChainActionIcons renders the action icons for a chain

@@ -56,8 +56,13 @@ func SDKPackageToReleaseSummary(
 				workRuns = globFilter(childRefs, fmt.Sprintf("**/-/**/@*/call/%s/*", chainName))
 			}
 
+			id := FunctionChainID("")
+			if len(workRuns) > 0 {
+				id = FunctionChainID(workRuns[0])
+			}
+
 			ws.Chain = &FunctionChainSummary{
-				ID:   NewID[FunctionChainID](),
+				ID:   id,
 				Name: chainName,
 				Functions: []*FunctionSummary{
 					{
