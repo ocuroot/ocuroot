@@ -388,7 +388,7 @@ func LogRenderSDK(logs []sdk.Log, extraColumns ...string) templ.Component {
 				return templ_7745c5c3_Err
 			}
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 19, "</div><style>\n\t\t.log-container {\n\t\t\toverflow-x: scroll;\n\t\t\twidth: 100%;\n\t\t}\n\n\t\t.log-entry {\n\t\t\tdisplay: flex;\n\t\t\tfont-family: \"Roboto Mono\", \"Fira Code\", \"Fira Mono\", \"Lucida Console\", Monaco, monospace;\n\t\t\talign-items: baseline;\n\t\t\twhite-space: nowrap;\n\t\t}\n\n\t\t.log-timestamp {\n\t\t\t\n\t\t}\n\n\t\t.log-extra-column {\n\t\t\t\n\t\t}\n\n\t\t.log-content {\n\t\t\tflex-grow: 1;\n\t\t\tmargin-left: 1rem;\n\t\t}\n\t</style>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 19, "</div><style>\n\t\t.log-container {\n\t\t\toverflow-x: scroll;\n\t\t\twidth: 100%;\n\t\t}\n\n\t\t.log-entry {\n\t\t\tdisplay: flex;\n\t\t\tfont-family: \"Roboto Mono\", \"Fira Code\", \"Fira Mono\", \"Lucida Console\", Monaco, monospace;\n\t\t\talign-items: baseline;\n\t\t\twhite-space: nowrap;\n\t\t}\n\n\t\t.log-content {\n\t\t\tflex-grow: 1;\n\t\t\tmargin-left: 1rem;\n\t\t}\n\t</style>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

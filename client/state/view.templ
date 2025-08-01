@@ -12,6 +12,7 @@ import (
     "github.com/ocuroot/ocuroot/ui/components/pipeline"
     "github.com/ocuroot/ocuroot/sdk"
     "github.com/ocuroot/ocuroot/ui/components/logs"
+    "strings"
 )
 
 templ ViewBody(){
@@ -58,27 +59,19 @@ templ ViewPage(props ViewPageProps) {
             if len(props.ChildRefs) > 0 {
                 @layout.Row() {
                     @layout.Column() {
-                        @StateContent(props.Content)
+                        @StateContent(props)
                     }
                     @layout.Sidebar() {
                     <h2>Children</h2>
-                        <ul class="list-style-circle">
-                            for _, ref := range props.ChildRefs {
-                                <li><a href={ fmt.Sprintf("/ref/%s", ref) }>{ normalizeRef(props.ResolvedRef,ref) }</a></li>
-                            }
-                        </ul>
+                        @RefList(props.ResolvedRef, BuildRefTree(props.ChildRefs))
                     }
                 }
             } else {
-                @StateContent(props.Content)
+                @StateContent(props)
             }
         } else {
             <h2>Refs</h2>
-            <ul class="list-style-circle">
-                for _, ref := range props.ChildRefs {
-                    <li><a href={ fmt.Sprintf("/ref/%s", ref) }>{ ref }</a></li>
-                }
-            </ul>
+            @RefList(props.ResolvedRef, BuildRefTree(props.ChildRefs))
         }
         <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.11.1/styles/default.min.css">
         <style>
@@ -113,12 +106,12 @@ templ ViewPage(props ViewPageProps) {
 	}
 }
 
-templ StateContent(content any) {
+templ StateContent(props ViewPageProps) {
     <div style="width: 100%">
-        switch c := content.(type) {
+        switch c := props.Content.(type) {
             case release.ReleaseInfo:
                 <h2>Release</h2>
-                @ReleaseCard(c)
+                @ReleaseCard(props)
             case models.Work:
                 <h2>Work</h2>
                 @components.Card() {
@@ -140,26 +133,27 @@ templ StateContent(content any) {
             default:
                 <h2>State</h2>
                 @components.Card() {
-                    <pre><code class="language-json">{ toJson(content) }</code></pre>
+                    <pre><code class="language-json">{ toJson(props.Content) }</code></pre>
                 }
         }
     </div>
 }
 
-templ ReleaseCard(release release.ReleaseInfo) {
-    <p class="subtitle">Commit: <a href="#">{ release.Commit }</a></p>
+templ ReleaseCard(props ViewPageProps) {
+    <p class="subtitle">Commit: <a href="#">{ props.Content.(release.ReleaseInfo).Commit }</a></p>
     @components.Card() {
-        @pipeline.PreviewPipeline(pipeline.PreviewPipelineProps{
-			Summary: ReleasePreview(release),
+        @pipeline.Pipeline(pipeline.PipelineProps{
+			Summary: ReleasePreview(props),
 		})
     }
 }
 
-func ReleasePreview(release release.ReleaseInfo) *models.ReleaseSummary {
+func ReleasePreview(props ViewPageProps) *models.ReleaseSummary {
     summary := models.SDKPackageToReleaseSummary(
-		models.ReleaseID("preview"),
+		models.ReleaseID(props.Ref),
 		"preview",
-		release.Package,
+		props.Content.(release.ReleaseInfo).Package,
+		props.ChildRefs...,
 	)
     return summary
 }
@@ -176,4 +170,15 @@ func toJson(content any) string {
 		return ""
 	}
 	return string(j)
+}
+
+templ RefList(prefix string, refs RefMap) {
+    <ul class="list-style-circle">
+    for _, key := range refs.OrderedKeys() {
+        <li>
+            <a href={ fmt.Sprintf("/ref/%s%s", prefix, key) }>{ strings.TrimPrefix(key, prefix) }</a>
+            @RefList(key, refs[key])
+        </li>
+    }
+    </ul>
 }

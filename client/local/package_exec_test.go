@@ -6,7 +6,6 @@ import (
 
 	"github.com/ocuroot/ocuroot/refs"
 	"github.com/ocuroot/ocuroot/sdk/starlarkerrors"
-	"github.com/ocuroot/ocuroot/store/models"
 )
 
 func TestPackageExec(t *testing.T) {
@@ -16,7 +15,7 @@ func TestPackageExec(t *testing.T) {
 		},
 	)
 
-	config, err := ExecutePackage(
+	_, err := ExecutePackage(
 		context.Background(),
 		"../../tests/minimal/",
 		refs.Ref{
@@ -27,7 +26,4 @@ func TestPackageExec(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to execute package: %v", starlarkerrors.Render(err))
 	}
-
-	releaseSummary := models.SDKPackageToReleaseSummary(models.ReleaseID("test"), "commit1", config.Package)
-	printJSON(releaseSummary)
 }

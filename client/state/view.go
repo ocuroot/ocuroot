@@ -40,7 +40,6 @@ func StartViewServer(ctx context.Context, store refstore.Store, port int) error 
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
-		childRefs = collapseRefs(childRefs)
 
 		content := ViewPage(ViewPageProps{
 			Ref:         "",
@@ -63,7 +62,6 @@ func StartViewServer(ctx context.Context, store refstore.Store, port int) error 
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
-		childRefs = collapseRefs(childRefs)
 
 		finalRef, err := refs.Parse(resolvedRef)
 		if err != nil {
@@ -120,6 +118,43 @@ func findAvailablePort(start, end int) (int, error) {
 		}
 	}
 	return 0, fmt.Errorf("no available ports found in range %d-%d", start, end)
+}
+
+type RefMap map[string]RefMap
+
+func (rm RefMap) OrderedKeys() []string {
+	var keys []string
+	for k := range rm {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	return keys
+}
+
+func (rm RefMap) AddAll(refs []string) {
+	// Sort by length so prefixes get into the tree first
+	sort.Slice(refs, func(i, j int) bool {
+		return len(refs[i]) < len(refs[j])
+	})
+	for _, ref := range refs {
+		rm.AddRef(ref)
+	}
+}
+
+func (rm RefMap) AddRef(ref string) {
+	for cr := path.Dir(ref); cr != "." && cr != ""; cr = path.Dir(cr) {
+		if t, exists := rm[cr]; exists {
+			t.AddRef(ref)
+			return
+		}
+	}
+	rm[ref] = RefMap{}
+}
+
+func BuildRefTree(refs []string) RefMap {
+	var tree = make(RefMap)
+	tree.AddAll(refs)
+	return tree
 }
 
 func normalizeRef(parent string, ref string) string {
