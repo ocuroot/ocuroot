@@ -709,8 +709,8 @@ func ReleaseCard(props ViewPageProps) templ.Component {
 	})
 }
 
-func ReleasePreview(props ViewPageProps) *models.ReleaseSummary {
-	summary := models.SDKPackageToReleaseSummary(
+func ReleasePreview(props ViewPageProps) *pipeline.ReleaseSummary {
+	summary := pipeline.SDKPackageToReleaseSummary(
 		models.ReleaseID(props.Ref),
 		"preview",
 		props.Content.(release.ReleaseInfo).Package,

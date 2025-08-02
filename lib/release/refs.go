@@ -50,7 +50,7 @@ func ChainRefFromFunctionRef(ref refs.Ref) refs.Ref {
 	return out
 }
 
-func FunctionRefFromChainRef(ref refs.Ref, fn *models.FunctionSummary) refs.Ref {
+func FunctionRefFromChainRef(ref refs.Ref, fn *models.Function) refs.Ref {
 	return ref.JoinSubPath("functions", string(fn.ID))
 }
 

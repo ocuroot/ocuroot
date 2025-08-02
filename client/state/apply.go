@@ -13,6 +13,7 @@ import (
 	"github.com/ocuroot/ocuroot/refs/refstore"
 	"github.com/ocuroot/ocuroot/sdk"
 	"github.com/ocuroot/ocuroot/store/models"
+	"github.com/ocuroot/ocuroot/ui/components/pipeline"
 )
 
 func ApplyIntent(ctx context.Context, tc release.TrackerConfig) error {
@@ -91,7 +92,7 @@ func applyDeployIntent(ctx context.Context, tc release.TrackerConfig) error {
 		return fmt.Errorf("failed to get intent: %w", err)
 	}
 
-	var releaseSummary models.ReleaseSummary
+	var releaseSummary pipeline.ReleaseSummary
 	if err := store.Get(ctx, intentContent.Release.String(), &releaseSummary); err != nil {
 		return fmt.Errorf("failed to get release summary: %w", err)
 	}
@@ -178,11 +179,11 @@ func applyDeployIntent(ctx context.Context, tc release.TrackerConfig) error {
 	err = rs.InitializeFunction(ctx, models.Work{
 		Release:    intentContent.Release,
 		Entrypoint: chainRef,
-	}, chainRef, &models.FunctionSummary{
+	}, chainRef, &models.Function{
 		ID:     "1",
 		Fn:     deployment.Up,
 		Inputs: intentContent.Inputs,
-		Status: models.SummarizedStatusPending,
+		Status: models.StatusPending,
 	})
 	if err != nil {
 		return fmt.Errorf("failed to initialize function: %w", err)

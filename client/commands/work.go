@@ -463,10 +463,10 @@ func reconcileAllDeploymentsAtCommit(ctx context.Context, store refstore.Store, 
 			log.Error("Failed to parse path", "ref", ref, "error", err)
 			continue
 		}
-		err = librelease.InitializeFunctionChain(ctx, store, newFunctionChainRef, &models.FunctionSummary{
+		err = librelease.InitializeFunctionChain(ctx, store, newFunctionChainRef, &models.Function{
 			ID:     "1",
 			Fn:     entryFunctionState.Current.Fn,
-			Status: models.SummarizedStatusPending,
+			Status: models.StatusPending,
 			Inputs: inputs,
 		})
 		if err != nil {

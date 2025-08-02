@@ -9,7 +9,7 @@ import (
 )
 
 type PreviewPipelineProps struct {
-	Summary *models.ReleaseSummary
+	Summary *ReleaseSummary
 }
 
 templ PreviewPipeline(props PreviewPipelineProps) {
@@ -82,7 +82,7 @@ templ PreviewPipeline(props PreviewPipelineProps) {
 
 // ternary is a helper function to simulate a ternary operator
 // modalsForChain renders the modals for a chain's functions
-templ previewModalsForChain(chain *models.FunctionChainSummary) {
+templ previewModalsForChain(chain *FunctionChainSummary) {
 	if len(chain.Functions) > 0 {
 		// First function's inputs
 		@components.Modal(fmt.Sprintf("chain-inputs-%s", chain.ID), "Chain Inputs") {
@@ -93,7 +93,7 @@ templ previewModalsForChain(chain *models.FunctionChainSummary) {
 			}
 		}
 		// Last function's outputs
-		if chain.Status() == models.SummarizedStatusComplete {
+		if chain.Status() == models.StatusComplete {
 			@components.Modal(fmt.Sprintf("chain-outputs-%s", chain.ID), "Chain Outputs") {
 				if len(chain.Functions[len(chain.Functions)-1].Outputs) > 0 {
 					@keyvalue.FromVarMap(chain.Functions[len(chain.Functions)-1].Outputs)
@@ -106,7 +106,7 @@ templ previewModalsForChain(chain *models.FunctionChainSummary) {
 }
 
 // ChainHeader renders a simplified header for a function chain
-templ PreviewWorkHeader(work *models.WorkSummary) {
+templ PreviewWorkHeader(work *WorkSummary) {
 	@previewModalsForChain(work.Chain)
 	<div class="group relative mb-2">
 		<div class="border border-gray-200 rounded overflow-hidden">
@@ -148,7 +148,7 @@ templ PreviewWorkHeader(work *models.WorkSummary) {
 }
 
 // PreviewChainActionIcons renders the action icons for a chain
-templ PreviewChainActionIcons(chain *models.FunctionChainSummary) {
+templ PreviewChainActionIcons(chain *FunctionChainSummary) {
 	if len(chain.Functions) > 0 {
 		<button
 			class="p-1 hover:bg-gray-300 rounded"
@@ -164,7 +164,7 @@ templ PreviewChainActionIcons(chain *models.FunctionChainSummary) {
 }
 
 // PreviewRenderPhaseSummary renders a phase summary with its chains
-templ PreviewRenderPhaseSummary(phase *models.PhaseSummary) {
+templ PreviewRenderPhaseSummary(phase *PhaseSummary) {
 	<div class="pipeline-card border rounded p-2 bg-white relative">
 		<div class="flex justify-between items-center mb-2">
 			<h3 class="text-sm font-semibold flex items-center">{ phase.Name }</h3>

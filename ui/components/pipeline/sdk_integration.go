@@ -1,4 +1,4 @@
-package models
+package pipeline
 
 import (
 	"fmt"
@@ -7,10 +7,11 @@ import (
 
 	libglob "github.com/gobwas/glob"
 	"github.com/ocuroot/ocuroot/sdk"
+	"github.com/ocuroot/ocuroot/store/models"
 )
 
 func SDKPackageToReleaseSummary(
-	releaseID ReleaseID,
+	releaseID models.ReleaseID,
 	commit string,
 	pkg *sdk.Package,
 	childRefs ...string,
@@ -22,7 +23,7 @@ func SDKPackageToReleaseSummary(
 
 	for _, phase := range pkg.Phases {
 		p := PhaseSummary{
-			ID:   NewID[PhaseID](),
+			ID:   models.NewID[models.PhaseID](),
 			Name: string(phase.Name),
 		}
 
@@ -39,7 +40,7 @@ func SDKPackageToReleaseSummary(
 				function = work.Deployment.Up
 				inputs = work.Deployment.Inputs
 				ws.Environment = &EnvironmentSummary{
-					ID:   NewID[EnvironmentID](),
+					ID:   models.NewID[models.EnvironmentID](),
 					Name: string(work.Deployment.Environment),
 				}
 
@@ -56,20 +57,20 @@ func SDKPackageToReleaseSummary(
 				workRuns = globFilter(childRefs, fmt.Sprintf("**/-/**/@*/call/%s/*", chainName))
 			}
 
-			id := FunctionChainID("")
+			id := models.NewID[models.FunctionChainID]()
 			if len(workRuns) > 0 {
-				id = FunctionChainID(workRuns[0])
+				id = models.FunctionChainID(workRuns[0])
 			}
 
 			ws.Chain = &FunctionChainSummary{
 				ID:   id,
 				Name: chainName,
-				Functions: []*FunctionSummary{
+				Functions: []*models.Function{
 					{
-						ID:     NewID[FunctionID](),
+						ID:     models.NewID[models.FunctionID](),
 						Fn:     function,
 						Inputs: inputs,
-						Status: SummarizedStatusPending,
+						Status: models.StatusPending,
 					},
 				},
 				Graph: sdkGraphToHandoffGraph(pkg.Functions[function.String()].Graph),
@@ -81,18 +82,18 @@ func SDKPackageToReleaseSummary(
 					functions := globFilter(childRefs, fmt.Sprintf("%s/functions/*", run))
 					functions = earliestFirst(functions)
 					for index, fn := range functions {
-						var status SummarizedStatus = SummarizedStatusPending
+						var status models.Status = models.StatusPending
 						statusRefs := globFilter(childRefs, fmt.Sprintf("%s/status/*", fn))
 						if len(statusRefs) > 0 {
-							status = SummarizedStatus(path.Base(statusRefs[0]))
+							status = models.Status(path.Base(statusRefs[0]))
 						}
-						var fn FunctionSummary
+						var fn *models.Function
 						if index == 0 {
-							fn = *ws.Chain.Functions[0]
+							fn = ws.Chain.Functions[0]
 							ws.Chain.Functions = nil
 						}
 						fn.Status = status
-						ws.Chain.Functions = append(ws.Chain.Functions, &fn)
+						ws.Chain.Functions = append(ws.Chain.Functions, fn)
 					}
 				}
 			}

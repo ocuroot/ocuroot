@@ -14,6 +14,7 @@ import (
 	"github.com/ocuroot/ocuroot/refs/refstore"
 	"github.com/ocuroot/ocuroot/sdk"
 	"github.com/ocuroot/ocuroot/store/models"
+	"github.com/ocuroot/ocuroot/ui/components/pipeline"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
 )
@@ -49,41 +50,41 @@ type ReleaseTracker struct {
 	ReleaseRef refs.Ref
 }
 
-func (r *ReleaseTracker) ReleaseStatus(ctx context.Context) (models.SummarizedStatus, error) {
+func (r *ReleaseTracker) ReleaseStatus(ctx context.Context) (models.Status, error) {
 	statuses, err := r.stateStore.Store.Match(ctx, r.stateStore.ReleaseRef.String()+"/**/status/*")
 	if err != nil {
 		return "", fmt.Errorf("failed to match release status: %w", err)
 	}
 
-	var allStatuses []models.SummarizedStatus
+	var allStatuses []models.Status
 
 	for _, statusRef := range statuses {
-		status := models.SummarizedStatus(path.Base(statusRef))
+		status := models.Status(path.Base(statusRef))
 		allStatuses = append(allStatuses, status)
 	}
 
 	isPending := true
 	for _, status := range allStatuses {
-		if status != models.SummarizedStatusPending {
+		if status != models.StatusPending {
 			isPending = false
 			break
 		}
 	}
 
 	if isPending {
-		return models.SummarizedStatusPending, nil
+		return models.StatusPending, nil
 	}
 
-	var out models.SummarizedStatus = models.SummarizedStatusComplete
+	var out models.Status = models.StatusComplete
 	for _, status := range allStatuses {
-		if status == models.SummarizedStatusFailed {
-			return models.SummarizedStatusFailed, nil
+		if status == models.StatusFailed {
+			return models.StatusFailed, nil
 		}
-		if status == models.SummarizedStatusRunning {
-			return models.SummarizedStatusRunning, nil
+		if status == models.StatusRunning {
+			return models.StatusRunning, nil
 		}
-		if status == models.SummarizedStatusCancelled {
-			return models.SummarizedStatusCancelled, nil
+		if status == models.StatusCancelled {
+			return models.StatusCancelled, nil
 		}
 	}
 
@@ -147,13 +148,13 @@ func (r *ReleaseTracker) InitRelease(ctx context.Context, commit string) error {
 	return nil
 }
 
-func (r *ReleaseTracker) GetReleaseSummary() (*models.ReleaseSummary, error) {
+func (r *ReleaseTracker) GetReleaseSummary() (*pipeline.ReleaseSummary, error) {
 	return r.stateStore.GetReleaseState(context.Background())
 }
 
 // UnfilteredNextFunctions returns all functions that are pending execution,
 // regardless of whether or not their inputs are available.
-func (r *ReleaseTracker) UnfilteredNextFunctions(ctx context.Context) (map[refs.Ref]*models.FunctionSummary, error) {
+func (r *ReleaseTracker) UnfilteredNextFunctions(ctx context.Context) (map[refs.Ref]*models.Function, error) {
 	nf, err := r.stateStore.PendingFunctions(ctx)
 	if err != nil {
 		return nil, err
@@ -164,7 +165,7 @@ func (r *ReleaseTracker) UnfilteredNextFunctions(ctx context.Context) (map[refs.
 
 // FilteredNextFunctions returns all functions that are pending execution,
 // but only those that have all their inputs available.
-func (r *ReleaseTracker) FilteredNextFunctions(ctx context.Context) (map[refs.Ref]*models.FunctionSummary, error) {
+func (r *ReleaseTracker) FilteredNextFunctions(ctx context.Context) (map[refs.Ref]*models.Function, error) {
 	if err := r.stateStore.Store.StartTransaction(ctx); err != nil {
 		return nil, err
 	}
@@ -181,7 +182,7 @@ func (r *ReleaseTracker) FilteredNextFunctions(ctx context.Context) (map[refs.Re
 
 	log.Info("Filtering pending functions", "functions", nf)
 
-	out := make(map[refs.Ref]*models.FunctionSummary)
+	out := make(map[refs.Ref]*models.Function)
 
 	for fr, fn := range nf {
 		missing, err := r.PopulateInputs(ctx, fr, fn)
@@ -254,7 +255,7 @@ func (r *ReleaseTracker) RunToPause(ctx context.Context, logger Logger) error {
 			if err != nil {
 				return fmt.Errorf("failed to get function chain status: %w", err)
 			}
-			if chainStatus != models.SummarizedStatusRunning && chainStatus != models.SummarizedStatusPending {
+			if chainStatus != models.StatusRunning && chainStatus != models.StatusPending {
 				chainSpan[chainName].End()
 			}
 		}
@@ -273,7 +274,7 @@ func (r *ReleaseTracker) RunToPause(ctx context.Context, logger Logger) error {
 	return nil
 }
 
-func (r *ReleaseTracker) PopulateInputs(ctx context.Context, fnRef refs.Ref, fn *models.FunctionSummary) ([]sdk.InputDescriptor, error) {
+func (r *ReleaseTracker) PopulateInputs(ctx context.Context, fnRef refs.Ref, fn *models.Function) ([]sdk.InputDescriptor, error) {
 	if fn.Inputs == nil {
 		fn.Inputs = make(map[string]sdk.InputDescriptor)
 	}
@@ -339,7 +340,7 @@ func PopulateInputs(ctx context.Context, store refstore.Store, inputs map[string
 	return out, nil
 }
 
-func (r *ReleaseTracker) updateIntent(ctx context.Context, fnRef refs.Ref, fn *models.FunctionSummary) error {
+func (r *ReleaseTracker) updateIntent(ctx context.Context, fnRef refs.Ref, fn *models.Function) error {
 	// We only want intents for deployments
 	if fnRef.SubPathType != refs.SubPathTypeDeploy {
 		return nil
@@ -380,7 +381,7 @@ func (r *ReleaseTracker) Run(
 	ctx context.Context,
 	logger sdk.Logger,
 	fnRef refs.Ref,
-	fn *models.FunctionSummary,
+	fn *models.Function,
 ) (sdk.WorkResult, error) {
 	log.Info("Run", "function", fnRef.String())
 	action := fmt.Sprintf("FUNCTION %s", fnRef.String())
@@ -399,7 +400,7 @@ func (r *ReleaseTracker) Run(
 		return sdk.WorkResult{}, fmt.Errorf("failed to start transaction: %w", err)
 	}
 
-	fn.Status = models.SummarizedStatusRunning
+	fn.Status = models.StatusRunning
 	if err := UpdateFunctionStateUnderRef(ctx, r.stateStore.Store, fnRef, fn); err != nil {
 		return sdk.WorkResult{}, fmt.Errorf("failed to update function state: %w", err)
 	}
@@ -448,11 +449,11 @@ func (r *ReleaseTracker) Run(
 		return sdk.WorkResult{}, fmt.Errorf("failed to run function %s: %w", fn.Fn, err)
 	}
 
-	fn.Status = models.SummarizedStatusComplete
+	fn.Status = models.StatusComplete
 
 	if result.Err != nil {
 		log.Error("function failed", "function", fn.Fn.Name, "error", result.Err)
-		fn.Status = models.SummarizedStatusFailed
+		fn.Status = models.StatusFailed
 
 		span.SetAttributes(
 			attribute.String(AttributeCICDPipelineTaskRunResult, "failure"),
@@ -476,7 +477,7 @@ func (r *ReleaseTracker) Run(
 		return result, fmt.Errorf("failed to save work state: %w", err)
 	}
 
-	var nextFunction *models.FunctionSummary
+	var nextFunction *models.Function
 
 	if result.Next != nil {
 		idNum, err := strconv.Atoi(string(fn.ID))
@@ -485,10 +486,10 @@ func (r *ReleaseTracker) Run(
 		}
 		idNum++
 
-		nextFunction = &models.FunctionSummary{
+		nextFunction = &models.Function{
 			ID:     models.FunctionID(fmt.Sprint(idNum)),
 			Fn:     result.Next.Fn,
-			Status: models.SummarizedStatusPending,
+			Status: models.StatusPending,
 			Inputs: result.Next.Inputs,
 		}
 
@@ -507,14 +508,14 @@ func (r *ReleaseTracker) Run(
 	return result, nil
 }
 
-func ResultToStatus(result sdk.WorkResult) models.SummarizedStatus {
+func ResultToStatus(result sdk.WorkResult) models.Status {
 	if result.Next != nil {
-		return models.SummarizedStatusRunning
+		return models.StatusRunning
 	}
 	if result.Err != nil {
-		return models.SummarizedStatusFailed
+		return models.StatusFailed
 	}
-	return models.SummarizedStatusComplete
+	return models.StatusComplete
 }
 
 func (r *ReleaseTracker) updateLogs(ctx context.Context, chainRef refs.Ref, logs []sdk.Log) error {
@@ -567,7 +568,7 @@ func (r *ReleaseTracker) saveWorkState(ctx context.Context, chainRef refs.Ref, r
 	}
 
 	// If the work completed successfully, record it as the most recent work ref
-	if status != models.SummarizedStatusComplete {
+	if status != models.StatusComplete {
 		return nil
 	}
 

@@ -11,10 +11,10 @@ import (
 	"github.com/ocuroot/ocuroot/store/models"
 )
 
-type LogURLFunction func(fc *models.FunctionChainSummary) string
+type LogURLFunction func(fc *FunctionChainSummary) string
 
 type PipelineProps struct {
-	Summary *models.ReleaseSummary
+	Summary *ReleaseSummary
 	LogURL  LogURLFunction
 }
 
@@ -132,26 +132,6 @@ func getStatusClass(status models.Status) string {
 	}
 }
 
-// getSummarizedStatusClass returns the CSS class for a given summarized status
-func getSummarizedStatusClass(status models.SummarizedStatus) string {
-	switch status {
-	case models.SummarizedStatusPending:
-		return "px-2 py-1 text-xs font-medium rounded-full bg-gray-100 text-gray-600"
-	case models.SummarizedStatusReady:
-		return "px-2 py-1 text-xs font-medium rounded-full bg-yellow-100 text-yellow-600"
-	case models.SummarizedStatusRunning:
-		return "px-2 py-1 text-xs font-medium rounded-full bg-blue-100 text-blue-600"
-	case models.SummarizedStatusComplete:
-		return "px-2 py-1 text-xs font-medium rounded-full bg-green-100 text-green-600"
-	case models.SummarizedStatusFailed:
-		return "px-2 py-1 text-xs font-medium rounded-full bg-red-100 text-red-600"
-	case models.SummarizedStatusCancelled:
-		return "px-2 py-1 text-xs font-medium rounded-full bg-gray-100 text-gray-600"
-	default:
-		return "px-2 py-1 text-xs font-medium rounded-full bg-gray-100 text-gray-600"
-	}
-}
-
 // getFunctionBorderClass returns the border class for a function based on its status
 func getFunctionBorderClass(status models.Status) string {
 	switch status {
@@ -168,28 +148,8 @@ func getFunctionBorderClass(status models.Status) string {
 	}
 }
 
-// statusFromSummarized converts a SummarizedStatus to a Status
-func statusFromSummarized(summarized models.SummarizedStatus) models.Status {
-	switch summarized {
-	case models.SummarizedStatusPending:
-		return models.StatusPending
-	case models.SummarizedStatusReady:
-		return models.StatusPending
-	case models.SummarizedStatusRunning:
-		return models.StatusRunning
-	case models.SummarizedStatusComplete:
-		return models.StatusComplete
-	case models.SummarizedStatusFailed:
-		return models.StatusFailed
-	case models.SummarizedStatusCancelled:
-		return models.StatusCancelled
-	default:
-		return models.StatusPending
-	}
-}
-
 // modalsForChain renders the modals for a chain's functions
-templ modalsForChain(chain *models.FunctionChainSummary, logURL LogURLFunction) {
+templ modalsForChain(chain *FunctionChainSummary, logURL LogURLFunction) {
 	@components.Modal(fmt.Sprintf("modal-chain-logs-%s", chain.ID), fmt.Sprintf("Chain Logs: %s", chain.Name), "full") {
 		if logURL != nil {
 			@logs.LogView(logURL(chain), fmt.Sprintf("chain-logs-%s", chain.ID))
@@ -207,7 +167,7 @@ templ modalsForChain(chain *models.FunctionChainSummary, logURL LogURLFunction) 
 			}
 		}
 		// Last function's outputs
-		if chain.Status() == models.SummarizedStatusComplete {
+		if chain.Status() == models.StatusComplete {
 			@components.Modal(fmt.Sprintf("chain-outputs-%s", chain.ID), "Chain Outputs") {
 				if len(chain.Functions[len(chain.Functions)-1].Outputs) > 0 {
 					@keyvalue.FromVarMap(chain.Functions[len(chain.Functions)-1].Outputs)
@@ -219,16 +179,16 @@ templ modalsForChain(chain *models.FunctionChainSummary, logURL LogURLFunction) 
 	}
 }
 
-// MapSummarizedStatusToProgress maps a summarized status to a progress indicator
-templ MapSummarizedStatusToProgress(status models.SummarizedStatus) {
+// MapStatusToProgress maps a status to a progress indicator
+templ MapStatusToProgress(status models.Status) {
 	switch status {
-		case models.SummarizedStatusPending:
+		case models.StatusPending:
 			@progress.SmallPending()
-		case models.SummarizedStatusRunning:
-			@progress.SmallRunning(0.5)
-		case models.SummarizedStatusComplete:
+		case models.StatusRunning:
+			@progress.SmallRunning(0.5)`
+		case models.StatusComplete:
 			@progress.SmallComplete()
-		case models.SummarizedStatusFailed:
+		case models.StatusFailed:
 			@progress.SmallFailed()
 		default:
 			@progress.SmallPending()
@@ -236,15 +196,15 @@ templ MapSummarizedStatusToProgress(status models.SummarizedStatus) {
 }
 
 // RenderPhaseProgress renders a progress indicator for a phase based on its status counts
-templ RenderPhaseProgress(counts models.StatusCountMap) {
+templ RenderPhaseProgress(counts StatusCountMap) {
 	// Determine overall status based on counts
-	if counts[models.SummarizedStatusFailed] > 0 {
+	if counts[models.StatusFailed] > 0 {
 		// If any failed, show failed with completion percentage
 		@progress.Progress(counts.CompletionFraction(), progress.StatusFailed)
-	} else if counts[models.SummarizedStatusRunning] > 0 {
+	} else if counts[models.StatusRunning] > 0 {
 		// If any running, show running with completion percentage
 		@progress.Progress(counts.CompletionFraction(), progress.StatusRunning)
-	} else if counts.Total() == counts[models.SummarizedStatusComplete] && counts.Total() > 0 {
+	} else if counts.Total() == counts[models.StatusComplete] && counts.Total() > 0 {
 		// If all complete, show complete
 		@progress.Progress(1.0, progress.StatusComplete)
 	} else {
@@ -254,7 +214,7 @@ templ RenderPhaseProgress(counts models.StatusCountMap) {
 }
 
 // ChainHeader renders a simplified header for a function chain
-templ WorkHeader(work *models.WorkSummary, logURL LogURLFunction) {
+templ WorkHeader(work *WorkSummary, logURL LogURLFunction) {
 	@modalsForChain(work.Chain, logURL)
 	<a href={ fmt.Sprintf("/ref/%s", work.Chain.ID) }>
 	<div class="group relative mb-2">
@@ -282,7 +242,7 @@ templ WorkHeader(work *models.WorkSummary, logURL LogURLFunction) {
 						<div class="text-xs text-gray-500">{ work.Chain.Name }</div>
 					</div>
 					<div class="flex items-center gap-2">
-						@MapSummarizedStatusToProgress(work.Chain.Status())
+						@MapStatusToProgress(work.Chain.Status())
 					</div>
 				</div>
 			</div>
@@ -298,7 +258,7 @@ templ WorkHeader(work *models.WorkSummary, logURL LogURLFunction) {
 }
 
 // ChainActionIcons renders the action icons for a chain
-templ ChainActionIcons(chain *models.FunctionChainSummary) {
+templ ChainActionIcons(chain *FunctionChainSummary) {
 	if len(chain.Functions) > 0 {
 		<button
 			class="p-1 hover:bg-gray-300 rounded"
@@ -307,7 +267,7 @@ templ ChainActionIcons(chain *models.FunctionChainSummary) {
 		>
 			@icons.Inputs()
 		</button>
-		if chain.Status() == models.SummarizedStatusComplete {
+		if chain.Status() == models.StatusComplete {
 			<button
 				class="p-1 hover:bg-gray-300 rounded"
 				title="View outputs"
@@ -316,7 +276,7 @@ templ ChainActionIcons(chain *models.FunctionChainSummary) {
 				@icons.Outputs()
 			</button>
 		}
-		if chain.Status() != models.SummarizedStatusComplete {
+		if chain.Status() != models.StatusComplete {
 			<button
 				class="p-1 opacity-50 cursor-not-allowed rounded"
 				title="Outputs not available until chain is complete"
@@ -338,12 +298,12 @@ templ ChainActionIcons(chain *models.FunctionChainSummary) {
 }
 
 // RenderPhaseSummary renders a phase summary with its chains
-templ RenderPhaseSummary(phase *models.PhaseSummary, logURL LogURLFunction) {
+templ RenderPhaseSummary(phase *PhaseSummary, logURL LogURLFunction) {
 	<div class="pipeline-card border rounded p-2 bg-white relative">
 		<div class="flex justify-between items-center mb-2">
 			<h3 class="text-sm font-semibold flex items-center">{ phase.Name }</h3>
 			<div class="flex items-center">
-				<span class="text-xs text-gray-600 mr-2">{ fmt.Sprintf("%d/%d", phase.StatusCounts()[models.SummarizedStatusComplete], phase.StatusCounts().Total()) }</span>
+				<span class="text-xs text-gray-600 mr-2">{ fmt.Sprintf("%d/%d", phase.StatusCounts()[models.StatusComplete], phase.StatusCounts().Total()) }</span>
 			</div>
 		</div>
 		<div class="space-y-2">

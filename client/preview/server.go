@@ -13,6 +13,7 @@ import (
 	"github.com/ocuroot/ocuroot/client/local"
 	"github.com/ocuroot/ocuroot/client/release"
 	"github.com/ocuroot/ocuroot/store/models"
+	"github.com/ocuroot/ocuroot/ui/components/pipeline"
 	"github.com/ocuroot/ui/assets"
 	"github.com/ocuroot/ui/css"
 	"github.com/ocuroot/ui/js"
@@ -154,7 +155,7 @@ func MakeServePreview(tc release.TrackerConfig) func(w http.ResponseWriter, r *h
 			return
 		}
 
-		summary := models.SDKPackageToReleaseSummary(
+		summary := pipeline.SDKPackageToReleaseSummary(
 			models.ReleaseID("preview"),
 			"preview",
 			config.Package,

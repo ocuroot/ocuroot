@@ -1,40 +1,26 @@
-package models
+package pipeline
 
 import (
 	"fmt"
 
 	"github.com/ocuroot/ocuroot/refs"
-	"github.com/ocuroot/ocuroot/sdk"
-)
-
-// SummarizedStatus represents a higher-level status that includes Ready state
-type SummarizedStatus string
-
-// SummarizedStatus constants
-const (
-	SummarizedStatusPending   SummarizedStatus = "pending"
-	SummarizedStatusRunning   SummarizedStatus = "running"
-	SummarizedStatusComplete  SummarizedStatus = "complete"
-	SummarizedStatusFailed    SummarizedStatus = "failed"
-	SummarizedStatusCancelled SummarizedStatus = "cancelled"
-	SummarizedStatusReady     SummarizedStatus = "ready"
+	"github.com/ocuroot/ocuroot/store/models"
 )
 
 type ReleaseSummary struct {
-	ID     ReleaseID      `json:"release_id"`
-	Commit string         `json:"commit"`
-	Phases []PhaseSummary `json:"phases"`
-	Tags   map[string]any `json:"tags"`
+	ID     models.ReleaseID `json:"release_id"`
+	Commit string           `json:"commit"`
+	Phases []PhaseSummary   `json:"phases"`
+	Tags   map[string]any   `json:"tags"`
 }
 
-func (rs *ReleaseSummary) Status() SummarizedStatus {
+func (rs *ReleaseSummary) Status() models.Status {
 	for _, phase := range rs.Phases {
-		ps := phase.Status()
-		if ps != SummarizedStatusComplete {
+		if ps := phase.Status(); ps != models.StatusComplete {
 			return ps
 		}
 	}
-	return SummarizedStatusComplete
+	return models.StatusComplete
 }
 
 func (rs *ReleaseSummary) GetOutputForEnvironment(environmentName, outputName string) (*any, error) {
@@ -66,7 +52,7 @@ func (rs *ReleaseSummary) GetOutputForWork(workName, outputName string) (*any, e
 	return nil, fmt.Errorf("work %s not found", workName)
 }
 
-func (rs *ReleaseSummary) FuncChainByID(id FunctionChainID) *FunctionChainSummary {
+func (rs *ReleaseSummary) FuncChainByID(id models.FunctionChainID) *FunctionChainSummary {
 	for _, phase := range rs.Phases {
 		for _, work := range phase.Work {
 			if work.Chain != nil && work.Chain.ID == id {
@@ -87,15 +73,15 @@ type HandoffEdge struct {
 }
 
 type FunctionChainSummary struct {
-	ID        FunctionChainID    `json:"id"`
-	Name      string             `json:"name"`
-	Functions []*FunctionSummary `json:"functions"`
-	Graph     []HandoffEdge      `json:"graph,omitempty"`
+	ID        models.FunctionChainID `json:"id"`
+	Name      string                 `json:"name"`
+	Functions []*models.Function     `json:"functions"`
+	Graph     []HandoffEdge          `json:"graph,omitempty"`
 }
 
-func (fcs FunctionChainSummary) Status() SummarizedStatus {
+func (fcs FunctionChainSummary) Status() models.Status {
 	if len(fcs.Functions) == 0 {
-		return SummarizedStatusPending
+		return models.StatusPending
 	}
 	return fcs.Functions[len(fcs.Functions)-1].Status
 }
@@ -108,32 +94,22 @@ func (fcs FunctionChainSummary) Outputs() map[string]any {
 	return lastFn.Outputs
 }
 
-type FunctionSummary struct {
-	ID           FunctionID                     `json:"id"`
-	Fn           sdk.FunctionDef                `json:"fn"`
-	Status       SummarizedStatus               `json:"status"`
-	Dependencies []refs.Ref                     `json:"dependencies,omitempty"`
-	Inputs       map[string]sdk.InputDescriptor `json:"inputs"`
-	Outputs      map[string]any                 `json:"outputs,omitempty"`
-}
-
 type EnvironmentSummary struct {
-	ID   EnvironmentID `json:"id"`
-	Name string        `json:"name"`
+	ID   models.EnvironmentID `json:"id"`
+	Name string               `json:"name"`
 }
 
 // StatusCountMap tracks the count of items in each status state
-type StatusCountMap map[SummarizedStatus]int
+type StatusCountMap map[models.Status]int
 
 // NewStatusCountMap creates a new StatusCountMap with all statuses initialized to zero
 func NewStatusCountMap() StatusCountMap {
 	return StatusCountMap{
-		SummarizedStatusPending:   0,
-		SummarizedStatusReady:     0,
-		SummarizedStatusRunning:   0,
-		SummarizedStatusComplete:  0,
-		SummarizedStatusFailed:    0,
-		SummarizedStatusCancelled: 0,
+		models.StatusPending:   0,
+		models.StatusRunning:   0,
+		models.StatusComplete:  0,
+		models.StatusFailed:    0,
+		models.StatusCancelled: 0,
 	}
 }
 
@@ -153,30 +129,30 @@ func (m StatusCountMap) CompletionFraction() float64 {
 	if total == 0 {
 		return 0
 	}
-	return float64(m[SummarizedStatusComplete]) / float64(total)
+	return float64(m[models.StatusComplete]) / float64(total)
 }
 
 type PhaseSummary struct {
-	ID   PhaseID       `json:"id"`
-	Name string        `json:"name"`
-	Work []WorkSummary `json:"work"`
+	ID   models.PhaseID `json:"id"`
+	Name string         `json:"name"`
+	Work []WorkSummary  `json:"work"`
 }
 
-func (ps *PhaseSummary) Status() SummarizedStatus {
+func (ps *PhaseSummary) Status() models.Status {
 	counts := ps.StatusCounts()
-	if counts[SummarizedStatusFailed] > 0 {
-		return SummarizedStatusFailed
+	if counts[models.StatusFailed] > 0 {
+		return models.StatusFailed
 	}
-	if counts[SummarizedStatusCancelled] > 0 {
-		return SummarizedStatusCancelled
+	if counts[models.StatusCancelled] > 0 {
+		return models.StatusCancelled
 	}
-	if counts[SummarizedStatusRunning] > 0 {
-		return SummarizedStatusRunning
+	if counts[models.StatusRunning] > 0 {
+		return models.StatusRunning
 	}
-	if counts[SummarizedStatusPending] > 0 {
-		return SummarizedStatusPending
+	if counts[models.StatusPending] > 0 {
+		return models.StatusPending
 	}
-	return SummarizedStatusComplete
+	return models.StatusComplete
 }
 
 // StatusCounts returns a StatusCountMap showing how many function chains are in each status.

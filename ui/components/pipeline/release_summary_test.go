@@ -1,4 +1,4 @@
-package models
+package pipeline
 
 import (
 	"fmt"
@@ -6,6 +6,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/ocuroot/ocuroot/sdk"
+	"github.com/ocuroot/ocuroot/store/models"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -19,88 +20,88 @@ func TestReleaseSummaryStatus(t *testing.T) {
 	tests := []struct {
 		name     string
 		summary  ReleaseSummary
-		expected SummarizedStatus
+		expected models.Status
 	}{
 		{
 			name: "empty release is complete",
 			summary: ReleaseSummary{
-				ID:     ReleaseID(newID()),
+				ID:     models.ReleaseID(newID()),
 				Phases: []PhaseSummary{},
 			},
-			expected: SummarizedStatusComplete,
+			expected: models.StatusComplete,
 		},
 		{
 			name: "release with all complete phases is complete",
 			summary: ReleaseSummary{
-				ID: ReleaseID(newID()),
+				ID: models.ReleaseID(newID()),
 				Phases: []PhaseSummary{
-					createPhaseSummary(SummarizedStatusComplete),
-					createPhaseSummary(SummarizedStatusComplete),
+					createPhaseSummary(models.StatusComplete),
+					createPhaseSummary(models.StatusComplete),
 				},
 			},
-			expected: SummarizedStatusComplete,
+			expected: models.StatusComplete,
 		},
 		{
 			name: "release with any pending phase is pending",
 			summary: ReleaseSummary{
-				ID: ReleaseID(newID()),
+				ID: models.ReleaseID(newID()),
 				Phases: []PhaseSummary{
-					createPhaseSummary(SummarizedStatusComplete),
-					createPhaseSummary(SummarizedStatusPending),
-					createPhaseSummary(SummarizedStatusComplete),
+					createPhaseSummary(models.StatusComplete),
+					createPhaseSummary(models.StatusPending),
+					createPhaseSummary(models.StatusComplete),
 				},
 			},
-			expected: SummarizedStatusPending,
+			expected: models.StatusPending,
 		},
 		{
 			name: "release with any running phase is running",
 			summary: ReleaseSummary{
-				ID: ReleaseID(newID()),
+				ID: models.ReleaseID(newID()),
 				Phases: []PhaseSummary{
-					createPhaseSummary(SummarizedStatusComplete),
-					createPhaseSummary(SummarizedStatusRunning),
-					createPhaseSummary(SummarizedStatusComplete),
+					createPhaseSummary(models.StatusComplete),
+					createPhaseSummary(models.StatusRunning),
+					createPhaseSummary(models.StatusComplete),
 				},
 			},
-			expected: SummarizedStatusRunning,
+			expected: models.StatusRunning,
 		},
 		{
 			name: "release with any failed phase is failed",
 			summary: ReleaseSummary{
-				ID: ReleaseID(newID()),
+				ID: models.ReleaseID(newID()),
 				Phases: []PhaseSummary{
-					createPhaseSummary(SummarizedStatusComplete),
-					createPhaseSummary(SummarizedStatusFailed),
-					createPhaseSummary(SummarizedStatusComplete),
+					createPhaseSummary(models.StatusComplete),
+					createPhaseSummary(models.StatusFailed),
+					createPhaseSummary(models.StatusComplete),
 				},
 			},
-			expected: SummarizedStatusFailed,
+			expected: models.StatusFailed,
 		},
 		{
 			name: "release with any cancelled phase is cancelled",
 			summary: ReleaseSummary{
-				ID: ReleaseID(newID()),
+				ID: models.ReleaseID(newID()),
 				Phases: []PhaseSummary{
-					createPhaseSummary(SummarizedStatusComplete),
-					createPhaseSummary(SummarizedStatusCancelled),
-					createPhaseSummary(SummarizedStatusComplete),
+					createPhaseSummary(models.StatusComplete),
+					createPhaseSummary(models.StatusCancelled),
+					createPhaseSummary(models.StatusComplete),
 				},
 			},
-			expected: SummarizedStatusCancelled,
+			expected: models.StatusCancelled,
 		},
 		{
 			name: "release returns first non-complete phase's status",
 			summary: ReleaseSummary{
-				ID: ReleaseID(newID()),
+				ID: models.ReleaseID(newID()),
 				Phases: []PhaseSummary{
-					createPhaseSummary(SummarizedStatusComplete),
-					createPhaseSummary(SummarizedStatusPending),
-					createPhaseSummary(SummarizedStatusRunning),
-					createPhaseSummary(SummarizedStatusCancelled),
-					createPhaseSummary(SummarizedStatusFailed),
+					createPhaseSummary(models.StatusComplete),
+					createPhaseSummary(models.StatusPending),
+					createPhaseSummary(models.StatusRunning),
+					createPhaseSummary(models.StatusCancelled),
+					createPhaseSummary(models.StatusFailed),
 				},
 			},
-			expected: SummarizedStatusPending,
+			expected: models.StatusPending,
 		},
 	}
 
@@ -117,91 +118,91 @@ func TestPhaseSummaryStatus(t *testing.T) {
 	tests := []struct {
 		name     string
 		phase    PhaseSummary
-		expected SummarizedStatus
+		expected models.Status
 	}{
 		{
 			name: "empty phase is complete",
 			phase: PhaseSummary{
-				ID:   PhaseID(newID()),
+				ID:   models.PhaseID(newID()),
 				Name: "Empty Phase",
 				Work: []WorkSummary{},
 			},
-			expected: SummarizedStatusComplete,
+			expected: models.StatusComplete,
 		},
 		{
 			name: "phase with all complete chains is complete",
 			phase: PhaseSummary{
-				ID:   PhaseID(newID()),
+				ID:   models.PhaseID(newID()),
 				Name: "Complete Phase",
 				Work: []WorkSummary{
-					createWorkSummary(SummarizedStatusComplete),
-					createWorkSummary(SummarizedStatusComplete),
+					createWorkSummary(models.StatusComplete),
+					createWorkSummary(models.StatusComplete),
 				},
 			},
-			expected: SummarizedStatusComplete,
+			expected: models.StatusComplete,
 		},
 		{
 			name: "phase with any pending chain is pending",
 			phase: PhaseSummary{
-				ID:   PhaseID(newID()),
+				ID:   models.PhaseID(newID()),
 				Name: "Pending Phase",
 				Work: []WorkSummary{
-					createWorkSummary(SummarizedStatusComplete),
-					createWorkSummary(SummarizedStatusPending),
+					createWorkSummary(models.StatusComplete),
+					createWorkSummary(models.StatusPending),
 				},
 			},
-			expected: SummarizedStatusPending,
+			expected: models.StatusPending,
 		},
 		{
 			name: "phase with any running chain is running",
 			phase: PhaseSummary{
-				ID:   PhaseID(newID()),
+				ID:   models.PhaseID(newID()),
 				Name: "Running Phase",
 				Work: []WorkSummary{
-					createWorkSummary(SummarizedStatusComplete),
-					createWorkSummary(SummarizedStatusRunning),
+					createWorkSummary(models.StatusComplete),
+					createWorkSummary(models.StatusRunning),
 				},
 			},
-			expected: SummarizedStatusRunning,
+			expected: models.StatusRunning,
 		},
 		{
 			name: "phase with any failed chain is failed",
 			phase: PhaseSummary{
-				ID:   PhaseID(newID()),
+				ID:   models.PhaseID(newID()),
 				Name: "Failed Phase",
 				Work: []WorkSummary{
-					createWorkSummary(SummarizedStatusComplete),
-					createWorkSummary(SummarizedStatusFailed),
+					createWorkSummary(models.StatusComplete),
+					createWorkSummary(models.StatusFailed),
 				},
 			},
-			expected: SummarizedStatusFailed,
+			expected: models.StatusFailed,
 		},
 		{
 			name: "phase with any cancelled chain is cancelled",
 			phase: PhaseSummary{
-				ID:   PhaseID(newID()),
+				ID:   models.PhaseID(newID()),
 				Name: "Cancelled Phase",
 				Work: []WorkSummary{
-					createWorkSummary(SummarizedStatusComplete),
-					createWorkSummary(SummarizedStatusCancelled),
+					createWorkSummary(models.StatusComplete),
+					createWorkSummary(models.StatusCancelled),
 				},
 			},
-			expected: SummarizedStatusCancelled,
+			expected: models.StatusCancelled,
 		},
 		{
 			name: "phase status priority: failed > cancelled > running > pending > complete",
 			phase: PhaseSummary{
-				ID:   PhaseID(newID()),
+				ID:   models.PhaseID(newID()),
 				Name: "Priority Phase",
 				Work: []WorkSummary{
-					createWorkSummary(SummarizedStatusComplete),
-					createWorkSummary(SummarizedStatusPending),
-					createWorkSummary(SummarizedStatusRunning),
-					createWorkSummary(SummarizedStatusCancelled),
-					createWorkSummary(SummarizedStatusFailed),
+					createWorkSummary(models.StatusComplete),
+					createWorkSummary(models.StatusPending),
+					createWorkSummary(models.StatusRunning),
+					createWorkSummary(models.StatusCancelled),
+					createWorkSummary(models.StatusFailed),
 				},
 			},
-			expected: SummarizedStatusFailed,
+			expected: models.StatusFailed,
 		},
 	}
 
@@ -218,53 +219,53 @@ func TestFunctionChainSummaryStatus(t *testing.T) {
 	tests := []struct {
 		name     string
 		chain    FunctionChainSummary
-		expected SummarizedStatus
+		expected models.Status
 	}{
 		{
 			name: "empty chain is pending",
 			chain: FunctionChainSummary{
-				ID:        FunctionChainID(newID()),
+				ID:        models.FunctionChainID(newID()),
 				Name:      "Empty Chain",
-				Functions: []*FunctionSummary{},
+				Functions: []*models.Function{},
 			},
-			expected: SummarizedStatusPending,
+			expected: models.StatusPending,
 		},
 		{
 			name: "chain status is the status of the last function",
 			chain: FunctionChainSummary{
-				ID:   FunctionChainID(newID()),
+				ID:   models.FunctionChainID(newID()),
 				Name: "Status Chain",
-				Functions: []*FunctionSummary{
-					createFunctionSummary(SummarizedStatusComplete),
-					createFunctionSummary(SummarizedStatusComplete),
-					createFunctionSummary(SummarizedStatusFailed),
+				Functions: []*models.Function{
+					createFunctionSummary(models.StatusComplete),
+					createFunctionSummary(models.StatusComplete),
+					createFunctionSummary(models.StatusFailed),
 				},
 			},
-			expected: SummarizedStatusFailed,
+			expected: models.StatusFailed,
 		},
 		{
 			name: "chain with only one function",
 			chain: FunctionChainSummary{
-				ID:   FunctionChainID(newID()),
+				ID:   models.FunctionChainID(newID()),
 				Name: "Single Function Chain",
-				Functions: []*FunctionSummary{
-					createFunctionSummary(SummarizedStatusRunning),
+				Functions: []*models.Function{
+					createFunctionSummary(models.StatusRunning),
 				},
 			},
-			expected: SummarizedStatusRunning,
+			expected: models.StatusRunning,
 		},
 		{
 			name: "chain with multiple functions in various states",
 			chain: FunctionChainSummary{
-				ID:   FunctionChainID(newID()),
+				ID:   models.FunctionChainID(newID()),
 				Name: "Multi-Function Chain",
-				Functions: []*FunctionSummary{
-					createFunctionSummary(SummarizedStatusComplete),
-					createFunctionSummary(SummarizedStatusFailed),
-					createFunctionSummary(SummarizedStatusPending),
+				Functions: []*models.Function{
+					createFunctionSummary(models.StatusComplete),
+					createFunctionSummary(models.StatusFailed),
+					createFunctionSummary(models.StatusPending),
 				},
 			},
-			expected: SummarizedStatusPending,
+			expected: models.StatusPending,
 		},
 	}
 
@@ -280,28 +281,27 @@ func TestFunctionChainSummaryStatus(t *testing.T) {
 func TestStatusCountMap(t *testing.T) {
 	t.Run("new status count map", func(t *testing.T) {
 		counts := NewStatusCountMap()
-		assert.Equal(t, 0, counts[SummarizedStatusPending])
-		assert.Equal(t, 0, counts[SummarizedStatusRunning])
-		assert.Equal(t, 0, counts[SummarizedStatusComplete])
-		assert.Equal(t, 0, counts[SummarizedStatusFailed])
-		assert.Equal(t, 0, counts[SummarizedStatusCancelled])
-		assert.Equal(t, 0, counts[SummarizedStatusReady])
+		assert.Equal(t, 0, counts[models.StatusPending])
+		assert.Equal(t, 0, counts[models.StatusRunning])
+		assert.Equal(t, 0, counts[models.StatusComplete])
+		assert.Equal(t, 0, counts[models.StatusFailed])
+		assert.Equal(t, 0, counts[models.StatusCancelled])
 	})
 
 	t.Run("total count", func(t *testing.T) {
 		counts := NewStatusCountMap()
-		counts[SummarizedStatusPending] = 2
-		counts[SummarizedStatusRunning] = 3
-		counts[SummarizedStatusComplete] = 5
-		counts[SummarizedStatusFailed] = 1
+		counts[models.StatusPending] = 2
+		counts[models.StatusRunning] = 3
+		counts[models.StatusComplete] = 5
+		counts[models.StatusFailed] = 1
 		assert.Equal(t, 11, counts.Total())
 	})
 
 	t.Run("completion fraction", func(t *testing.T) {
 		counts := NewStatusCountMap()
-		counts[SummarizedStatusPending] = 2
-		counts[SummarizedStatusRunning] = 2
-		counts[SummarizedStatusComplete] = 6
+		counts[models.StatusPending] = 2
+		counts[models.StatusRunning] = 2
+		counts[models.StatusComplete] = 6
 		assert.Equal(t, 0.6, counts.CompletionFraction())
 	})
 
@@ -318,39 +318,39 @@ func TestReleaseSummaryIntegration(t *testing.T) {
 	// to validate the status calculation logic works across the entire structure
 
 	// Case 1: All complete release
-	allCompleteRelease := createRelease([][]SummarizedStatus{
-		{SummarizedStatusComplete, SummarizedStatusComplete},
-		{SummarizedStatusComplete, SummarizedStatusComplete},
+	allCompleteRelease := createRelease([][]models.Status{
+		{models.StatusComplete, models.StatusComplete},
+		{models.StatusComplete, models.StatusComplete},
 	})
-	assert.Equal(t, SummarizedStatusComplete, allCompleteRelease.Status())
+	assert.Equal(t, models.StatusComplete, allCompleteRelease.Status())
 
 	// Case 2: Release with a failed function in one chain
-	failedFunctionRelease := createRelease([][]SummarizedStatus{
-		{SummarizedStatusComplete, SummarizedStatusComplete},
-		{SummarizedStatusComplete, SummarizedStatusFailed},
+	failedFunctionRelease := createRelease([][]models.Status{
+		{models.StatusComplete, models.StatusComplete},
+		{models.StatusComplete, models.StatusFailed},
 	})
-	assert.Equal(t, SummarizedStatusFailed, failedFunctionRelease.Status())
+	assert.Equal(t, models.StatusFailed, failedFunctionRelease.Status())
 
 	// Case 3: Release with mixed statuses
-	mixedStatusRelease := createRelease([][]SummarizedStatus{
-		{SummarizedStatusComplete, SummarizedStatusComplete},
-		{SummarizedStatusRunning, SummarizedStatusPending},
-		{SummarizedStatusComplete, SummarizedStatusComplete},
+	mixedStatusRelease := createRelease([][]models.Status{
+		{models.StatusComplete, models.StatusComplete},
+		{models.StatusRunning, models.StatusPending},
+		{models.StatusComplete, models.StatusComplete},
 	})
-	assert.Equal(t, SummarizedStatusRunning, mixedStatusRelease.Status())
+	assert.Equal(t, models.StatusRunning, mixedStatusRelease.Status())
 
 	// Case 4: Release with pending functions
-	pendingRelease := createRelease([][]SummarizedStatus{
-		{SummarizedStatusComplete, SummarizedStatusComplete},
-		{SummarizedStatusComplete, SummarizedStatusPending},
+	pendingRelease := createRelease([][]models.Status{
+		{models.StatusComplete, models.StatusComplete},
+		{models.StatusComplete, models.StatusPending},
 	})
-	assert.Equal(t, SummarizedStatusPending, pendingRelease.Status())
+	assert.Equal(t, models.StatusPending, pendingRelease.Status())
 }
 
 // Helper function to create a PhaseSummary with a specific status
-func createPhaseSummary(status SummarizedStatus) PhaseSummary {
+func createPhaseSummary(status models.Status) PhaseSummary {
 	return PhaseSummary{
-		ID:   PhaseID(newID()),
+		ID:   models.PhaseID(newID()),
 		Name: "Test Phase",
 		Work: []WorkSummary{
 			createWorkSummary(status),
@@ -359,16 +359,16 @@ func createPhaseSummary(status SummarizedStatus) PhaseSummary {
 }
 
 // Helper function to create a WorkSummary with a specific status
-func createWorkSummary(status SummarizedStatus) WorkSummary {
+func createWorkSummary(status models.Status) WorkSummary {
 	return WorkSummary{
 		Environment: &EnvironmentSummary{
-			ID:   EnvironmentID(newID()),
+			ID:   models.EnvironmentID(newID()),
 			Name: "Test Environment",
 		},
 		Chain: &FunctionChainSummary{
-			ID:   FunctionChainID(newID()),
+			ID:   models.FunctionChainID(newID()),
 			Name: "Test Chain",
-			Functions: []*FunctionSummary{
+			Functions: []*models.Function{
 				createFunctionSummary(status),
 			},
 		},
@@ -376,9 +376,9 @@ func createWorkSummary(status SummarizedStatus) WorkSummary {
 }
 
 // Helper function to create a FunctionSummary with a specific status
-func createFunctionSummary(status SummarizedStatus) *FunctionSummary {
-	return &FunctionSummary{
-		ID: FunctionID(newID()),
+func createFunctionSummary(status models.Status) *models.Function {
+	return &models.Function{
+		ID: models.FunctionID(newID()),
 		Fn: sdk.FunctionDef{
 			Name: "Test Function",
 		},
@@ -395,7 +395,7 @@ func createFunctionSummary(status SummarizedStatus) *FunctionSummary {
 }
 
 // Helper function to create a complete release with phases and chains
-func createRelease(phaseStatuses [][]SummarizedStatus) *ReleaseSummary {
+func createRelease(phaseStatuses [][]models.Status) *ReleaseSummary {
 	phases := make([]PhaseSummary, 0, len(phaseStatuses))
 
 	// Create a phase for each status array
@@ -404,14 +404,14 @@ func createRelease(phaseStatuses [][]SummarizedStatus) *ReleaseSummary {
 
 		// Create chains with the specified statuses
 		for j, status := range chainStatuses {
-			functions := make([]*FunctionSummary, 0, 1)
+			functions := make([]*models.Function, 0, 1)
 
 			// Add a function with the specified status
 			functions = append(functions, createFunctionSummary(status))
 
 			// Create the chain
 			chain := &FunctionChainSummary{
-				ID:        FunctionChainID(newID()),
+				ID:        models.FunctionChainID(newID()),
 				Name:      fmt.Sprintf("Chain %d-%d", i, j),
 				Functions: functions,
 			}
@@ -419,7 +419,7 @@ func createRelease(phaseStatuses [][]SummarizedStatus) *ReleaseSummary {
 			// Add the chain to the work
 			work = append(work, WorkSummary{
 				Environment: &EnvironmentSummary{
-					ID:   EnvironmentID(newID()),
+					ID:   models.EnvironmentID(newID()),
 					Name: fmt.Sprintf("Environment %d-%d", i, j),
 				},
 				Chain: chain,
@@ -428,7 +428,7 @@ func createRelease(phaseStatuses [][]SummarizedStatus) *ReleaseSummary {
 
 		// Create the phase
 		phases = append(phases, PhaseSummary{
-			ID:   PhaseID(newID()),
+			ID:   models.PhaseID(newID()),
 			Name: fmt.Sprintf("Phase %d", i),
 			Work: work,
 		})
@@ -436,7 +436,7 @@ func createRelease(phaseStatuses [][]SummarizedStatus) *ReleaseSummary {
 
 	// Create the release with all phases
 	return &ReleaseSummary{
-		ID:     ReleaseID(newID()),
+		ID:     models.ReleaseID(newID()),
 		Phases: phases,
 	}
 }

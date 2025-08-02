@@ -70,13 +70,13 @@ func updateStatus(ctx context.Context, store refstore.Store, ref refs.Ref, ev *T
 
 	var status WorkStatus
 	switch chainStatus {
-	case models.SummarizedStatusPending:
+	case models.StatusPending:
 		status = WorkStatusPending
-	case models.SummarizedStatusRunning:
+	case models.StatusRunning:
 		status = WorkStatusRunning
-	case models.SummarizedStatusComplete:
+	case models.StatusComplete:
 		status = WorkStatusDone
-	case models.SummarizedStatusFailed:
+	case models.StatusFailed:
 		status = WorkStatusFailed
 	default:
 		status = WorkStatusDone

@@ -171,7 +171,7 @@ func checkFinalReleaseState(
 		return err
 	}
 
-	if status == models.SummarizedStatusFailed {
+	if status == models.StatusFailed {
 		return fmt.Errorf("release failed")
 	}
 

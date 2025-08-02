@@ -27,3 +27,12 @@ type Work struct {
 	Entrypoint refs.Ref       `json:"entrypoint"`
 	Outputs    map[string]any `json:"output"`
 }
+
+type Function struct {
+	ID           FunctionID                     `json:"id"`
+	Fn           sdk.FunctionDef                `json:"fn"`
+	Status       Status                         `json:"status"`
+	Dependencies []refs.Ref                     `json:"dependencies,omitempty"`
+	Inputs       map[string]sdk.InputDescriptor `json:"inputs"`
+	Outputs      map[string]any                 `json:"outputs,omitempty"`
+}

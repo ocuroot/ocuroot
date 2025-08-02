@@ -17,7 +17,7 @@ import (
 )
 
 type PreviewPipelineProps struct {
-	Summary *models.ReleaseSummary
+	Summary *ReleaseSummary
 }
 
 func PreviewPipeline(props PreviewPipelineProps) templ.Component {
@@ -81,7 +81,7 @@ func PreviewPipeline(props PreviewPipelineProps) templ.Component {
 
 // ternary is a helper function to simulate a ternary operator
 // modalsForChain renders the modals for a chain's functions
-func previewModalsForChain(chain *models.FunctionChainSummary) templ.Component {
+func previewModalsForChain(chain *FunctionChainSummary) templ.Component {
 	return templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
 		templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
 		if templ_7745c5c3_CtxErr := ctx.Err(); templ_7745c5c3_CtxErr != nil {
@@ -140,7 +140,7 @@ func previewModalsForChain(chain *models.FunctionChainSummary) templ.Component {
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			if chain.Status() == models.SummarizedStatusComplete {
+			if chain.Status() == models.StatusComplete {
 				templ_7745c5c3_Var4 := templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
 					templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
 					templ_7745c5c3_Buffer, templ_7745c5c3_IsBuffer := templruntime.GetBuffer(templ_7745c5c3_W)
@@ -177,7 +177,7 @@ func previewModalsForChain(chain *models.FunctionChainSummary) templ.Component {
 }
 
 // ChainHeader renders a simplified header for a function chain
-func PreviewWorkHeader(work *models.WorkSummary) templ.Component {
+func PreviewWorkHeader(work *WorkSummary) templ.Component {
 	return templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
 		templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
 		if templ_7745c5c3_CtxErr := ctx.Err(); templ_7745c5c3_CtxErr != nil {
@@ -260,7 +260,7 @@ func PreviewWorkHeader(work *models.WorkSummary) templ.Component {
 }
 
 // PreviewChainActionIcons renders the action icons for a chain
-func PreviewChainActionIcons(chain *models.FunctionChainSummary) templ.Component {
+func PreviewChainActionIcons(chain *FunctionChainSummary) templ.Component {
 	return templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
 		templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
 		if templ_7745c5c3_CtxErr := ctx.Err(); templ_7745c5c3_CtxErr != nil {
@@ -325,7 +325,7 @@ func PreviewChainActionIcons(chain *models.FunctionChainSummary) templ.Component
 }
 
 // PreviewRenderPhaseSummary renders a phase summary with its chains
-func PreviewRenderPhaseSummary(phase *models.PhaseSummary) templ.Component {
+func PreviewRenderPhaseSummary(phase *PhaseSummary) templ.Component {
 	return templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
 		templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
 		if templ_7745c5c3_CtxErr := ctx.Err(); templ_7745c5c3_CtxErr != nil {

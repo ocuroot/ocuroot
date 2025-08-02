@@ -13,6 +13,7 @@ import (
 	"github.com/ocuroot/ocuroot/refs/refstore"
 	"github.com/ocuroot/ocuroot/sdk"
 	"github.com/ocuroot/ocuroot/store/models"
+	"github.com/ocuroot/ocuroot/ui/components/pipeline"
 )
 
 // ReleaseStore creates a ReleaseStore from a string ref.
@@ -147,14 +148,14 @@ func CheckDependencies(ctx context.Context, store refstore.Store, fs FunctionSta
 	return true, nil
 }
 
-func (w *releaseStore) PendingFunctions(ctx context.Context) (map[refs.Ref]*models.FunctionSummary, error) {
+func (w *releaseStore) PendingFunctions(ctx context.Context) (map[refs.Ref]*models.Function, error) {
 	matchRef := w.ReleaseRef.String() + "/**/functions/*/status/pending"
 	pendingFunctions, err := w.Store.Match(ctx, matchRef)
 	if err != nil {
 		return nil, err
 	}
 
-	out := make(map[refs.Ref]*models.FunctionSummary)
+	out := make(map[refs.Ref]*models.Function)
 	for _, fn := range pendingFunctions {
 		functionRef := strings.TrimSuffix(fn, "/status/pending")
 
@@ -203,8 +204,8 @@ func (w *releaseStore) AddTags(ctx context.Context, tags []string) error {
 }
 
 // GetReleaseState implements ReleaseStateStore.
-func (w *releaseStore) GetReleaseState(ctx context.Context) (*models.ReleaseSummary, error) {
-	var release models.ReleaseSummary
+func (w *releaseStore) GetReleaseState(ctx context.Context) (*pipeline.ReleaseSummary, error) {
+	var release pipeline.ReleaseSummary
 	err := w.Store.Get(ctx, w.ReleaseRef.String(), &release)
 	if err != nil {
 		return nil, err
@@ -212,7 +213,7 @@ func (w *releaseStore) GetReleaseState(ctx context.Context) (*models.ReleaseSumm
 	return &release, nil
 }
 
-func GetFunctionChainStatusFromFunctions(ctx context.Context, store refstore.Store, chainRef refs.Ref) (models.SummarizedStatus, error) {
+func GetFunctionChainStatusFromFunctions(ctx context.Context, store refstore.Store, chainRef refs.Ref) (models.Status, error) {
 	resultMatches, err := store.Match(ctx, chainRef.String()+"/functions/*/status/*")
 	if err != nil {
 		return "", err
@@ -227,51 +228,48 @@ func GetFunctionChainStatusFromFunctions(ctx context.Context, store refstore.Sto
 		statusCounts[status]++
 	}
 
-	if statusCounts[string(models.SummarizedStatusPending)] == len(resultMatches) {
-		return models.SummarizedStatusPending, nil
+	if statusCounts[string(models.StatusPending)] == len(resultMatches) {
+		return models.StatusPending, nil
 	}
-	if statusCounts[string(models.SummarizedStatusComplete)] == len(resultMatches) {
-		return models.SummarizedStatusComplete, nil
-	}
-
-	if statusCounts[string(models.SummarizedStatusRunning)] > 0 {
-		return models.SummarizedStatusRunning, nil
-	}
-	if statusCounts[string(models.SummarizedStatusFailed)] > 0 {
-		return models.SummarizedStatusFailed, nil
-	}
-	if statusCounts[string(models.SummarizedStatusCancelled)] > 0 {
-		return models.SummarizedStatusCancelled, nil
-	}
-	if statusCounts[string(models.SummarizedStatusReady)] > 0 {
-		return models.SummarizedStatusReady, nil
+	if statusCounts[string(models.StatusComplete)] == len(resultMatches) {
+		return models.StatusComplete, nil
 	}
 
-	if statusCounts[string(models.SummarizedStatusPending)] > 0 && statusCounts[string(models.SummarizedStatusComplete)] > 0 {
-		return models.SummarizedStatusRunning, nil
+	if statusCounts[string(models.StatusRunning)] > 0 {
+		return models.StatusRunning, nil
+	}
+	if statusCounts[string(models.StatusFailed)] > 0 {
+		return models.StatusFailed, nil
+	}
+	if statusCounts[string(models.StatusCancelled)] > 0 {
+		return models.StatusCancelled, nil
+	}
+
+	if statusCounts[string(models.StatusPending)] > 0 && statusCounts[string(models.StatusComplete)] > 0 {
+		return models.StatusRunning, nil
 	}
 
 	// Default to pending
-	return models.SummarizedStatusPending, nil
+	return models.StatusPending, nil
 }
 
-func GetFunctionChainStatus(ctx context.Context, store refstore.Store, chainRef refs.Ref) (models.SummarizedStatus, error) {
+func GetFunctionChainStatus(ctx context.Context, store refstore.Store, chainRef refs.Ref) (models.Status, error) {
 	resultMatches, err := store.Match(ctx, chainRef.String()+"/status/*")
 	if err != nil {
 		return "", err
 	}
 
 	if len(resultMatches) == 0 {
-		return models.SummarizedStatusPending, nil
+		return models.StatusPending, nil
 	}
 	if len(resultMatches) > 1 {
 		return "", fmt.Errorf("expected 1 result, got %d (%v)", len(resultMatches), resultMatches)
 	}
 
-	return models.SummarizedStatus(path.Base(resultMatches[0])), nil
+	return models.Status(path.Base(resultMatches[0])), nil
 }
 
-func (w *releaseStore) GetFunctionChainStatus(ctx context.Context, chainRef refs.Ref) (models.SummarizedStatus, error) {
+func (w *releaseStore) GetFunctionChainStatus(ctx context.Context, chainRef refs.Ref) (models.Status, error) {
 	return GetFunctionChainStatus(ctx, w.Store, chainRef)
 }
 
@@ -279,7 +277,7 @@ func (w *releaseStore) InitializeFunction(
 	ctx context.Context,
 	workState models.Work,
 	functionChainRef refs.Ref,
-	fn *models.FunctionSummary,
+	fn *models.Function,
 ) error {
 	// Set the initial (pending) state for the function
 	functionRef := FunctionRefFromChainRef(functionChainRef, fn)
@@ -296,7 +294,7 @@ func (w *releaseStore) InitializeFunction(
 		return fmt.Errorf("failed to set work state: %w", err)
 	}
 
-	if err := saveStatus(ctx, w.Store, functionChainRef, models.SummarizedStatusPending); err != nil {
+	if err := saveStatus(ctx, w.Store, functionChainRef, models.StatusPending); err != nil {
 		return fmt.Errorf("failed to save status: %w", err)
 	}
 
@@ -307,7 +305,7 @@ func InitializeFunctionChain(
 	ctx context.Context,
 	store refstore.Store,
 	functionChainRef refs.Ref,
-	fn *models.FunctionSummary,
+	fn *models.Function,
 ) error {
 	// Set the initial (pending) state for the function
 	functionRef := FunctionRefFromChainRef(functionChainRef, fn)
@@ -326,13 +324,13 @@ func InitializeFunctionChain(
 		return fmt.Errorf("failed to set work state: %w", err)
 	}
 
-	if err := saveStatus(ctx, store, functionChainRef, models.SummarizedStatusPending); err != nil {
+	if err := saveStatus(ctx, store, functionChainRef, models.StatusPending); err != nil {
 		return fmt.Errorf("failed to save status: %w", err)
 	}
 	return nil
 }
 
-func UpdateFunctionStateUnderRef(ctx context.Context, store refstore.Store, functionRef refs.Ref, function *models.FunctionSummary) error {
+func UpdateFunctionStateUnderRef(ctx context.Context, store refstore.Store, functionRef refs.Ref, function *models.Function) error {
 	functionStatusRef := functionRef.JoinSubPath(statusPathSegment)
 
 	var s FunctionState
@@ -357,7 +355,7 @@ func UpdateFunctionStateUnderRef(ctx context.Context, store refstore.Store, func
 	return nil
 }
 
-func saveStatus(ctx context.Context, store refstore.Store, ref refs.Ref, status models.SummarizedStatus) error {
+func saveStatus(ctx context.Context, store refstore.Store, ref refs.Ref, status models.Status) error {
 	functionStatusRef := ref.JoinSubPath(statusPathSegment)
 
 	// Remove any existing status markers
@@ -379,13 +377,13 @@ func saveStatus(ctx context.Context, store refstore.Store, ref refs.Ref, status 
 }
 
 type FunctionState struct {
-	Current models.FunctionSummary `json:"current"`
-	History []StatusEvent          `json:"history"`
+	Current models.Function `json:"current"`
+	History []StatusEvent   `json:"history"`
 }
 
 type StatusEvent struct {
-	Time   time.Time               `json:"time"`
-	Status models.SummarizedStatus `json:"status"`
+	Time   time.Time     `json:"time"`
+	Status models.Status `json:"status"`
 }
 
 type StatusMarker struct {
@@ -397,15 +395,15 @@ const (
 	functionsPathSegment = "functions"
 )
 
-func (r *releaseStore) SDKWorkToFunctionChain(ctx context.Context, work sdk.Work, down bool) (refs.Ref, models.Work, *models.FunctionSummary, error) {
+func (r *releaseStore) SDKWorkToFunctionChain(ctx context.Context, work sdk.Work, down bool) (refs.Ref, models.Work, *models.Function, error) {
 	workRef := r.ReleaseRef
 
 	mWork := models.Work{
 		Release: r.ReleaseRef,
 	}
-	fs := &models.FunctionSummary{
+	fs := &models.Function{
 		ID:     "1",
-		Status: models.SummarizedStatusPending,
+		Status: models.StatusPending,
 	}
 
 	if work.Deployment != nil {
@@ -445,8 +443,8 @@ func (r *releaseStore) SDKWorkToFunctionChain(ctx context.Context, work sdk.Work
 
 // SDKPackageToFunctionChains converts a SDK package to a map of function chain refs to
 // function summaries representing the first function in each chain
-func (r *releaseStore) SDKPackageToFunctionChains(ctx context.Context, pkg *sdk.Package) (map[refs.Ref]*models.FunctionSummary, error) {
-	functionChains := make(map[refs.Ref]*models.FunctionSummary)
+func (r *releaseStore) SDKPackageToFunctionChains(ctx context.Context, pkg *sdk.Package) (map[refs.Ref]*models.Function, error) {
+	functionChains := make(map[refs.Ref]*models.Function)
 	var previousPhaseRefs []refs.Ref
 	for _, phase := range pkg.Phases {
 		var currentPhaseRefs []refs.Ref
@@ -457,7 +455,7 @@ func (r *releaseStore) SDKPackageToFunctionChains(ctx context.Context, pkg *sdk.
 			}
 			fc.Dependencies = previousPhaseRefs
 			functionChains[workRef] = fc
-			currentPhaseRefs = append(currentPhaseRefs, workRef.JoinSubPath("status", string(models.SummarizedStatusComplete)))
+			currentPhaseRefs = append(currentPhaseRefs, workRef.JoinSubPath("status", string(models.StatusComplete)))
 		}
 		previousPhaseRefs = currentPhaseRefs
 	}

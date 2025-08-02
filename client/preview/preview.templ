@@ -6,18 +6,17 @@ import (
 	"github.com/ocuroot/ui/components"
 	"github.com/ocuroot/ocuroot/ui/components/pipeline"
 	"github.com/ocuroot/ocuroot/ui/components/watch"
-	"github.com/ocuroot/ocuroot/store/models"
 	"github.com/ocuroot/ocuroot/sdk"
 )
 
-templ Preview(summary *models.ReleaseSummary, pkgPath string, pkg sdk.Package) {
+templ Preview(summary *pipeline.ReleaseSummary, pkgPath string, pkg sdk.Package) {
 	<h2>{ pkgPath }</h2>
 	@pipeline.PreviewPipeline(pipeline.PreviewPipelineProps{
 		Summary: summary,
 	})
 }
 
-templ PreviewPage(summary *models.ReleaseSummary, pkgPath string, pkg sdk.Package) {
+templ PreviewPage(summary *pipeline.ReleaseSummary, pkgPath string, pkg sdk.Package) {
 	@components.RootSimple("Release Preview") {
 		@Preview(summary, pkgPath, pkg)
 		@watch.Watch("/watch")
