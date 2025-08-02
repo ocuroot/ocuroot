@@ -56,19 +56,7 @@ templ ViewPage(props ViewPageProps) {
         }
 
         if props.Content != nil {
-            if len(props.ChildRefs) > 0 {
-                @layout.Row() {
-                    @layout.Column() {
-                        @StateContent(props)
-                    }
-                    @layout.Sidebar() {
-                    <h2>Children</h2>
-                        @RefList(props.ResolvedRef, BuildRefTree(props.ChildRefs))
-                    }
-                }
-            } else {
-                @StateContent(props)
-            }
+            @StateContent(props)
         } else {
             <h2>Refs</h2>
             @RefList(props.ResolvedRef, BuildRefTree(props.ChildRefs))
@@ -113,9 +101,17 @@ templ StateContent(props ViewPageProps) {
                 <h2>Release</h2>
                 @ReleaseCard(props)
             case models.Work:
-                <h2>Work</h2>
-                @components.Card() {
-                    <pre><code class="language-json">{ toJson(c) }</code></pre>
+                 @layout.Row() {
+                    @layout.Column() {
+                        <h2>Work</h2>
+                        @components.Card() {
+                            <pre><code class="language-json">{ toJson(props.Content) }</code></pre>
+                        }
+                    }
+                    @layout.Sidebar() {
+                        <h2>Children</h2>
+                        @RefList(props.ResolvedRef, BuildRefTree(props.ChildRefs))
+                    }
                 }
             case models.Intent:
                 <h2>Intent</h2>
@@ -126,14 +122,30 @@ templ StateContent(props ViewPageProps) {
                 <h2>Logs</h2>
                 @Logs(c)
             case release.FunctionState:
-                <h2>Function State</h2>
-                @components.Card() {
-                    <pre><code class="language-json">{ toJson(c) }</code></pre>
+                @layout.Row() {
+                    @layout.Column() {
+                        <h2>Function State</h2>
+                        @components.Card() {
+                            <pre><code class="language-json">{ toJson(props.Content) }</code></pre>
+                        }
+                    }
+                    @layout.Sidebar() {
+                        <h2>Children</h2>
+                        @RefList(props.ResolvedRef, BuildRefTree(props.ChildRefs))
+                    }
                 }
             default:
-                <h2>State</h2>
-                @components.Card() {
-                    <pre><code class="language-json">{ toJson(props.Content) }</code></pre>
+                @layout.Row() {
+                    @layout.Column() {
+                        <h2>State</h2>
+                        @components.Card() {
+                            <pre><code class="language-json">{ toJson(props.Content) }</code></pre>
+                        }
+                    }
+                    @layout.Sidebar() {
+                        <h2>Children</h2>
+                        @RefList(props.ResolvedRef, BuildRefTree(props.ChildRefs))
+                    }
                 }
         }
     </div>
