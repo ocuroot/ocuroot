@@ -80,8 +80,8 @@ github.com/muesli/termenv v0.16.0 h1:S5AlUN9dENB57rsbnkPyfdGuWIlkmzJjbFf0Tf5FWUc
 github.com/muesli/termenv v0.16.0/go.mod h1:ZRfOIKPFDYQoDFF4Olj7/QJbW60Ol/kL1pU3VfY/Cnk=
 github.com/ocuroot/gittools v0.0.8 h1:neZ+M8ODhKPxKWAZlAQPPQ0TzQm83qzlq8iAxos0a8s=
 github.com/ocuroot/gittools v0.0.8/go.mod h1:P1JPg9N9xTbmew7IjgmGDeBAk9K4I/vcWsLRXBiEQF8=
-github.com/ocuroot/ui v0.0.6 h1:wm93O6NxP3vr4jBFM50LwEE5BSQ1Bmg+EYZh5VIMQa8=
-github.com/ocuroot/ui v0.0.6/go.mod h1:7wyPuPnL1mPsyWlYSuTdaWZFu9Z4v0bbcv/O7nn7WeE=
+github.com/ocuroot/ui v0.0.7 h1:QDOoKJkXzNKfqQCH0y0f+ipM5DMdlfxMTiAED8A6Oa8=
+github.com/ocuroot/ui v0.0.7/go.mod h1:7wyPuPnL1mPsyWlYSuTdaWZFu9Z4v0bbcv/O7nn7WeE=
 github.com/oklog/ulid/v2 v2.1.1 h1:suPZ4ARWLOJLegGFiZZ1dFAkqzhMjL3J1TzI+5wHz8s=
 github.com/oklog/ulid/v2 v2.1.1/go.mod h1:rcEKHmBBKfef9DhnvX7y1HZBYxjXb0cP5ExxNsTT1QQ=
 github.com/pborman/getopt v0.0.0-20170112200414-7148bc3a4c30/go.mod h1:85jBQOZwpVEaDAr341tbn15RS4fCAsIst0qp7i8ex1o=
