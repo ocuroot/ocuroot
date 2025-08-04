@@ -30,10 +30,6 @@ func StartViewServer(ctx context.Context, store refstore.Store, port int) error 
 		}
 	}
 
-	// Initialize the unified CSS and JS services
-	cssService := css.NewService()
-	jsService := js.NewService()
-
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		childRefs, err := store.Match(ctx, "**")
 		if err != nil {
@@ -82,8 +78,13 @@ func StartViewServer(ctx context.Context, store refstore.Store, port int) error 
 		})
 		content.Render(ctx, w)
 	})
-	http.HandleFunc("/style.css", cssService.ServeCSS)
-	http.HandleFunc("/script.js", jsService.ServeJS)
+
+	// Initialize the unified CSS and JS services
+	cssService := css.NewService()
+	jsService := js.NewService()
+	http.HandleFunc(cssService.GetVersionedURL(), cssService.ServeCSS)
+	http.HandleFunc(jsService.GetVersionedURL(), jsService.ServeJS)
+
 	http.HandleFunc("/static/logo.svg", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "image/svg+xml")
 		w.Write([]byte(assets.Logo))

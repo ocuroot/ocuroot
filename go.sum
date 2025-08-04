@@ -80,8 +80,8 @@ github.com/muesli/termenv v0.16.0 h1:S5AlUN9dENB57rsbnkPyfdGuWIlkmzJjbFf0Tf5FWUc
 github.com/muesli/termenv v0.16.0/go.mod h1:ZRfOIKPFDYQoDFF4Olj7/QJbW60Ol/kL1pU3VfY/Cnk=
 github.com/ocuroot/gittools v0.0.8 h1:neZ+M8ODhKPxKWAZlAQPPQ0TzQm83qzlq8iAxos0a8s=
 github.com/ocuroot/gittools v0.0.8/go.mod h1:P1JPg9N9xTbmew7IjgmGDeBAk9K4I/vcWsLRXBiEQF8=
-github.com/ocuroot/ui v0.0.3 h1:dD+2jzL0F8i5NLWQzA0nco49viHUT5RhjNyf35DE978=
-github.com/ocuroot/ui v0.0.3/go.mod h1:W0jasoS3IREXtUDvw1flXqaTGmMI4D2tbQ91w77W4CM=
+github.com/ocuroot/ui v0.0.6 h1:wm93O6NxP3vr4jBFM50LwEE5BSQ1Bmg+EYZh5VIMQa8=
+github.com/ocuroot/ui v0.0.6/go.mod h1:7wyPuPnL1mPsyWlYSuTdaWZFu9Z4v0bbcv/O7nn7WeE=
 github.com/oklog/ulid/v2 v2.1.1 h1:suPZ4ARWLOJLegGFiZZ1dFAkqzhMjL3J1TzI+5wHz8s=
 github.com/oklog/ulid/v2 v2.1.1/go.mod h1:rcEKHmBBKfef9DhnvX7y1HZBYxjXb0cP5ExxNsTT1QQ=
 github.com/pborman/getopt v0.0.0-20170112200414-7148bc3a4c30/go.mod h1:85jBQOZwpVEaDAr341tbn15RS4fCAsIst0qp7i8ex1o=
@@ -162,5 +162,3 @@ gopkg.in/check.v1 v1.0.0-20201130134442-10cb98267c6c h1:Hei/4ADfdWqJk1ZMxUNpqntN
 gopkg.in/check.v1 v1.0.0-20201130134442-10cb98267c6c/go.mod h1:JHkPIbrfpd72SG/EVd6muEfDQjcINNoR0C8j2r3qZ4Q=
 gopkg.in/yaml.v3 v3.0.1 h1:fxVm/GzAzEWqLHuvctI91KS9hhNmmWOoWu0XTYJS7CA=
 gopkg.in/yaml.v3 v3.0.1/go.mod h1:K4uyk7z7BCEPqu6E+C64Yfv1cQ7kz7rIZviUmN+EgEM=
-pgregory.net/rapid v1.2.0 h1:keKAYRcjm+e1F0oAuU5F5+YPAWcyxNNRK2wud503Gnk=
-pgregory.net/rapid v1.2.0/go.mod h1:PY5XlDGj0+V1FCq0o192FdRhpKHGTRIWBgqjDBTrq04=

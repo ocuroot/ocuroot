@@ -18,7 +18,7 @@ require (
 	github.com/mark3labs/mcp-go v0.28.0
 	github.com/mattn/go-isatty v0.0.20
 	github.com/ocuroot/gittools v0.0.8
-	github.com/ocuroot/ui v0.0.3
+	github.com/ocuroot/ui v0.0.6
 	github.com/oklog/ulid/v2 v2.1.1
 	github.com/spf13/cobra v1.9.1
 	github.com/spf13/pflag v1.0.6
@@ -29,7 +29,6 @@ require (
 	go.opentelemetry.io/otel/sdk v1.36.0
 	go.opentelemetry.io/otel/trace v1.36.0
 	go.starlark.net v0.0.0-20250318223901-d9371fef63fe
-	pgregory.net/rapid v1.2.0
 )
 
 require (

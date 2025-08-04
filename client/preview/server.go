@@ -21,10 +21,6 @@ import (
 
 // StartPreviewServer starts a web server to preview the package configuration
 func StartPreviewServer(tc release.TrackerConfig, previewPort int) {
-	// Initialize the unified CSS and JS services
-	cssService := css.NewService()
-	jsService := js.NewService()
-
 	// Find available port if one wasn't specified
 	port := previewPort
 	if port == 0 {
@@ -37,8 +33,13 @@ func StartPreviewServer(tc release.TrackerConfig, previewPort int) {
 	}
 
 	http.HandleFunc("/", MakeServePreview(tc))
-	http.HandleFunc("/style.css", cssService.ServeCSS)
-	http.HandleFunc("/script.js", jsService.ServeJS)
+
+	// Initialize the unified CSS and JS services
+	cssService := css.NewService()
+	jsService := js.NewService()
+	http.HandleFunc(cssService.GetVersionedURL(), cssService.ServeCSS)
+	http.HandleFunc(jsService.GetVersionedURL(), jsService.ServeJS)
+
 	http.HandleFunc("/static/logo.svg", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "image/svg+xml")
 		w.Write([]byte(assets.Logo))
