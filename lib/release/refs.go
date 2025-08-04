@@ -24,6 +24,7 @@ var (
 	GlobCustomState             = libglob.MustCompile("**/@*/custom/*", '/')
 	GlobCustomIntent            = libglob.MustCompile("**/+*/custom/*", '/')
 	GlobCustomStateOrIntent     = libglob.MustCompile("**/{@,+}*/custom/*", '/')
+	GlobEnvironment             = libglob.MustCompile("{@,+}*/environment/*", '/')
 )
 
 func WorkRefFromChainRef(ref refs.Ref) (refs.Ref, error) {
@@ -63,12 +64,16 @@ func LoadRef(ctx context.Context, store refstore.Store, ref refs.Ref) (any, erro
 		return LoadRefOfType[ReleaseInfo](ctx, store, ref)
 	case GlobWork.Match(ref.String()):
 		return LoadRefOfType[models.Work](ctx, store, ref)
+	case GlobChain.Match(ref.String()):
+		return LoadRefOfType[models.Work](ctx, store, ref)
 	case GlobDeploymentIntent.Match(ref.String()):
 		return LoadRefOfType[models.Intent](ctx, store, ref)
 	case GlobLog.Match(ref.String()):
 		return LoadRefOfType[[]sdk.Log](ctx, store, ref)
 	case GlobFunction.Match(ref.String()):
 		return LoadRefOfType[FunctionState](ctx, store, ref)
+	case GlobEnvironment.Match(ref.String()):
+		return LoadRefOfType[models.Environment](ctx, store, ref)
 	default:
 		return LoadRefOfType[any](ctx, store, ref)
 	}

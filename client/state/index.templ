@@ -1,0 +1,36 @@
+package state
+
+import (
+    "github.com/ocuroot/ui/components"
+)
+
+templ Index(environmentCount, releaseCount, deploymentCount, customStateCount int) {
+    @ViewBody(){
+        @components.HeroGrid(){
+            @components.HeroNumber(components.HeroNumberProps{
+                Count:   environmentCount,
+                Title:   "Environments",
+                Link:    "View",
+                LinkURL: "/match/@/environment/*",
+            })
+            @components.HeroNumber(components.HeroNumberProps{
+                Count:   releaseCount,
+                Title:   "Releases",
+                Link:    "View",
+                LinkURL: "/match/**/@*",
+            })
+            @components.HeroNumber(components.HeroNumberProps{
+                Count:   deploymentCount,
+                Title:   "Deployments",
+                Link:    "View",
+                LinkURL: "/match/**/@*/deploy/*",
+            })
+            @components.HeroNumber(components.HeroNumberProps{
+                Count:   customStateCount,
+                Title:   "Custom State",
+                Link:    "View",
+                LinkURL: "/match/**/@*/custom/*",
+            })
+        }
+    }
+}

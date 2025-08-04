@@ -1,0 +1,86 @@
+package state
+
+import (
+    "fmt"
+    "strings"
+    "path"
+
+    "github.com/ocuroot/ocuroot/store/models"
+    "github.com/ocuroot/ocuroot/lib/release"
+    "github.com/ocuroot/ui/components/badges"
+    "github.com/ocuroot/ui/components/layout"
+
+)
+
+templ WorkView(props RefPageProps) {
+	@WorkContent(props.Content.(models.Work), props.ChildRefs)
+}
+
+templ WorkContent(work models.Work, children []string) {
+    <div class="functionheader">
+        <h2>Work</h2>
+        <div class="functionstatus">
+            @StatusBadge(StatusFromChildren(children))
+        </div>
+    </div>
+    @layout.Row() {
+        @Column40(){
+            for _, child := range children {
+                if release.GlobFunction.Match(child) {
+                    <div hx-trigger="load" hx-get={ fmt.Sprintf("/ref/%s?partial=true", child) } hx-swap="innerHTML">{ fmt.Sprint(child) }</div>
+                }
+            }
+        }
+        @Column60() {
+            for _, child := range children {
+                if strings.HasSuffix(child, "/logs") {
+                    <div class="logview">
+                        <div hx-trigger="load" hx-get={ fmt.Sprintf("/ref/%s?partial=true", child) } hx-swap="innerHTML">{ fmt.Sprint(child) }</div>
+                    </div>
+                }
+            }
+        }
+    }
+}
+
+templ StatusBadge(status string) {
+    switch status {
+        case "running":
+            @badges.Pending("Pending")
+        case "pending":
+            @badges.Pending("Pending")
+        case "failed":
+            @badges.Negative("Failed")
+        case "complete":
+            @badges.Positive("Success")
+        case "cancelled":
+            @badges.Negative("Cancelled")
+    }
+}
+
+func StatusFromChildren(children []string) string {
+    for _, child := range children {
+        if strings.Contains(child,"/status/") {
+            return path.Base(child)
+        }
+    }
+    return ""
+}
+
+templ HalfColumn() {
+    <div class="halfcolumn">
+        {children...}
+    </div>
+}
+
+templ Column40() {
+    <div class="column column-40">
+        {children...}
+    </div>
+}
+
+templ Column60() {
+    <div class="column column-60">
+        {children...}
+    </div>
+}

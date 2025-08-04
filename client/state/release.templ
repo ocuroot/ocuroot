@@ -1,0 +1,27 @@
+package state
+
+import (
+    "github.com/ocuroot/ui/components"
+    "github.com/ocuroot/ocuroot/store/models"
+    "github.com/ocuroot/ocuroot/lib/release"
+    "github.com/ocuroot/ocuroot/ui/components/pipeline"
+)
+
+templ ReleaseCard(props RefPageProps) {
+    <p class="subtitle">Commit: <a href="#">{ props.Content.(release.ReleaseInfo).Commit }</a></p>
+    @components.Card() {
+        @pipeline.Pipeline(pipeline.PipelineProps{
+			Summary: ReleasePreview(props),
+		})
+    }
+}
+
+func ReleasePreview(props RefPageProps) *pipeline.ReleaseSummary {
+    summary := pipeline.SDKPackageToReleaseSummary(
+		models.ReleaseID(props.Ref),
+		"preview",
+		props.Content.(release.ReleaseInfo).Package,
+		props.ChildRefs...,
+	)
+    return summary
+}

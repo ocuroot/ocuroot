@@ -31,19 +31,43 @@ func StartViewServer(ctx context.Context, store refstore.Store, port int) error 
 	}
 
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		childRefs, err := store.Match(ctx, "**")
+		environmentRefs, err := store.Match(ctx, "@/environment/*")
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		releaseRefs, err := store.Match(ctx, "**/@*")
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		deploymentRefs, err := store.Match(ctx, "**/@*/deploy/*")
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		customStateRefs, err := store.Match(ctx, "**/@*/custom/*")
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		index := Index(len(environmentRefs), len(releaseRefs), len(deploymentRefs), len(customStateRefs))
+		index.Render(ctx, w)
+	})
+	http.HandleFunc("/match/", func(w http.ResponseWriter, r *http.Request) {
+		matchStr := strings.TrimPrefix(r.URL.Path, "/match/")
+		refs, err := store.Match(ctx, matchStr)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
 
-		content := ViewPage(ViewPageProps{
-			Ref:         "",
-			ResolvedRef: "",
-			Content:     nil,
-			ChildRefs:   childRefs,
-		})
-		content.Render(ctx, w)
+		if r.URL.Query().Get("partial") == "true" {
+			content := Match(refs)
+			content.Render(ctx, w)
+			return
+		}
+		MatchPage(refs).Render(ctx, w)
 	})
 	http.HandleFunc("/ref/", func(w http.ResponseWriter, r *http.Request) {
 		refStr := strings.TrimPrefix(r.URL.Path, "/ref/")
@@ -70,7 +94,18 @@ func StartViewServer(ctx context.Context, store refstore.Store, port int) error 
 			return
 		}
 
-		content := ViewPage(ViewPageProps{
+		if r.URL.Query().Get("partial") == "true" {
+			content := StateContent(RefPageProps{
+				Ref:         refStr,
+				ResolvedRef: resolvedRef,
+				Content:     doc,
+				ChildRefs:   childRefs,
+			})
+			content.Render(ctx, w)
+			return
+		}
+
+		content := RefPage(RefPageProps{
 			Ref:         refStr,
 			ResolvedRef: resolvedRef,
 			Content:     doc,
@@ -79,11 +114,8 @@ func StartViewServer(ctx context.Context, store refstore.Store, port int) error 
 		content.Render(ctx, w)
 	})
 
-	// Initialize the unified CSS and JS services
-	cssService := css.NewService()
-	jsService := js.NewService()
-	http.HandleFunc(cssService.GetVersionedURL(), cssService.ServeCSS)
-	http.HandleFunc(jsService.GetVersionedURL(), jsService.ServeJS)
+	http.HandleFunc(css.Default().GetVersionedURL(), css.Default().Serve)
+	http.HandleFunc(js.Default().GetVersionedURL(), js.Default().Serve)
 
 	http.HandleFunc("/static/logo.svg", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "image/svg+xml")

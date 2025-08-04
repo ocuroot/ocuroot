@@ -1,0 +1,13 @@
+package state
+
+import (
+    "github.com/ocuroot/ocuroot/sdk"
+    "github.com/ocuroot/ui/components"
+    "github.com/ocuroot/ocuroot/ui/components/logs"
+)
+
+templ Logs(l []sdk.Log) {
+    @components.Card() {
+        @logs.LogRenderSDK(l, "")
+    }
+}

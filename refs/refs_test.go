@@ -24,7 +24,6 @@ func TestValidNormalizedRefs(t *testing.T) {
 		"github.com/ocu-project/ocu/-/package.ocu.star/+/deploy/staging", // Intent
 		"github.com/ocu-project/ocu/-/package.ocu.star/@ABC123/deploy/staging/ABC123/logs",
 		"github.com/ocu-project/ocu/-/package.ocu.star/@ABC123/deploy/staging/ABC123/outputs",
-		"github.com/ocu-project/ocu/-/package.ocu.star/@ABC123/deploy/staging/ABC123/outputs/",
 		"github.com/org/repo/-/package.ocu.star/@v1/deploy/prod#output/host",
 
 		// Global values, can be used for environments
@@ -417,6 +416,28 @@ func TestInvalidRefs(t *testing.T) {
 			_, err := Parse(ref)
 			if err == nil {
 				t.Errorf("expected an error")
+			}
+		})
+	}
+}
+
+func TestRefNormalization(t *testing.T) {
+	// Normalization should remove trailing slashes
+	var refsToNormalized = map[string]string{
+		"./call/build/": "./call/build",
+		"github.com/example/example/-/path/to/package/@/call/build#output/output1/": "github.com/example/example/-/path/to/package/@/call/build#output/output1",
+		"github.com/example/example/-/path/to/package/@/call/build/":                "github.com/example/example/-/path/to/package/@/call/build",
+	}
+	for ref, expected := range refsToNormalized {
+		t.Run(ref, func(t *testing.T) {
+			pr, err := Parse(ref)
+			if err != nil {
+				t.Errorf("Parse(%q) returned error: %v", ref, err)
+				return
+			}
+			if pr.String() != expected {
+				t.Errorf("expected %v, got %v", expected, pr.String())
+				return
 			}
 		})
 	}

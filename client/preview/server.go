@@ -35,10 +35,8 @@ func StartPreviewServer(tc release.TrackerConfig, previewPort int) {
 	http.HandleFunc("/", MakeServePreview(tc))
 
 	// Initialize the unified CSS and JS services
-	cssService := css.NewService()
-	jsService := js.NewService()
-	http.HandleFunc(cssService.GetVersionedURL(), cssService.ServeCSS)
-	http.HandleFunc(jsService.GetVersionedURL(), jsService.ServeJS)
+	http.HandleFunc(css.Default().GetVersionedURL(), css.Default().Serve)
+	http.HandleFunc(js.Default().GetVersionedURL(), js.Default().Serve)
 
 	http.HandleFunc("/static/logo.svg", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "image/svg+xml")

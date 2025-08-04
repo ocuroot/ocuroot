@@ -1,0 +1,114 @@
+package state
+
+import (
+	"encoding/json"
+	"fmt"
+    "strings"
+
+	"github.com/ocuroot/ui/components"
+    "github.com/ocuroot/ui/components/layout"
+    "github.com/ocuroot/ocuroot/store/models"
+    "github.com/ocuroot/ocuroot/lib/release"
+    "github.com/ocuroot/ocuroot/sdk"
+)
+
+type RefPageProps struct {
+    Ref string
+    ResolvedRef string
+
+    Content any
+    ChildRefs []string
+}
+
+templ RefPage(props RefPageProps) {
+	@ViewBody(){
+        if props.Ref != "" {
+            <h1>{ props.Ref }</h1>
+            if props.ResolvedRef != "" && props.ResolvedRef != props.Ref {
+                <p class="subtitle">{ props.ResolvedRef }</p>
+            }
+        } else {
+            <h1>All State</h1>
+        }
+
+        if props.Content != nil {
+            @StateContentWithHeader(props)
+        } else {
+            <h2>Refs</h2>
+            @RefList(props.ResolvedRef, BuildRefTree(props.ChildRefs))
+        }
+        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.11.1/styles/default.min.css">        
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.11.1/highlight.min.js"></script>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.11.1/languages/json.min.js"></script>
+        <script>hljs.highlightAll();</script>
+	}
+}
+
+templ StateContentWithHeader(props RefPageProps) {
+    switch props.Content.(type) {
+        case release.ReleaseInfo:
+            <h2>Release</h2>
+        case models.Work:
+        case models.Intent:
+            <h2>Intent</h2>
+        case []sdk.Log:
+            <h2>Logs</h2>
+        case release.FunctionState:
+            <h2>Function</h2>
+        case models.Environment:
+            <h2>Environment</h2>
+        default:
+    }
+    @StateContent(props)
+}
+
+templ StateContent(props RefPageProps) {
+    switch c := props.Content.(type) {
+        case release.ReleaseInfo:
+            @ReleaseCard(props)
+        case models.Work:
+            @WorkView(props)
+        case models.Intent:
+            @components.Card() {
+                <pre><code class="language-json">{ toJson(c) }</code></pre>
+            }
+        case []sdk.Log:
+            @Logs(c)
+        case release.FunctionState:
+            @FunctionState(props)
+        case models.Environment:
+            @Environment(props)
+        default:
+            @layout.Row() {
+                @layout.Column() {
+                    <h2>State</h2>
+                    @components.Card() {
+                        <pre><code class="language-json">{ toJson(props.Content) }</code></pre>
+                    }
+                }
+                @layout.Sidebar() {
+                    <h2>Children</h2>
+                    @RefList(props.ResolvedRef, BuildRefTree(props.ChildRefs))
+                }
+            }
+    }
+}
+
+func toJson(content any) string {
+	j, err := json.MarshalIndent(content, "", "  ")
+	if err != nil {
+		return ""
+	}
+	return string(j)
+}
+
+templ RefList(prefix string, refs RefMap) {
+    <ul class="list-style-circle">
+    for _, key := range refs.OrderedKeys() {
+        <li>
+            <a href={ fmt.Sprintf("/ref/%s", key) }>{ strings.TrimPrefix(key, prefix) }</a>
+            @RefList(key, refs[key])
+        </li>
+    }
+    </ul>
+}

@@ -36,3 +36,8 @@ type Function struct {
 	Inputs       map[string]sdk.InputDescriptor `json:"inputs"`
 	Outputs      map[string]any                 `json:"outputs,omitempty"`
 }
+
+type Environment struct {
+	Name       string         `json:"name"`
+	Attributes map[string]any `json:"attributes"`
+}

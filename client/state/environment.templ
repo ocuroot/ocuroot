@@ -1,0 +1,21 @@
+package state
+
+import (
+    "fmt"
+    "github.com/ocuroot/ocuroot/store/models"
+)
+
+templ Environment(props RefPageProps) {
+    @EnvironmentContent(props.Content.(models.Environment), props.ChildRefs)
+}
+
+templ EnvironmentContent(env models.Environment, children []string) {
+    <h2>{ env.Name }</h2>
+    <div class="divider"></div>
+    <h3>Attributes</h3>
+    <pre><code class="language-json">{ toJson(env.Attributes) }</code></pre>
+    <div class="divider"></div>
+    <h3>Deployments</h3>
+    <div hx-trigger="load" hx-get={ fmt.Sprintf("/match/**/@/deploy/%s?partial=true", env.Name) } hx-swap="innerHTML">
+    </div>
+}

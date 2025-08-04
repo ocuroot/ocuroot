@@ -1,0 +1,29 @@
+package state
+
+import (
+    "fmt"
+    "strings"
+)
+
+templ MatchPage(refs []string) {
+    @ViewBody(){
+        @Match(refs)
+    }
+}
+
+templ Match(refs []string) {
+    if len(refs) == 0 {
+        <p>No refs found</p>
+    } else {
+        <ul class="list-style-circle">
+            for _, ref := range refs {
+                // Ignore repo config refs for now
+                if !strings.Contains(ref, "/repo.ocu.star/") {
+                    <li>
+                        <a href={ fmt.Sprintf("/ref/%s", ref) }>{ ref }</a>
+                    </li>
+                }
+            }
+        </ul>
+    }
+}

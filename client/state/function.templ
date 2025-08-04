@@ -1,0 +1,67 @@
+package state
+
+import (
+    "fmt"
+
+    "github.com/ocuroot/ui/components"
+    "github.com/ocuroot/ocuroot/lib/release"
+    "github.com/ocuroot/ocuroot/sdk"
+    "github.com/ocuroot/ui/components/badges"
+)
+
+templ FunctionState(props RefPageProps) {
+    @components.Card(){
+        @FunctionStateContent(props.Content.(release.FunctionState), props.ChildRefs)
+    }
+}
+
+templ FunctionStateContent(fs release.FunctionState, children []string) {
+    <div class="functionheader">
+        <h2 class="functionname">{ fs.Current.Fn.Name }</h2>
+        <div class="functionstatus"> 
+            @StatusBadge(StatusFromChildren(children))
+        </div>
+    </div>
+
+    <h3>Inputs</h3>
+    <ul>
+        for key, input := range fs.Current.Inputs {
+            <div class="input">
+                <strong>{ key }</strong><br/>
+                @Input(input)
+            </div>
+        }
+    </ul>
+    <div class="divider"></div>
+    <h3>Outputs</h3>
+    <ul>
+        for key, output := range fs.Current.Outputs {
+            <div class="output">
+                <strong>{ key }</strong><br/>
+                <em>{ fmt.Sprint(output) }</em>
+            </div>
+        }
+    </ul>
+    <div class="divider"></div>
+
+    <h3>History</h3>
+    <ul>
+        for _, history := range fs.History {
+            <li>{ history.Time.Format("2006-01-02 15:04:05") }: { history.Status }</li>
+        }
+    </ul>
+}
+
+templ Input(desc sdk.InputDescriptor) {
+    if desc.Value != nil {
+        <em>{ fmt.Sprint(desc.Value) }</em>
+    } else if desc.Ref != nil && desc.Default != nil {
+        <em>{ fmt.Sprint(desc.Default) }</em>
+    } else if desc.Ref != nil {
+        @badges.Warning("Pending")
+    }
+
+    if desc.Ref != nil {
+        <a href={ fmt.Sprintf("/ref/%s", *desc.Ref) }>@badges.Neutral("Ref")</a>
+    }
+}

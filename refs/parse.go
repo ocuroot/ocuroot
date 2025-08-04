@@ -28,7 +28,7 @@ func Parse(ref string) (Ref, error) {
 			pt := SubPathType(item.val)
 			outRef.SubPathType = pt
 		case item.typ == itemSubpath:
-			outRef.SubPath = item.val
+			outRef.SubPath = strings.TrimSuffix(item.val, "/")
 		case item.typ == itemRelease:
 			outRef.ReleaseOrIntent = ReleaseOrIntent{
 				Type:  Release,
@@ -40,7 +40,7 @@ func Parse(ref string) (Ref, error) {
 				Value: item.val,
 			}
 		case item.typ == itemFragment:
-			outRef.Fragment = item.val
+			outRef.Fragment = strings.TrimSuffix(item.val, "/")
 		}
 	}
 

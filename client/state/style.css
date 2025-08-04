@@ -1,0 +1,82 @@
+.hljs, .hljs-subst {
+    background-color: var(--bg-surface) !important;
+    color: var(--text-primary) !important;
+}
+
+.hljs-punctuation {
+    color: var(--primary-color) !important;
+}
+
+.hljs-attr {
+    color: var(--text-secondary) !important;
+}
+
+.hljs-string {
+    color: var(--link-color) !important;
+}
+
+.hljs-literal {
+    color: var(--link-color) !important;
+}
+
+.halfcolumn {
+    flex: 50%;
+    width: 50%;
+    padding-top: 0.5rem;
+    padding-bottom: 0.5rem;
+}
+
+.column {
+    padding-top: 0.5rem;
+    padding-bottom: 0.5rem;
+}
+
+.column-40 {
+    flex: 40%;
+    width: 40%;
+}
+
+.column-60 {
+    flex: 60%;
+    width: 60%;
+}
+
+.functionheader {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid var(--border-color);
+    padding-bottom: 0.5rem;
+}
+
+.functionheader h2 {
+    margin: 0;
+}
+
+.functionstatus {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.logview {
+    height: 70vh;
+}
+
+.logview .log-container {
+    height: calc(70vh - 2rem);
+    overflow-y: scroll;
+}
+
+.divider {
+    border-bottom: 1px solid var(--border-color);
+    padding-bottom: 0.5rem;
+}
+
+.input {
+    margin-bottom: 0.5rem;
+}
+
+.output {
+    margin-bottom: 0.5rem;
+}

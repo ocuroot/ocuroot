@@ -1,18 +1,9 @@
 package state
 
 import (
-	"encoding/json"
-	"fmt"
-	"github.com/ocuroot/ui/components"
+    "github.com/ocuroot/ui/components"
     "github.com/ocuroot/ui/components/navbar"
     "github.com/ocuroot/ui/js"
-    "github.com/ocuroot/ui/components/layout"
-    "github.com/ocuroot/ocuroot/store/models"
-    "github.com/ocuroot/ocuroot/lib/release"
-    "github.com/ocuroot/ocuroot/ui/components/pipeline"
-    "github.com/ocuroot/ocuroot/sdk"
-    "github.com/ocuroot/ocuroot/ui/components/logs"
-    "strings"
 )
 
 templ ViewBody(){
@@ -22,175 +13,29 @@ templ ViewBody(){
 			BrandURL:        "/",
 			LogoURL:         "/static/logo.svg",
 			Items: []navbar.NavItem{
-				navbar.NavLink{
-					Name: "Root",
-					URL:  "/",
-				},
-			},
+                navbar.NavLink{
+                    Name: "Environments",
+                    URL:  "/match/@/environment/*",
+                },
+                navbar.NavLink{
+                    Name: "Releases",
+                    URL:  "/match/**/@*",
+                },
+                navbar.NavLink{
+                    Name: "Deployments",
+                    URL:  "/match/**/@*/deploy/*",
+                },
+                navbar.NavLink{
+                    Name: "Custom State",
+                    URL:  "/match/**/@*/custom/*",
+                },
+            },
 			ShowThemeToggle: true,
 		})
         @components.Container(){
 		    { children... }
         }
 		@js.UnifiedJSScript()
+        <script src="https://cdn.jsdelivr.net/npm/htmx.org@2.0.6/dist/htmx.min.js"></script>
 	}
-}
-
-type ViewPageProps struct {
-    Ref string
-    ResolvedRef string
-
-    Content any
-    ChildRefs []string
-}
-
-templ ViewPage(props ViewPageProps) {
-	@ViewBody(){
-        if props.Ref != "" {
-            <h1>{ props.Ref }</h1>
-            if props.ResolvedRef != "" && props.ResolvedRef != props.Ref {
-                <p class="subtitle">{ props.ResolvedRef }</p>
-            }
-        } else {
-            <h1>All State</h1>
-        }
-
-        if props.Content != nil {
-            @StateContent(props)
-        } else {
-            <h2>Refs</h2>
-            @RefList(props.ResolvedRef, BuildRefTree(props.ChildRefs))
-        }
-        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.11.1/styles/default.min.css">
-        <style>
-            .hljs, .hljs-subst {
-                background-color: var(--bg-surface);
-                color: var(--text-primary);
-            }
-
-            .hljs-punctuation {
-                color: var(--primary-color);
-            }
-
-            .hljs-attr {
-                color: var(--text-secondary);
-            }
-
-            .hljs-string {
-                color: var(--link-color);
-            }
-
-            .hljs-literal {
-                color: var(--link-color);
-            }
-        </style>
-        
-        <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.11.1/highlight.min.js"></script>
-
-        <!-- and it's easy to individually load additional languages -->
-        <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.11.1/languages/json.min.js"></script>
-
-        <script>hljs.highlightAll();</script>
-	}
-}
-
-templ StateContent(props ViewPageProps) {
-    <div style="width: 100%">
-        switch c := props.Content.(type) {
-            case release.ReleaseInfo:
-                <h2>Release</h2>
-                @ReleaseCard(props)
-            case models.Work:
-                 @layout.Row() {
-                    @layout.Column() {
-                        <h2>Work</h2>
-                        @components.Card() {
-                            <pre><code class="language-json">{ toJson(props.Content) }</code></pre>
-                        }
-                    }
-                    @layout.Sidebar() {
-                        <h2>Children</h2>
-                        @RefList(props.ResolvedRef, BuildRefTree(props.ChildRefs))
-                    }
-                }
-            case models.Intent:
-                <h2>Intent</h2>
-                @components.Card() {
-                    <pre><code class="language-json">{ toJson(c) }</code></pre>
-                }
-            case []sdk.Log:
-                <h2>Logs</h2>
-                @Logs(c)
-            case release.FunctionState:
-                @layout.Row() {
-                    @layout.Column() {
-                        <h2>Function State</h2>
-                        @components.Card() {
-                            <pre><code class="language-json">{ toJson(props.Content) }</code></pre>
-                        }
-                    }
-                    @layout.Sidebar() {
-                        <h2>Children</h2>
-                        @RefList(props.ResolvedRef, BuildRefTree(props.ChildRefs))
-                    }
-                }
-            default:
-                @layout.Row() {
-                    @layout.Column() {
-                        <h2>State</h2>
-                        @components.Card() {
-                            <pre><code class="language-json">{ toJson(props.Content) }</code></pre>
-                        }
-                    }
-                    @layout.Sidebar() {
-                        <h2>Children</h2>
-                        @RefList(props.ResolvedRef, BuildRefTree(props.ChildRefs))
-                    }
-                }
-        }
-    </div>
-}
-
-templ ReleaseCard(props ViewPageProps) {
-    <p class="subtitle">Commit: <a href="#">{ props.Content.(release.ReleaseInfo).Commit }</a></p>
-    @components.Card() {
-        @pipeline.Pipeline(pipeline.PipelineProps{
-			Summary: ReleasePreview(props),
-		})
-    }
-}
-
-func ReleasePreview(props ViewPageProps) *pipeline.ReleaseSummary {
-    summary := pipeline.SDKPackageToReleaseSummary(
-		models.ReleaseID(props.Ref),
-		"preview",
-		props.Content.(release.ReleaseInfo).Package,
-		props.ChildRefs...,
-	)
-    return summary
-}
-
-templ Logs(l []sdk.Log) {
-    @components.Card() {
-        @logs.LogRenderSDK(l, "")
-    }
-}
-
-func toJson(content any) string {
-	j, err := json.MarshalIndent(content, "", "  ")
-	if err != nil {
-		return ""
-	}
-	return string(j)
-}
-
-templ RefList(prefix string, refs RefMap) {
-    <ul class="list-style-circle">
-    for _, key := range refs.OrderedKeys() {
-        <li>
-            <a href={ fmt.Sprintf("/ref/%s", key) }>{ strings.TrimPrefix(key, prefix) }</a>
-            @RefList(key, refs[key])
-        </li>
-    }
-    </ul>
 }

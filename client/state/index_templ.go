@@ -10,11 +10,9 @@ import templruntime "github.com/a-h/templ/runtime"
 
 import (
 	"github.com/ocuroot/ui/components"
-	"github.com/ocuroot/ui/components/navbar"
-	"github.com/ocuroot/ui/js"
 )
 
-func ViewBody() templ.Component {
+func Index(environmentCount, releaseCount, deploymentCount, customStateCount int) templ.Component {
 	return templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
 		templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
 		if templ_7745c5c3_CtxErr := ctx.Err(); templ_7745c5c3_CtxErr != nil {
@@ -47,37 +45,6 @@ func ViewBody() templ.Component {
 				}()
 			}
 			ctx = templ.InitializeContext(ctx)
-			templ_7745c5c3_Err = navbar.Navbar(navbar.NavbarConfig{
-				BrandName: "Ocuroot",
-				BrandURL:  "/",
-				LogoURL:   "/static/logo.svg",
-				Items: []navbar.NavItem{
-					navbar.NavLink{
-						Name: "Environments",
-						URL:  "/match/@/environment/*",
-					},
-					navbar.NavLink{
-						Name: "Releases",
-						URL:  "/match/**/@*",
-					},
-					navbar.NavLink{
-						Name: "Deployments",
-						URL:  "/match/**/@*/deploy/*",
-					},
-					navbar.NavLink{
-						Name: "Custom State",
-						URL:  "/match/**/@*/custom/*",
-					},
-				},
-				ShowThemeToggle: true,
-			}).Render(ctx, templ_7745c5c3_Buffer)
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
-			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, " ")
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
-			}
 			templ_7745c5c3_Var3 := templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
 				templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
 				templ_7745c5c3_Buffer, templ_7745c5c3_IsBuffer := templruntime.GetBuffer(templ_7745c5c3_W)
@@ -90,31 +57,63 @@ func ViewBody() templ.Component {
 					}()
 				}
 				ctx = templ.InitializeContext(ctx)
-				templ_7745c5c3_Err = templ_7745c5c3_Var1.Render(ctx, templ_7745c5c3_Buffer)
+				templ_7745c5c3_Err = components.HeroNumber(components.HeroNumberProps{
+					Count:   environmentCount,
+					Title:   "Environments",
+					Link:    "View",
+					LinkURL: "/match/@/environment/*",
+				}).Render(ctx, templ_7745c5c3_Buffer)
+				if templ_7745c5c3_Err != nil {
+					return templ_7745c5c3_Err
+				}
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, " ")
+				if templ_7745c5c3_Err != nil {
+					return templ_7745c5c3_Err
+				}
+				templ_7745c5c3_Err = components.HeroNumber(components.HeroNumberProps{
+					Count:   releaseCount,
+					Title:   "Releases",
+					Link:    "View",
+					LinkURL: "/match/**/@*",
+				}).Render(ctx, templ_7745c5c3_Buffer)
+				if templ_7745c5c3_Err != nil {
+					return templ_7745c5c3_Err
+				}
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 2, " ")
+				if templ_7745c5c3_Err != nil {
+					return templ_7745c5c3_Err
+				}
+				templ_7745c5c3_Err = components.HeroNumber(components.HeroNumberProps{
+					Count:   deploymentCount,
+					Title:   "Deployments",
+					Link:    "View",
+					LinkURL: "/match/**/@*/deploy/*",
+				}).Render(ctx, templ_7745c5c3_Buffer)
+				if templ_7745c5c3_Err != nil {
+					return templ_7745c5c3_Err
+				}
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 3, " ")
+				if templ_7745c5c3_Err != nil {
+					return templ_7745c5c3_Err
+				}
+				templ_7745c5c3_Err = components.HeroNumber(components.HeroNumberProps{
+					Count:   customStateCount,
+					Title:   "Custom State",
+					Link:    "View",
+					LinkURL: "/match/**/@*/custom/*",
+				}).Render(ctx, templ_7745c5c3_Buffer)
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
 				return nil
 			})
-			templ_7745c5c3_Err = components.Container().Render(templ.WithChildren(ctx, templ_7745c5c3_Var3), templ_7745c5c3_Buffer)
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
-			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 2, " ")
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
-			}
-			templ_7745c5c3_Err = js.UnifiedJSScript().Render(ctx, templ_7745c5c3_Buffer)
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
-			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 3, " <script src=\"https://cdn.jsdelivr.net/npm/htmx.org@2.0.6/dist/htmx.min.js\"></script>")
+			templ_7745c5c3_Err = components.HeroGrid().Render(templ.WithChildren(ctx, templ_7745c5c3_Var3), templ_7745c5c3_Buffer)
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			return nil
 		})
-		templ_7745c5c3_Err = components.Body().Render(templ.WithChildren(ctx, templ_7745c5c3_Var2), templ_7745c5c3_Buffer)
+		templ_7745c5c3_Err = ViewBody().Render(templ.WithChildren(ctx, templ_7745c5c3_Var2), templ_7745c5c3_Buffer)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
