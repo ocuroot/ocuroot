@@ -10,8 +10,8 @@ init_repos() {
     export INTENT_REMOTE="$base_dir/intent.git"
     
     # Create bare repositories
-    git init --bare "$STATE_REMOTE"
-    git init --bare "$INTENT_REMOTE"
+    git -c init.defaultBranch=main init --bare "$STATE_REMOTE"
+    git -c init.defaultBranch=main init --bare "$INTENT_REMOTE"
     
     echo "Repositories initialized at:"
     echo "STATE_REMOTE: $STATE_REMOTE"
@@ -34,7 +34,7 @@ init_working_dir() {
     mkdir -p "$working_dir"
     
     # Initialize git repo
-    git -C "$working_dir" init
+    git -c init.defaultBranch=main -C "$working_dir" init
     
     # Add remote
     git -C "$working_dir" remote add origin "$remote_url"
@@ -45,5 +45,5 @@ init_working_dir() {
     
     # Create empty commit and push back to remote
     git -C "$working_dir" commit --allow-empty -m "Initial commit"
-    git -C "$working_dir" push origin HEAD:master
+    git -C "$working_dir" push origin HEAD:main
 }
