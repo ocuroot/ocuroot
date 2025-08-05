@@ -21,6 +21,9 @@ There are 4 key elements in state:
 * *Deployments* represent a specific release being deployed to an environment
 * *Custom state* allows you to pass data into releases and deployments without having to modify code
 
+Of these three, Environments, Deployments and Custom state have intent equivalents so they can be manually modified.
+Releases are entirely managed by Ocuroot based on the contents of your source repo.
+
 ## Installation
 
 ### From Source
