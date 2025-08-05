@@ -86,7 +86,7 @@ func TrackerForExistingRelease(ctx context.Context, tc TrackerConfig) (*release.
 	}
 
 	if tc.Commit != releaseSummary.Commit {
-		return nil, fmt.Errorf("release commit does not match current commit")
+		return nil, fmt.Errorf("release commit does not match current commit:\nTo check out the expected commit, run:\n\tgit checkout %v", releaseSummary.Commit)
 	}
 
 	return tracker, nil
