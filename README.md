@@ -43,6 +43,9 @@ configuration files from other source.
 All state managed by Ocuroot is stored as JSON documents and organized by Reference, a URI-compatible string
 that describes config files within source repos, Releases, Deployments, Environments and Custom configuration.
 
+State can be queried and manipulated using the `ocuroot state` commands. Run `ocuroot state --help` for more
+information
+
 References are of the form:
 
 ```
@@ -62,9 +65,6 @@ Intent References are dented by the use of `+` instead of `@` for the release. S
 `github.com/ocuroot/example/-/frontend/release.ocu.star/+/deploy/production` would
 refer to the desired state for deploying the frontend to the production environment.
 
-State can be queried and manipulated using the `ocuroot state` commands. Run `ocuroot state --help` for more
-information
-
 ### The SDK
 
 The SDK provides functions and structs to interact with Ocuroot, as well as the host system and network.
@@ -79,8 +79,8 @@ A full set of stubs for the 0.3.0 SDK can be found at [sdk/sdk/0.3.0](sdk/sdk/0.
 
 ### repo.ocu.star
 
-The `repo.ocu.star` file must be placed in the root of your repo. It defines common configuration used by all
-other config files.
+The `repo.ocu.star` file defines common configuration used by all other config files.
+It must be placed in the root of your repo.
 
 A *repo alias* may be defined to override the default repo name. This name would be used in all state references
 to content within this repo.
