@@ -1,7 +1,7 @@
 # ocuroot
 
 The Ocuroot client. The client is a command line tool that manages state for
-releases and environments of your applications and cloud resources. It is provided
+releases and environments of your applications and cloud resources. It's provided
 as a standalone tool that runs on top of existing CI services.
 
 ## About Ocuroot
@@ -19,9 +19,9 @@ There are 4 key elements in state:
 * *Releases* define a process to build and deploy your applications and resources
 * *Environments* define locations where releases are deployed
 * *Deployments* represent a specific release being deployed to an environment
-* *Custom state* allows you to pass data into releases and deployments without having to modify code
+* *Custom State* allows you to pass data into releases and deployments without having to modify code
 
-Of these three, Environments, Deployments and Custom state have intent equivalents so they can be manually modified.
+Of these three, Environments, Deployments and Custom State have intent equivalents so they can be manually modified.
 Releases are entirely managed by Ocuroot based on the contents of your source repo.
 
 ## Installation
@@ -34,14 +34,14 @@ go install github.com/ocuroot/ocuroot@latest
 
 ## Configuration
 
-All configuration written in imperative [Starlark](https://github.com/bazelbuild/starlark),
+All configuration is written in imperative [Starlark](https://github.com/bazelbuild/starlark),
 a dialect of Python. Ocuroot uses the `.ocu.star` suffix to distinguish its
-configuration files from other source.
+configuration files.
 
 ### State
 
 All state managed by Ocuroot is stored as JSON documents and organized by Reference, a URI-compatible string
-that describes config files within source repos, Releases, Deployments, Environments and Custom configuration.
+that describes config files within source repos, Releases, Deployments, Environments and Custom State.
 
 State can be queried and manipulated using the `ocuroot state` commands. Run `ocuroot state --help` for more
 information
@@ -49,19 +49,19 @@ information
 References are of the form:
 
 ```
-<repo>/-/<path>/@<release>/<subpath>#<fragment>
+[repo]/-/[path]/@[release]/[subpath]#[fragment]
 ```
 
-* <repo>: Is the URL or alias of a Git repo.
-* <path>: Is the path to a file within the repo, usually a *.ocu.star file.
-* <release>: Is a release identifier. If blank, the most recent release is implied.
-* <subpath>: A path to a document within the release, such as a deployment to a specific environment.
-* <fragment>: An optional path to a field within the document.
+* [repo]: Is the URL or alias of a Git repo.
+* [path]: Is the path to a file within the repo, usually a *.ocu.star file.
+* [release]: Is a release identifier. If blank, the most recent release is implied.
+* [subpath]: A path to a document within the release, such as a deployment to a specific environment.
+* [fragment]: An optional path to a field within the document.
 
 For example, `github.com/ocuroot/example/-/frontend/release.ocu.star/@1.0.0/call/build#output/image` would
 refer to the container image for the 1.0.0 release of the frontend in an example repo.
 
-Intent References are dented by the use of `+` instead of `@` for the release. So
+Intent References are denpted by the use of `+` instead of `@` for the release. So
 `github.com/ocuroot/example/-/frontend/release.ocu.star/+/deploy/production` would
 refer to the desired state for deploying the frontend to the production environment.
 
@@ -89,7 +89,7 @@ to content within this repo.
 repo_alias("my_repo")
 ```
 
-A location for the *state store* should be set so Ocuroot knows where to read and write state and intent. Most
+A location for your *state store* must be set so Ocuroot knows where to read and write state and intent. Most
 commonly, this will be one or two git repos:
 
 ```python
@@ -114,7 +114,7 @@ trigger(_trigger)
 
 Releases describe deployment processes end-to-end. They can be included in any *.ocu.star file.
 
-Releases are divided into Phases, which are executed in-order. Within each Phase are a set of Work items
+Releases are divided into Phases, which are executed in order. Within each Phase are a set of Work items,
 which may be calls to functions or deployments. These items may be executed concurrently within each Phase.
 
 ```python
@@ -179,18 +179,22 @@ You can start a new Release by running:
 ocuroot release new my_release.ocu.star
 ```
 
-This will start a new Release with the current state of your Git repo for the Release process defined in `my_release.ocu.star`. Once a Release has been started, Ocuroot will execute its Phases in-order as long as it is able to do so.
+This will start a new Release using the process defined in `my_release.ocu.star` at the current commit in your source repo. 
+Once a Release has been started, Ocuroot will execute its Phases in order as long as it's able to do so.
 
 ### Managing work
 
-Sometimes, a dependency will not allow a Release to continue, and you need to come back later. You can pick up any
-outstanding work on a given commit in your Git repo by running:
+Sometimes, a dependency won't allow a Release to continue. For example, a frontend service may have a dependency on a backend
+service that has not yet been deployed.
+
+Once your dependencies are satisfied, you can pick up any outstanding work against your currently checked out commit by running:
 
 ```bash
 ocuroot work continue
 ```
 
-If you want to kick of outstanding work in your CI platform, you can use the trigger command:
+The above will continue work on your local machine. If you want to schedule any outstanding work onto your CI platform, 
+you can use the trigger command:
 
 ```bash
 ocuroot work trigger
