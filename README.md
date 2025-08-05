@@ -112,7 +112,7 @@ trigger(_trigger)
 
 ### Defining releases
 
-Releases describe a deployment process end-to-end, they can be included in any `*.ocu.star` file.
+Releases describe deployment processes end-to-end. They can be included in any *.ocu.star file.
 
 Releases are divided into Phases, which are executed in-order. Within each Phase are a set of Work items
 which may be calls to functions or deployments. These items may be executed concurrently within each Phase.
