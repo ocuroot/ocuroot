@@ -2,7 +2,10 @@ package state
 
 import (
     "fmt"
+    "path"
+
     "github.com/ocuroot/ocuroot/store/models"
+    "github.com/ocuroot/ui/css"
 )
 
 templ Environment(props RefPageProps) {
@@ -18,4 +21,39 @@ templ EnvironmentContent(env models.Environment, children []string) {
     <h3>Deployments</h3>
     <div hx-trigger="load" hx-get={ fmt.Sprintf("/match/**/@/deploy/%s?partial=true", env.Name) } hx-swap="innerHTML">
     </div>
+}
+
+templ EnvironmentList(refs []string) {
+    <div class="environmentgrid">
+        for _, ref := range refs {
+            <a href={ fmt.Sprintf("/ref/%s", ref) }>
+                <div class="environment">
+                    { path.Base(ref) }
+                </div>
+            </a>
+        }
+    </div>
+}
+
+const environmentCSS = `
+    .environmentgrid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+        gap: 1rem;
+    }
+
+    .environment {
+        padding: 1rem;
+        border: 1px solid var(--border-color);
+        border-radius: 0.5rem;
+        text-align: center;
+    }
+
+    .environment:hover {
+        background-color: var(--bg-secondary);
+    }
+`
+
+func init() {
+    css.Default().Add([]byte(environmentCSS))
 }

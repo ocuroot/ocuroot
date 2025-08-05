@@ -55,19 +55,19 @@ func StartViewServer(ctx context.Context, store refstore.Store, port int) error 
 		index.Render(ctx, w)
 	})
 	http.HandleFunc("/match/", func(w http.ResponseWriter, r *http.Request) {
-		matchStr := strings.TrimPrefix(r.URL.Path, "/match/")
-		refs, err := store.Match(ctx, matchStr)
+		query := strings.TrimPrefix(r.URL.Path, "/match/")
+		refs, err := store.Match(ctx, query)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
 
 		if r.URL.Query().Get("partial") == "true" {
-			content := Match(refs)
+			content := Match(query, refs)
 			content.Render(ctx, w)
 			return
 		}
-		MatchPage(refs).Render(ctx, w)
+		MatchPage(query, refs).Render(ctx, w)
 	})
 	http.HandleFunc("/ref/", func(w http.ResponseWriter, r *http.Request) {
 		refStr := strings.TrimPrefix(r.URL.Path, "/ref/")

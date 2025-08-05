@@ -5,18 +5,25 @@ import (
     "strings"
 )
 
-templ MatchPage(refs []string) {
+templ MatchPage(query string, refs []string) {
     @ViewBody(){
-        @Match(refs)
+        @Match(query, refs)
     }
 }
 
-templ Match(refs []string) {
-    if len(refs) == 0 {
-        <p>No refs found</p>
-    } else {
-        <ul class="list-style-circle">
-            for _, ref := range refs {
+templ Match(query string, refs []string) {
+    switch query {
+        case "**/@*":
+            @ReleaseList(refs)
+        case "@/environment/*":
+            @EnvironmentList(refs)
+        
+        default:
+            if len(refs) == 0 {
+                <p>No refs found</p>
+            } else {
+                <ul class="list-style-circle">
+                for _, ref := range refs {
                 // Ignore repo config refs for now
                 if !strings.Contains(ref, "/repo.ocu.star/") {
                     <li>
@@ -24,6 +31,7 @@ templ Match(refs []string) {
                     </li>
                 }
             }
-        </ul>
+            </ul>
+        }
     }
 }

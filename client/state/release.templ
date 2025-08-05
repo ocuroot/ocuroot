@@ -1,10 +1,14 @@
 package state
 
 import (
+    "fmt"
+
     "github.com/ocuroot/ui/components"
     "github.com/ocuroot/ocuroot/store/models"
     "github.com/ocuroot/ocuroot/lib/release"
     "github.com/ocuroot/ocuroot/ui/components/pipeline"
+    "github.com/ocuroot/ui/components/table"
+    "github.com/ocuroot/ocuroot/refs"
 )
 
 templ ReleaseCard(props RefPageProps) {
@@ -25,3 +29,32 @@ func ReleasePreview(props RefPageProps) *pipeline.ReleaseSummary {
 	)
     return summary
 }
+
+templ ReleaseList(refList []string) {
+    @table.Table(table.TableProps{}, "Repo", "Config file", "Release") {
+        for _, ref := range refList {
+            if pr, err := refs.Parse(ref); err != nil {
+                @table.Tr(table.TRProps{}) {
+                    @table.Td(table.TDProps{}) {
+                        { ref }
+                    }
+                }
+            } else {
+                @table.Tr(table.TRProps{
+                    Link: templ.URL(fmt.Sprintf("/ref/%s", ref)),
+                }) {
+                    @table.Td(table.TDProps{}) {
+                        { pr.Repo }
+                    }
+                    @table.Td(table.TDProps{}) {
+                        { pr.Filename }
+                    }
+                    @table.Td(table.TDProps{}) {
+                       { pr.ReleaseOrIntent.Value } 
+                    }
+                }
+            }
+        }   
+    }
+}
+
