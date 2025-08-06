@@ -8,6 +8,7 @@ import (
 	"path"
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/ocuroot/ocuroot/lib/release"
 	"github.com/ocuroot/ocuroot/refs"
@@ -134,7 +135,30 @@ func StartViewServer(ctx context.Context, store refstore.Store, port int) error 
 	srv := &http.Server{
 		Addr: fmt.Sprintf(":%d", port),
 	}
-	fmt.Printf("Listening on port %d\n", port)
+
+	go func() {
+		// Wait until the server returns 2xx on the relevant port
+		// then output instructions
+		client := &http.Client{
+			Timeout: 1 * time.Second,
+		}
+		url := fmt.Sprintf("http://localhost:%d", port)
+
+		for {
+			resp, err := client.Get(url)
+			if err == nil && resp.StatusCode >= 200 && resp.StatusCode < 300 {
+				resp.Body.Close()
+				fmt.Printf("Your state view is ready and waiting!\n")
+				fmt.Printf("Open your browser to: %s\n", url)
+				return
+			}
+			if resp != nil {
+				resp.Body.Close()
+			}
+			time.Sleep(100 * time.Millisecond)
+		}
+	}()
+
 	if err := srv.ListenAndServe(); err != nil {
 		return fmt.Errorf("failed to start server: %w", err)
 	}
