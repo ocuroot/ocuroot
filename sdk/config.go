@@ -24,6 +24,11 @@ type Config struct {
 	Backend Backend
 }
 
+// GlobalFuncs returns the user-defined functions from the loaded configuration
+func (c *Config) GlobalFuncs() map[string]*starlark.Function {
+	return c.globalFuncs
+}
+
 type FunctionContext struct {
 	WorkID  WorkID         `json:"work_id"`
 	Package *Package       `json:"package,omitempty"`

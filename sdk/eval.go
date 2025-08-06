@@ -9,6 +9,72 @@ import (
 	"go.starlark.net/syntax"
 )
 
+// EvalWithGlobals executes expr with additional globals and returns both the result and final globals
+// This is useful for REPL scenarios where you want to capture user-defined functions
+func EvalWithGlobals(ctx context.Context, backend Backend, sdkVersion string, expr string, additionalGlobals starlark.StringDict) (any, starlark.StringDict, error) {
+	c := &configLoader{
+		backend: backend,
+	}
+	builtinsByVersion, err := c.LoadBuiltinsForAllVersion()
+	if err != nil {
+		return nil, nil, err
+	}
+
+	var builtins starlark.StringDict
+	if sdkVersion != "" {
+		var exists bool
+		builtins, exists = builtinsByVersion[sdkVersion]
+		if !exists {
+			return nil, nil, fmt.Errorf("version %s not found", sdkVersion)
+		}
+	}
+
+	// Merge SDK builtins with additional globals
+	mergedGlobals := make(starlark.StringDict)
+	for k, v := range builtins {
+		mergedGlobals[k] = v
+	}
+	for k, v := range additionalGlobals {
+		mergedGlobals[k] = v
+	}
+
+	thread := &starlark.Thread{
+		Name: "eval",
+		Print: func(thread *starlark.Thread, msg string) {
+			// Default print function to avoid nil dereference
+			fmt.Println(msg)
+		},
+	}
+
+	opts := syntax.FileOptions{}
+	opts.LoadBindsGlobally = true
+
+	// parse
+	wasRead := false
+	f, err := opts.ParseCompoundStmt("<stdin>", func() ([]byte, error) {
+		if !wasRead {
+			wasRead = true
+			return []byte(expr + "\n"), nil
+		}
+		return nil, nil
+	})
+	if err != nil {
+		return nil, nil, err
+	}
+
+	se := soleExpr(f)
+	if se == nil {
+		return nil, nil, fmt.Errorf("no expression found")
+	}
+
+	r, err := starlark.EvalExprOptions(&opts, thread, se, mergedGlobals)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return convertValue(r), mergedGlobals, nil
+}
+
 // Eval executes expr and returns the result
 func Eval(ctx context.Context, backend Backend, sdkVersion string, expr string) (any, error) {
 	c := &configLoader{
@@ -29,6 +95,10 @@ func Eval(ctx context.Context, backend Backend, sdkVersion string, expr string) 
 	}
 	thread := &starlark.Thread{
 		Name: "eval",
+		Print: func(thread *starlark.Thread, msg string) {
+			// Default print function to avoid nil dereference
+			fmt.Println(msg)
+		},
 	}
 
 	opts := syntax.FileOptions{}
