@@ -168,6 +168,11 @@ func lexStart(l *lexer) stateFn {
 		return lexRelease
 	}
 
+	if strings.HasPrefix(l.input[l.pos:], intentPrefix) {
+		l.emit(itemGlobal)
+		return lexIntent
+	}
+
 	return lexPath
 }
 

@@ -1,6 +1,10 @@
 package commands
 
 import (
+	"os"
+
+	"github.com/charmbracelet/log"
+	"github.com/ocuroot/ocuroot/about"
 	"github.com/spf13/cobra"
 )
 
@@ -14,6 +18,7 @@ var RootCmd = &cobra.Command{
 	Long: `Ocuroot client provides command-line tools for interacting 
 with the Ocuroot release orchestration platform.`,
 	PersistentPreRun: func(cmd *cobra.Command, args []string) {
+		log.Info("Starting ocuroot", "version", about.Version, "args", os.Args[1:])
 		cleanup = setupTelemetry()
 	},
 	PersistentPostRun: func(cmd *cobra.Command, args []string) {

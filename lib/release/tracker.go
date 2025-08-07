@@ -187,6 +187,7 @@ func (r *ReleaseTracker) FilteredNextFunctions(ctx context.Context) (map[refs.Re
 	for fr, fn := range nf {
 		missing, err := r.PopulateInputs(ctx, fr, fn)
 		if err != nil {
+			log.Error("failed to populate inputs", "function", fr.String(), "error", err)
 			return nil, err
 		}
 		if len(missing) == 0 {
@@ -195,6 +196,8 @@ func (r *ReleaseTracker) FilteredNextFunctions(ctx context.Context) (map[refs.Re
 			log.Info("function missing inputs", "function", fr.String(), "missing", missing)
 		}
 	}
+
+	log.Info("Filtered functions", "count", len(out))
 
 	return out, nil
 }
@@ -220,7 +223,11 @@ func (r *ReleaseTracker) RunToPause(ctx context.Context, logger Logger) error {
 		chainSpan map[string]trace.Span      = make(map[string]trace.Span)
 	)
 
-	for fns, err := r.FilteredNextFunctions(ctx); len(fns) > 0; fns, err = r.FilteredNextFunctions(ctx) {
+	var (
+		fns map[refs.Ref]*models.Function
+		err error
+	)
+	for fns, err = r.FilteredNextFunctions(ctx); len(fns) > 0; fns, err = r.FilteredNextFunctions(ctx) {
 		if err != nil {
 			return fmt.Errorf("failed to get next functions: %w", err)
 		}
@@ -260,6 +267,9 @@ func (r *ReleaseTracker) RunToPause(ctx context.Context, logger Logger) error {
 			}
 		}
 	}
+	if err != nil {
+		return fmt.Errorf("failed to get next functions: %w", err)
+	}
 
 	releaseStatus, err := r.ReleaseStatus(ctx)
 	if err != nil {
@@ -270,6 +280,84 @@ func (r *ReleaseTracker) RunToPause(ctx context.Context, logger Logger) error {
 		// TODO: Map this to success;failure;timeout;skipped
 		attribute.String(AttributeCICDPipelineRunState, string(releaseStatus)),
 	)
+
+	return nil
+}
+
+func (r *ReleaseTracker) Task(ctx context.Context, ref string, logger Logger) error {
+	err := r.stateStore.Store.StartTransaction(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to start transaction: %w", err)
+	}
+
+	defer func() {
+		commitErr := r.stateStore.Store.CommitTransaction(ctx, "running task")
+		if commitErr != nil {
+			log.Error("failed to commit transaction", "error", commitErr)
+		}
+	}()
+
+	pr, err := refs.Parse(ref)
+	if err != nil {
+		return err
+	}
+
+	if pr.SubPath == "check_envs" {
+		err = r.checkEnvs(ctx, logger)
+		if err != nil {
+			return fmt.Errorf("failed to check environments: %w", err)
+		}
+	}
+
+	// Remove the task now it is complete
+	return r.stateStore.Store.Delete(ctx, ref)
+}
+
+func (r *ReleaseTracker) checkEnvs(ctx context.Context, logger Logger) error {
+	var err error
+
+	ref := r.stateStore.ReleaseRef
+	// Create all our function chains up front
+	functionChains, err := r.stateStore.SDKPackageToFunctionChains(ctx, r.pkg)
+	if err != nil {
+		return fmt.Errorf("failed to create function chains: %w", err)
+	}
+
+	for functionChainRef, fn := range functionChains {
+		// Only create a chain for the first run
+		// This will capture new environments
+		if path.Base(functionChainRef.String()) != "1" {
+			continue
+		}
+
+		log.Info("Creating chain", "ref", functionChainRef.String())
+
+		functionRef := FunctionRefFromChainRef(functionChainRef, fn)
+		err = r.stateStore.InitializeFunction(ctx, models.Work{
+			Release:    r.stateStore.ReleaseRef,
+			Entrypoint: functionRef,
+		}, functionChainRef, fn)
+		if err != nil {
+			return fmt.Errorf("failed to initialize function: %w", err)
+		}
+	}
+
+	// Update the package info
+	var releaseInfo ReleaseInfo
+	err = r.stateStore.Store.Get(ctx, ref.String(), &releaseInfo)
+	if err != nil {
+		return fmt.Errorf("failed to get release state: %w", err)
+	}
+
+	releaseInfo.Package = r.pkg
+
+	if err := r.stateStore.Store.Set(
+		ctx,
+		ref.String(),
+		releaseInfo,
+	); err != nil {
+		return fmt.Errorf("failed to set release state: %w", err)
+	}
 
 	return nil
 }

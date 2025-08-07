@@ -32,7 +32,7 @@ var WorkCmd = &cobra.Command{
 var WorkContinueCmd = &cobra.Command{
 	Use:   "continue",
 	Short: "Continue outstanding work",
-	Long:  `Continue outstanding work.`,
+	Long:  `Continue outstanding work against the current commit.`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx := cmd.Context()
 
@@ -194,6 +194,71 @@ var WorkTriggerCommand = &cobra.Command{
 
 		return nil
 	},
+}
+
+var WorkTasksCmd = &cobra.Command{
+	Use:   "tasks",
+	Short: "Run scheduled tasks",
+	Long:  `Run scheduled tasks against this commit.`,
+	RunE: func(cmd *cobra.Command, args []string) error {
+		ctx := cmd.Context()
+
+		tc, err := getTrackerConfig(cmd, args)
+		if err != nil {
+			return fmt.Errorf("failed to get tracker config: %w", err)
+		}
+
+		// Match any outstanding tasks for this repo
+		mr := fmt.Sprintf(
+			"%v/-/**/@%v*/task/*",
+			tc.Ref.Repo,
+			tc.Commit,
+		)
+		log.Info("Checking for tasks", "glob", mr)
+		tasks, err := tc.Store.Match(
+			ctx,
+			mr)
+		if err != nil {
+			return fmt.Errorf("failed to match refs: %w", err)
+		}
+
+		for _, ref := range tasks {
+			log.Info("Found outstanding task", "ref", ref)
+			if err := runTask(ctx, tc, ref); err != nil {
+				return fmt.Errorf("failed to run task: %w", err)
+			}
+		}
+
+		return nil
+	},
+}
+
+func runTask(ctx context.Context, tc release.TrackerConfig, ref string) error {
+	var err error
+
+	tc.Ref, err = refs.Parse(ref)
+	if err != nil {
+		return fmt.Errorf("failed to parse ref: %w", err)
+	}
+	tc.Ref.SubPath = ""
+	tc.Ref.SubPathType = refs.SubPathTypeNone
+
+	log.Info("Setting up tracker", "tc", tc)
+	tracker, err := release.TrackerForExistingRelease(ctx, tc)
+	if err != nil {
+		if errors.Is(err, refstore.ErrRefNotFound) {
+			fmt.Println("The specified release was not found. " + tc.Ref.String())
+			return nil
+		}
+		return fmt.Errorf("failed to get tracker: %w", err)
+	}
+
+	err = tracker.Task(ctx, ref, nil)
+	if err != nil {
+		return fmt.Errorf("running task in tracker: %w", err)
+	}
+
+	return nil
 }
 
 func continueRelease(ctx context.Context, tc release.TrackerConfig, logMode bool) error {
@@ -424,7 +489,6 @@ func reconcileAllDeploymentsAtCommit(ctx context.Context, store refstore.Store, 
 
 		inputs, err := librelease.PopulateInputs(ctx, store, entryFunctionInputs)
 		if err != nil {
-			log.Error("Failed to populate inputs", "ref", ref, "error", err)
 			continue
 		}
 
@@ -489,4 +553,6 @@ func init() {
 	WorkTriggerCommand.Flags().BoolP("dryrun", "d", false, "List refs for work that would be triggered")
 	WorkTriggerCommand.Flags().BoolP("intent", "i", false, "Trigger intents instead of deployments")
 	WorkCmd.AddCommand(WorkTriggerCommand)
+
+	WorkCmd.AddCommand(WorkTasksCmd)
 }

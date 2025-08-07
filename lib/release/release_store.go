@@ -49,7 +49,7 @@ func (r *releaseStore) GetReleaseInfo() (*ReleaseInfo, error) {
 	return &releaseInfo, nil
 }
 
-func (w *releaseStore) InitDeployment(ctx context.Context, env string, up bool) error {
+func (w *releaseStore) InitDeploymentUp(ctx context.Context, env string) error {
 	err := w.Store.StartTransaction(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to start transaction: %w", err)
@@ -83,10 +83,72 @@ func (w *releaseStore) InitDeployment(ctx context.Context, env string, up bool) 
 		return fmt.Errorf("release is not configured for environment %s", env)
 	}
 
-	ref, fnWork, fs, err := w.SDKWorkToFunctionChain(ctx, *work, up)
+	ref, fnWork, fs, err := w.sdkWorkToFunctionChain(ctx, *work)
 	if err != nil {
 		return fmt.Errorf("failed to get function chain: %w", err)
 	}
+	err = w.InitializeFunction(ctx, fnWork, ref, fs)
+	if err != nil {
+		return fmt.Errorf("failed to initialize function: %w", err)
+	}
+	return nil
+}
+
+func (w *releaseStore) InitDeploymentDown(ctx context.Context, env string) error {
+	// Get the current deployment
+	currentDeploymentRef := w.ReleaseRef.SetSubPathType(refs.SubPathTypeDeploy).SetSubPath(env)
+	currentDeployment := models.Work{}
+	if err := w.Store.Get(ctx, currentDeploymentRef.String(), &currentDeployment); err != nil {
+		if errors.Is(err, refstore.ErrRefNotFound) {
+			log.Info("no current deployment found. nothing to be done", "environment", env)
+			return nil
+		}
+		return fmt.Errorf("failed to get current deployment: %w", err)
+	}
+
+	entrypoint := FunctionState{}
+	if err := w.Store.Get(ctx, currentDeployment.Entrypoint.String(), &entrypoint); err != nil {
+		return fmt.Errorf("failed to get entrypoint: %w", err)
+	}
+
+	ri, err := w.GetReleaseInfo()
+	if err != nil {
+		return fmt.Errorf("failed to get release state: %w", err)
+	}
+
+	var downFunc *sdk.FunctionDef
+	for _, phase := range ri.Package.Phases {
+		for _, w := range phase.Work {
+			if w.Deployment != nil && w.Deployment.Environment == sdk.EnvironmentName(env) {
+				downFunc = &w.Deployment.Down
+				break
+			}
+		}
+		if downFunc != nil {
+			break
+		}
+	}
+	if downFunc == nil {
+		return fmt.Errorf("release has no down function %s", env)
+	}
+
+	err = w.Store.StartTransaction(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to start transaction: %w", err)
+	}
+
+	defer func() {
+		commitErr := w.Store.CommitTransaction(ctx, "initializing deployment (down)")
+		if commitErr != nil {
+			log.Error("failed to commit transaction", "error", commitErr)
+		}
+	}()
+
+	ref, fnWork, fs, err := w.sdkWorkToFunctionChainDown(ctx, env, entrypoint, *downFunc)
+	if err != nil {
+		return fmt.Errorf("failed to get function chain: %w", err)
+	}
+
 	err = w.InitializeFunction(ctx, fnWork, ref, fs)
 	if err != nil {
 		return fmt.Errorf("failed to initialize function: %w", err)
@@ -391,11 +453,10 @@ type StatusMarker struct {
 }
 
 const (
-	statusPathSegment    = "status"
-	functionsPathSegment = "functions"
+	statusPathSegment = "status"
 )
 
-func (r *releaseStore) SDKWorkToFunctionChain(ctx context.Context, work sdk.Work, down bool) (refs.Ref, models.Work, *models.Function, error) {
+func (r *releaseStore) sdkWorkToFunctionChain(ctx context.Context, work sdk.Work) (refs.Ref, models.Work, *models.Function, error) {
 	workRef := r.ReleaseRef
 
 	mWork := models.Work{
@@ -410,13 +471,8 @@ func (r *releaseStore) SDKWorkToFunctionChain(ctx context.Context, work sdk.Work
 		workRef = workRef.
 			SetSubPathType(refs.SubPathTypeDeploy).
 			SetSubPath(string(work.Deployment.Environment))
-		if down {
-			mWork.Type = models.WorkTypeDown
-			fs.Fn = work.Deployment.Down
-		} else {
-			mWork.Type = models.WorkTypeUp
-			fs.Fn = work.Deployment.Up
-		}
+		mWork.Type = models.WorkTypeUp
+		fs.Fn = work.Deployment.Up
 		fs.Inputs = work.Deployment.Inputs
 	}
 
@@ -441,6 +497,51 @@ func (r *releaseStore) SDKWorkToFunctionChain(ctx context.Context, work sdk.Work
 	return workRef, mWork, fs, nil
 }
 
+// TODO: This needs updating to use the previous chain
+func (r *releaseStore) sdkWorkToFunctionChainDown(
+	ctx context.Context,
+	environment string,
+	fn FunctionState,
+	downFunc sdk.FunctionDef,
+) (refs.Ref, models.Work, *models.Function, error) {
+	workRef := r.ReleaseRef
+	workRef = workRef.
+		SetSubPathType(refs.SubPathTypeDeploy).
+		SetSubPath(environment)
+
+	mWork := models.Work{
+		Type:    models.WorkTypeDown,
+		Release: r.ReleaseRef,
+	}
+	fs := &models.Function{
+		ID:     "1",
+		Status: models.StatusPending,
+		Fn:     downFunc,
+		Inputs: make(map[string]sdk.InputDescriptor),
+	}
+
+	for name, input := range fn.Current.Inputs {
+		i := sdk.InputDescriptor{
+			Value: input.Value,
+		}
+		if input.Value == nil {
+			i.Value = input.Default
+		}
+		fs.Inputs[name] = i
+	}
+
+	workRefString, err := refstore.IncrementPath(ctx, r.Store, fmt.Sprintf("%s/", workRef.String()))
+	if err != nil {
+		return refs.Ref{}, models.Work{}, nil, fmt.Errorf("failed to increment path: %w", err)
+	}
+	workRef, err = refs.Parse(workRefString)
+	if err != nil {
+		return refs.Ref{}, models.Work{}, nil, fmt.Errorf("failed to parse path: %w", err)
+	}
+
+	return workRef, mWork, fs, nil
+}
+
 // SDKPackageToFunctionChains converts a SDK package to a map of function chain refs to
 // function summaries representing the first function in each chain
 func (r *releaseStore) SDKPackageToFunctionChains(ctx context.Context, pkg *sdk.Package) (map[refs.Ref]*models.Function, error) {
@@ -449,7 +550,7 @@ func (r *releaseStore) SDKPackageToFunctionChains(ctx context.Context, pkg *sdk.
 	for _, phase := range pkg.Phases {
 		var currentPhaseRefs []refs.Ref
 		for _, work := range phase.Work {
-			workRef, _, fc, err := r.SDKWorkToFunctionChain(ctx, work, false)
+			workRef, _, fc, err := r.sdkWorkToFunctionChain(ctx, work)
 			if err != nil {
 				return nil, err
 			}

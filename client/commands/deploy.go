@@ -79,7 +79,7 @@ Example:
 			return err
 		}
 
-		err = releaseStore.InitDeployment(ctx, envName, true)
+		err = releaseStore.InitDeploymentDown(ctx, envName)
 		if err != nil {
 			return err
 		}

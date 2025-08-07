@@ -301,6 +301,18 @@ func TestRefStructure(t *testing.T) {
 			},
 		},
 		{
+			ref: "+/environment/production",
+			expected: Ref{
+				Global: true,
+				ReleaseOrIntent: ReleaseOrIntent{
+					Type:  Intent,
+					Value: "",
+				},
+				SubPathType: SubPathTypeEnvironment,
+				SubPath:     "production",
+			},
+		},
+		{
 			ref: "@/environment/staging#attributes/type",
 			expected: Ref{
 				Global:          true,

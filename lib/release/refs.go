@@ -14,6 +14,7 @@ var (
 	GlobPackage                 = libglob.MustCompile(`**/[^@+]+/**`, '/')
 	GlobRelease                 = libglob.MustCompile("**/{@,+}*", '/')
 	GlobWork                    = libglob.MustCompile("**/@*/{call,deploy}/*", '/')
+	GlobTask                    = libglob.MustCompile("**/@*/task/*", '/')
 	GlobDeploymentState         = libglob.MustCompile("**/@*/deploy/*", '/')
 	GlobDeploymentIntent        = libglob.MustCompile("**/+*/deploy/*", '/')
 	GlobDeploymentStateOrIntent = libglob.MustCompile("**/{@,+}*/deploy/*", '/')
