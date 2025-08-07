@@ -3,6 +3,7 @@ package client
 import (
 	"errors"
 	"fmt"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -67,6 +68,7 @@ func GetRepoInfo(repoRootPath string) (string, string, error) {
 			return "", "", fmt.Errorf("failed to get repo URL: %w", err)
 		}
 		repoURL = strings.TrimRight(repoURL, "\n")
+		repoURL = gitURLToRefPath(repoURL)
 	}
 
 	if commit == "" {
@@ -78,4 +80,20 @@ func GetRepoInfo(repoRootPath string) (string, string, error) {
 		commit = strings.TrimRight(string(commitB), "\n")
 	}
 	return repoURL, commit, nil
+}
+
+func gitURLToRefPath(gitURL string) string {
+	gitURL = strings.TrimSuffix(gitURL, ".git")
+
+	if strings.HasPrefix(gitURL, "git@") {
+		gitURL := strings.TrimPrefix(gitURL, "git@")
+		gitURL = strings.ReplaceAll(gitURL, ":", "/")
+		return gitURL
+	}
+
+	gu, err := url.Parse(gitURL)
+	if err != nil {
+		return gitURL
+	}
+	return fmt.Sprintf("%s/%s", gu.Host, strings.TrimPrefix(gu.Path, "/"))
 }
