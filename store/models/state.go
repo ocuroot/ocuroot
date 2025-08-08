@@ -41,3 +41,7 @@ type Environment struct {
 	Name       string         `json:"name"`
 	Attributes map[string]any `json:"attributes"`
 }
+
+type RepoConfig struct {
+	Source []byte `json:"source"`
+}

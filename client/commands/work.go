@@ -306,7 +306,7 @@ func triggerWork(ctx context.Context, readOnlyStore refstore.Store, configRef st
 	}
 
 	fmt.Println("Triggering work for repo: " + configRef)
-	var repoConfig RepoConfig
+	var repoConfig models.RepoConfig
 	if err := readOnlyStore.Get(ctx, configRef, &repoConfig); err != nil {
 		return fmt.Errorf("failed to get repo config (%v): %w", configRef, err)
 	}

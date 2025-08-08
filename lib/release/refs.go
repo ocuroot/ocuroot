@@ -12,6 +12,7 @@ import (
 
 var (
 	GlobPackage                 = libglob.MustCompile(`**/[^@+]+/**`, '/')
+	GlobRepoConfig              = libglob.MustCompile("**/-/repo.ocu.star/@*", '/')
 	GlobRelease                 = libglob.MustCompile("**/{@,+}*", '/')
 	GlobWork                    = libglob.MustCompile("**/@*/{call,deploy}/*", '/')
 	GlobTask                    = libglob.MustCompile("**/@*/task/*", '/')
@@ -61,6 +62,8 @@ type Custom any
 // LoadRef loads the document at a reference and
 func LoadRef(ctx context.Context, store refstore.Store, ref refs.Ref) (any, error) {
 	switch {
+	case GlobRepoConfig.Match(ref.String()):
+		return LoadRefOfType[models.RepoConfig](ctx, store, ref)
 	case GlobRelease.Match(ref.String()):
 		return LoadRefOfType[ReleaseInfo](ctx, store, ref)
 	case GlobWork.Match(ref.String()):

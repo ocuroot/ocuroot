@@ -22,7 +22,12 @@ func View(ctx context.Context, store refstore.Store) error {
 	return StartViewServer(ctx, store, 0)
 }
 
+type server struct {
+	store refstore.Store
+}
+
 func StartViewServer(ctx context.Context, store refstore.Store, port int) error {
+
 	if port == 0 {
 		var err error
 		port, err = findAvailablePort(3000, 3100) // Try ports 3000-3100
@@ -31,45 +36,45 @@ func StartViewServer(ctx context.Context, store refstore.Store, port int) error 
 		}
 	}
 
+	s := &server{
+		store: store,
+	}
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		environmentRefs, err := store.Match(ctx, "@/environment/*")
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
-		releaseRefs, err := store.Match(ctx, "**/@*")
+
+		allReleaseRefs, err := store.Match(ctx, "**/-/**@*")
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
+		// Filter out paths containing repo.ocu.star
+		var releaseRefs []string
+		for _, ref := range allReleaseRefs {
+			if !strings.Contains(ref, "repo.ocu.star") {
+				releaseRefs = append(releaseRefs, ref)
+			}
+		}
+
 		deploymentRefs, err := store.Match(ctx, "**/@*/deploy/*")
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
+
 		customStateRefs, err := store.Match(ctx, "**/@*/custom/*")
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
+
 		index := Index(len(environmentRefs), len(releaseRefs), len(deploymentRefs), len(customStateRefs))
 		index.Render(ctx, w)
 	})
-	http.HandleFunc("/match/", func(w http.ResponseWriter, r *http.Request) {
-		query := strings.TrimPrefix(r.URL.Path, "/match/")
-		refs, err := store.Match(ctx, query)
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
-
-		if r.URL.Query().Get("partial") == "true" {
-			content := Match(query, refs)
-			content.Render(ctx, w)
-			return
-		}
-		MatchPage(query, refs).Render(ctx, w)
-	})
+	http.HandleFunc("/match/", s.handleMatch)
 	http.HandleFunc("/ref/", func(w http.ResponseWriter, r *http.Request) {
 		refStr := strings.TrimPrefix(r.URL.Path, "/ref/")
 		resolvedRef, err := store.ResolveLink(ctx, refStr)
@@ -212,32 +217,4 @@ func BuildRefTree(refs []string) RefMap {
 	var tree = make(RefMap)
 	tree.AddAll(refs)
 	return tree
-}
-
-func normalizeRef(parent string, ref string) string {
-	return strings.TrimPrefix(ref, parent+"/")
-}
-
-func collapseRefs(refs []string) []string {
-	var refSet = make(map[string]struct{})
-	for _, ref := range refs {
-		refSet[ref] = struct{}{}
-	}
-	var out []string
-	for ref := range refSet {
-		isSubRef := false
-		cr := path.Dir(ref)
-		for cr != "." && cr != "" {
-			if _, exists := refSet[cr]; exists {
-				isSubRef = true
-				break
-			}
-			cr = path.Dir(cr)
-		}
-		if !isSubRef {
-			out = append(out, ref)
-		}
-	}
-	sort.Strings(out)
-	return out
 }

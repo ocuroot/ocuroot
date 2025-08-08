@@ -13,6 +13,7 @@ import (
 	"github.com/ocuroot/ocuroot/refs"
 	"github.com/ocuroot/ocuroot/refs/refstore"
 	"github.com/ocuroot/ocuroot/sdk"
+	"github.com/ocuroot/ocuroot/store/models"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 	"go.starlark.net/starlark"
@@ -110,7 +111,7 @@ func getTrackerConfigNoRef() (release.TrackerConfig, error) {
 }
 
 func execRepoFileFromStore(ctx context.Context, readOnlyStore refstore.Store, repoConfigRef string) (*local.BackendOutputs, error) {
-	var repoConfig RepoConfig
+	var repoConfig models.RepoConfig
 	if err := readOnlyStore.Get(ctx, repoConfigRef, &repoConfig); err != nil {
 		return nil, fmt.Errorf("failed to get repo config: %w", err)
 	}
@@ -313,10 +314,6 @@ func getTrackerConfig(cmd *cobra.Command, args []string) (release.TrackerConfig,
 	return tc, nil
 }
 
-type RepoConfig struct {
-	Source []byte `json:"source"`
-}
-
 func saveRepoConfig(tc release.TrackerConfig, data []byte) error {
 	// Write the repo file to the state stores for later use
 	repoRef := tc.Ref
@@ -327,7 +324,7 @@ func saveRepoConfig(tc release.TrackerConfig, data []byte) error {
 	repoRef.SubPath = ""
 	repoRef.Fragment = ""
 
-	repoConfig := RepoConfig{
+	repoConfig := models.RepoConfig{
 		Source: data,
 	}
 
@@ -339,7 +336,7 @@ func saveRepoConfig(tc release.TrackerConfig, data []byte) error {
 		tc.Store.CommitTransaction(context.Background(), "Save repo config")
 	}()
 
-	if err := tc.Store.Get(context.Background(), repoRef.String(), &RepoConfig{}); err == refstore.ErrRefNotFound {
+	if err := tc.Store.Get(context.Background(), repoRef.String(), &models.RepoConfig{}); err == refstore.ErrRefNotFound {
 		if err = tc.Store.Set(context.Background(), repoRef.String(), repoConfig); err != nil {
 			return fmt.Errorf("failed to set ref store: %w", err)
 		}
@@ -349,7 +346,7 @@ func saveRepoConfig(tc release.TrackerConfig, data []byte) error {
 	}
 
 	repoRef = repoRef.MakeIntent()
-	if err := tc.Store.Get(context.Background(), repoRef.String(), &RepoConfig{}); err == refstore.ErrRefNotFound {
+	if err := tc.Store.Get(context.Background(), repoRef.String(), &models.RepoConfig{}); err == refstore.ErrRefNotFound {
 		if err := tc.Store.Set(context.Background(), repoRef.String(), repoConfig); err != nil {
 			return fmt.Errorf("failed to set ref store: %w", err)
 		}

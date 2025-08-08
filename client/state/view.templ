@@ -6,6 +6,20 @@ import (
     "github.com/ocuroot/ui/js"
 )
 
+const (
+    GlobEnvironments = "@/environment/*"
+    GlobRepositories = "**/-/repo.ocu.star/@"
+    GlobReleases = "**/@*"
+    GlobDeployments = "**/@*/deploy/*"
+    GlobCustomState = "**/@*/custom/*"
+)
+
+templ InBody(c templ.Component) {
+    @ViewBody() {
+        @c
+    }
+}
+
 templ ViewBody(){
     @components.Body(){
 		@navbar.Navbar(navbar.NavbarConfig{
@@ -15,19 +29,23 @@ templ ViewBody(){
 			Items: []navbar.NavItem{
                 navbar.NavLink{
                     Name: "Environments",
-                    URL:  "/match/@/environment/*",
+                    URL:  "/match/" + GlobEnvironments,
+                },
+                navbar.NavLink{
+                    Name: "Repositories",
+                    URL:  "/match/" + GlobRepositories,
                 },
                 navbar.NavLink{
                     Name: "Releases",
-                    URL:  "/match/**/@*",
+                    URL:  "/match/" + GlobReleases,
                 },
                 navbar.NavLink{
                     Name: "Deployments",
-                    URL:  "/match/**/@*/deploy/*",
+                    URL:  "/match/" + GlobDeployments,
                 },
                 navbar.NavLink{
                     Name: "Custom State",
-                    URL:  "/match/**/@*/custom/*",
+                    URL:  "/match/" + GlobCustomState,
                 },
             },
 			ShowThemeToggle: true,

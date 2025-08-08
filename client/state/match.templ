@@ -2,7 +2,7 @@ package state
 
 import (
     "fmt"
-    "strings"
+    "github.com/ocuroot/ui/components/table"
 )
 
 templ MatchPage(query string, refs []string) {
@@ -11,11 +11,30 @@ templ MatchPage(query string, refs []string) {
     }
 }
 
+type ResultTableRow struct {
+    URL templ.SafeURL
+    Cells []templ.Component    
+}
+
+templ ResultTable(cols []string, rows []ResultTableRow) {
+    @table.Table(table.TableProps{}, cols...) {
+        for _, row := range rows {
+            @table.Tr(table.TRProps{
+                Link: row.URL,
+            }) {
+                for _, cell := range row.Cells {
+                    @table.Td(table.TDProps{}) {
+                        @cell
+                    }
+                }
+            }
+        }
+    }
+}   
+
 templ Match(query string, refs []string) {
     switch query {
-        case "**/@*":
-            @ReleaseList(refs)
-        case "@/environment/*":
+        case GlobEnvironments:
             @EnvironmentList(refs)
         
         default:
@@ -24,12 +43,9 @@ templ Match(query string, refs []string) {
             } else {
                 <ul class="list-style-circle">
                 for _, ref := range refs {
-                // Ignore repo config refs for now
-                if !strings.Contains(ref, "/repo.ocu.star/") {
                     <li>
                         <a href={ fmt.Sprintf("/ref/%s", ref) }>{ ref }</a>
                     </li>
-                }
             }
             </ul>
         }
