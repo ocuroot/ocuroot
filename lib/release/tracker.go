@@ -145,6 +145,15 @@ func (r *ReleaseTracker) InitRelease(ctx context.Context, commit string) error {
 		return fmt.Errorf("failed to set release state: %w", err)
 	}
 
+	// Set commit marker
+	if err := r.stateStore.Store.Set(
+		ctx,
+		ref.SetSubPathType(refs.SubPathTypeCommit).SetSubPath(commit).String(),
+		models.NewMarker(),
+	); err != nil {
+		return fmt.Errorf("failed to set release state: %w", err)
+	}
+
 	return nil
 }
 

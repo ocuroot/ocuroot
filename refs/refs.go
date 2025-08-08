@@ -102,11 +102,17 @@ const (
 	SubPathTypeCustom      SubPathType = "custom"
 	SubPathTypeEnvironment SubPathType = "environment"
 	SubPathTypeTask        SubPathType = "task"
+	SubPathTypeCommit      SubPathType = "commit"
 )
 
 func (s SubPathType) Valid() error {
 	switch s {
-	case SubPathTypeDeploy, SubPathTypeCall, SubPathTypeCustom, SubPathTypeEnvironment, SubPathTypeTask:
+	case SubPathTypeDeploy,
+		SubPathTypeCall,
+		SubPathTypeCustom,
+		SubPathTypeEnvironment,
+		SubPathTypeTask,
+		SubPathTypeCommit:
 		return nil
 	default:
 		return fmt.Errorf("invalid subpath type: %s", s)

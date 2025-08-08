@@ -25,7 +25,7 @@ func TrackerForNewRelease(ctx context.Context, tc TrackerConfig) (*release.Relea
 		return nil, nil, fmt.Errorf("release should not be specified")
 	}
 
-	tc.Ref, err = NextReleaseID(ctx, tc.Store, tc.Ref, tc.Commit)
+	tc.Ref, err = NextReleaseID(ctx, tc.Store, tc.Ref)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to get next release ID: %w", err)
 	}
@@ -93,19 +93,29 @@ func TrackerForExistingRelease(ctx context.Context, tc TrackerConfig) (*release.
 }
 
 func GetExistingReleases(ctx context.Context, tc TrackerConfig) ([]string, error) {
-	matchRef := refs.Ref{
-		Repo:     tc.Ref.Repo,
-		Filename: tc.Ref.Filename,
-		ReleaseOrIntent: refs.ReleaseOrIntent{
-			Type:  refs.Release,
-			Value: tc.Commit + ".*",
-		},
-	}
-
-	matches, err := tc.Store.Match(ctx, matchRef.String())
+	// Match releases for this repo/commit and find outstanding work for them
+	mr := fmt.Sprintf(
+		"%v/-/%v/@*/commit/%v",
+		tc.Ref.Repo,
+		tc.Ref.Filename,
+		tc.Commit,
+	)
+	releasesForCommit, err := tc.Store.Match(ctx, mr)
 	if err != nil {
-		return nil, fmt.Errorf("failed to match releases: %w", err)
+		return nil, fmt.Errorf("failed to match refs: %w", err)
 	}
 
-	return matches, nil
+	var out []string
+	for _, ref := range releasesForCommit {
+		pr, err := refs.Parse(ref)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse ref: %w", err)
+		}
+		pr = pr.SetSubPathType(refs.SubPathTypeNone).
+			SetSubPath("").
+			SetFragment("")
+		out = append(out, pr.String())
+	}
+
+	return out, nil
 }

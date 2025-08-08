@@ -49,6 +49,7 @@ var WorkContinueCmd = &cobra.Command{
 		}
 
 		// Match any outstanding functions for this repo/commit
+		// This uses the old pattern of including the commit id in the version
 		mr := fmt.Sprintf(
 			"%v/-/**/@%v*/{deploy,call}/**/functions/*/status/pending",
 			tc.Ref.Repo,
@@ -61,6 +62,21 @@ var WorkContinueCmd = &cobra.Command{
 			return fmt.Errorf("failed to match refs: %w", err)
 		}
 
+		releasesForCommit, err := releasesForCommit(ctx, tc.Store, tc.Ref.Repo, tc.Commit)
+		if err != nil {
+			return fmt.Errorf("failed to get releases for commit: %w", err)
+		}
+		for _, ref := range releasesForCommit {
+			log.Info("Found release for commit", "ref", ref)
+			outstandingWork, err := tc.Store.Match(
+				cmd.Context(),
+				fmt.Sprintf("%v/{deploy,call}/**/functions/*/status/pending", ref.String()))
+			if err != nil {
+				return fmt.Errorf("failed to match refs: %w", err)
+			}
+			outstanding = append(outstanding, outstandingWork...)
+		}
+
 		releases := make(map[refs.Ref]struct{})
 		for _, ref := range outstanding {
 			log.Info("Found outstanding function", "ref", ref)
@@ -68,9 +84,9 @@ var WorkContinueCmd = &cobra.Command{
 			if err != nil {
 				return fmt.Errorf("failed to parse ref: %w", err)
 			}
-			pr = pr.SetSubPathType(refs.SubPathTypeNone)
-			pr = pr.SetSubPath("")
-			pr = pr.SetFragment("")
+			pr = pr.SetSubPathType(refs.SubPathTypeNone).
+				SetSubPath("").
+				SetFragment("")
 			releases[pr] = struct{}{}
 		}
 
@@ -147,11 +163,6 @@ var WorkTriggerCommand = &cobra.Command{
 			return fmt.Errorf("failed to get reconcilable deployments: %w", err)
 		}
 
-		type RepoCommitTuple struct {
-			Repo   string
-			Commit string
-		}
-
 		repos := make(map[RepoCommitTuple]struct{})
 		for _, ref := range outstanding {
 			funcReady, err := librelease.FunctionIsReady(ctx, store, ref)
@@ -165,24 +176,23 @@ var WorkTriggerCommand = &cobra.Command{
 			if dryRun {
 				fmt.Println("Outstanding ref: " + ref)
 			}
-			pr, err := refs.Parse(ref)
+
+			repoCommit, err := getRepoAndCommitForRelease(ctx, ref, store)
 			if err != nil {
-				return fmt.Errorf("failed to parse ref: %w", err)
+				return fmt.Errorf("failed to get repo and commit for release: %w", err)
 			}
-			repos[RepoCommitTuple{
-				Repo:   pr.Repo,
-				Commit: strings.Split(pr.ReleaseOrIntent.Value, ".")[0],
-			}] = struct{}{}
+			repos[repoCommit] = struct{}{}
 		}
 
 		for _, ref := range reconcilable {
 			if dryRun {
 				fmt.Println("Reconcilable ref: " + ref.String())
 			}
-			repos[RepoCommitTuple{
-				Repo:   ref.Repo,
-				Commit: strings.Split(ref.ReleaseOrIntent.Value, ".")[0],
-			}] = struct{}{}
+			repoCommit, err := getRepoAndCommitForRelease(ctx, ref.String(), store)
+			if err != nil {
+				return fmt.Errorf("failed to get repo and commit for release: %w", err)
+			}
+			repos[repoCommit] = struct{}{}
 		}
 
 		for repoCommit := range repos {
@@ -208,18 +218,20 @@ var WorkTasksCmd = &cobra.Command{
 			return fmt.Errorf("failed to get tracker config: %w", err)
 		}
 
-		// Match any outstanding tasks for this repo
-		mr := fmt.Sprintf(
-			"%v/-/**/@%v*/task/*",
-			tc.Ref.Repo,
-			tc.Commit,
-		)
-		log.Info("Checking for tasks", "glob", mr)
-		tasks, err := tc.Store.Match(
-			ctx,
-			mr)
+		releasesForCommit, err := releasesForCommit(ctx, tc.Store, tc.Ref.Repo, tc.Commit)
 		if err != nil {
-			return fmt.Errorf("failed to match refs: %w", err)
+			return fmt.Errorf("failed to get releases for commit: %w", err)
+		}
+
+		var tasks []string
+		for _, ref := range releasesForCommit {
+			mr := fmt.Sprintf("%v/task/*", ref.String())
+			log.Info("Checking for tasks", "glob", mr)
+			matchedTasks, err := tc.Store.Match(ctx, mr)
+			if err != nil {
+				return fmt.Errorf("failed to match refs: %w", err)
+			}
+			tasks = append(tasks, matchedTasks...)
 		}
 
 		for _, ref := range tasks {
@@ -296,7 +308,7 @@ func triggerWork(ctx context.Context, readOnlyStore refstore.Store, configRef st
 	fmt.Println("Triggering work for repo: " + configRef)
 	var repoConfig RepoConfig
 	if err := readOnlyStore.Get(ctx, configRef, &repoConfig); err != nil {
-		return fmt.Errorf("failed to get repo config: %w", err)
+		return fmt.Errorf("failed to get repo config (%v): %w", configRef, err)
 	}
 
 	backend, be := local.BackendForRepo()

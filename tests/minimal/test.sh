@@ -5,7 +5,7 @@ export OCU_REPO_COMMIT_OVERRIDE=${OCU_REPO_COMMIT_OVERRIDE:-commitid}
 source $(dirname "$0")/../test_helpers.sh
 
 test_two_releases() {
-    echo "Test: releases"
+    echo "Test: two releases"
     echo ""
     setup_test
 
@@ -34,7 +34,6 @@ test_two_releases() {
     ocuroot work trigger
     assert_equal "0" "$?" "Failed to trigger work"
     popd > /dev/null
-
 
     echo "== continue work =="
     ocuroot work continue
@@ -136,6 +135,39 @@ test_deploy_intent() {
     echo ""
 }
 
+test_force_deploy() {
+    echo "Test: force deploy"
+    echo ""
+    setup_test
+
+    echo "== initial release =="
+    ocuroot release new basic.ocu.star
+    assert_equal "0" "$?" "Failed to release v1"
+
+    check_ref_exists "basic.ocu.star/@1"
+
+    echo "== block release to same commit =="
+    ocuroot release new basic.ocu.star
+    assert_not_equal "0" "$?" "Should not allow release to same commit"
+
+    check_ref_does_not_exist "basic.ocu.star/@2"
+
+    echo "== force release to same commit =="
+    ocuroot release new basic.ocu.star --force
+    assert_equal "0" "$?" "Failed to force release to same commit"
+
+    check_ref_exists "basic.ocu.star/@2"
+
+    echo "== deploy to different commit =="
+    OCU_REPO_COMMIT_OVERRIDE=commit2 ocuroot release new basic.ocu.star
+    assert_equal "0" "$?" "Failed to deploy to different commit"
+
+    check_ref_exists "basic.ocu.star/@3"
+
+    echo "Test succeeded"
+    echo ""
+}
+
 setup_test() {
     # Clean up any previous runs
     rm -rf .store
@@ -153,5 +185,6 @@ pushd "$(dirname "$0")" > /dev/null
 test_two_releases
 test_down
 test_deploy_intent
+test_force_deploy
 
 popd > /dev/null

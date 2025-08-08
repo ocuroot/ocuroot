@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"path"
 	"strings"
-	"time"
 
 	"github.com/charmbracelet/log"
 	"github.com/ocuroot/ocuroot/client/release"
@@ -96,7 +95,7 @@ func applyEnvironmentIntent(ctx context.Context, tc release.TrackerConfig) error
 		}
 		parsedDeployment = parsedDeployment.SetSubPathType(refs.SubPathTypeTask).SetSubPath("check_envs")
 
-		if err := store.Set(ctx, parsedDeployment.String(), librelease.StatusMarker{Time: time.Now()}); err != nil {
+		if err := store.Set(ctx, parsedDeployment.String(), models.NewMarker()); err != nil {
 			return fmt.Errorf("failed to set task: %w", err)
 		}
 	}

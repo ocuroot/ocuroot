@@ -429,9 +429,8 @@ func saveStatus(ctx context.Context, store refstore.Store, ref refs.Ref, status 
 		store.Delete(ctx, status)
 	}
 
-	t := time.Now()
 	functionStateRef := functionStatusRef.JoinSubPath(string(status))
-	if err := store.Set(ctx, functionStateRef.String(), StatusMarker{Time: t}); err != nil {
+	if err := store.Set(ctx, functionStateRef.String(), models.NewMarker()); err != nil {
 		return fmt.Errorf("failed to set function state: %w", err)
 	}
 
@@ -446,10 +445,6 @@ type FunctionState struct {
 type StatusEvent struct {
 	Time   time.Time     `json:"time"`
 	Status models.Status `json:"status"`
-}
-
-type StatusMarker struct {
-	Time time.Time `json:"time"`
 }
 
 const (
