@@ -18,6 +18,7 @@ type Store interface {
 	// Match will return all the refs matching the provided glob patterns
 	// See: https://en.wikipedia.org/wiki/Glob_(programming)
 	Match(ctx context.Context, glob ...string) ([]string, error)
+	MatchOptions(ctx context.Context, options MatchOptions, glob ...string) ([]string, error)
 
 	// Link will create a new ref that points to the target ref
 	Link(ctx context.Context, ref string, target string) error
@@ -32,4 +33,8 @@ type Store interface {
 	GetDependants(ctx context.Context, ref string) ([]string, error)
 
 	Close() error
+}
+
+type MatchOptions struct {
+	NoLinks bool
 }

@@ -70,6 +70,11 @@ func (r *ReadOnlyStore) Match(ctx context.Context, glob ...string) ([]string, er
 	return r.store.Match(ctx, glob...)
 }
 
+// MatchOptions implements RefStore.
+func (r *ReadOnlyStore) MatchOptions(ctx context.Context, options MatchOptions, glob ...string) ([]string, error) {
+	return r.store.MatchOptions(ctx, options, glob...)
+}
+
 // RemoveDependency implements RefStore.
 func (r *ReadOnlyStore) RemoveDependency(ctx context.Context, ref string, dependency string) error {
 	return ErrReadOnly

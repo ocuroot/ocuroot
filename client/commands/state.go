@@ -8,6 +8,7 @@ import (
 	"github.com/ocuroot/ocuroot/client/release"
 	"github.com/ocuroot/ocuroot/client/state"
 	"github.com/ocuroot/ocuroot/refs"
+	"github.com/ocuroot/ocuroot/refs/refstore"
 	"github.com/ocuroot/ocuroot/sdk"
 	"github.com/spf13/cobra"
 )
@@ -66,9 +67,16 @@ var StateMatchCmd = &cobra.Command{
 			glob = args[0]
 		}
 
+		noLinks, err := cmd.Flags().GetBool("no-links")
+		if err != nil {
+			return fmt.Errorf("failed to get no-links flag: %w", err)
+		}
+
 		cmd.SilenceUsage = true
 
-		refs, err := store.Match(cmd.Context(), glob)
+		refs, err := store.MatchOptions(cmd.Context(), refstore.MatchOptions{
+			NoLinks: noLinks,
+		}, glob)
 		if err != nil {
 			return fmt.Errorf("failed to match refs: %w", err)
 		}
@@ -252,6 +260,7 @@ func init() {
 	StateCmd.AddCommand(StateDiffCmd)
 	StateCmd.AddCommand(StateGetCmd)
 	StateCmd.AddCommand(StateMatchCmd)
+	StateMatchCmd.Flags().BoolP("no-links", "l", false, "Do not match links.")
 
 	StateCmd.AddCommand(StateSetIntentCmd)
 	StateSetIntentCmd.Flags().StringP("format", "f", "string", "format of the input value. One of 'string', 'starlark' or 'json'.")

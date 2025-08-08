@@ -280,6 +280,16 @@ func (g *GitRefStore) Match(ctx context.Context, glob ...string) ([]string, erro
 	return g.s.Match(ctx, glob...)
 }
 
+func (g *GitRefStore) MatchOptions(ctx context.Context, options MatchOptions, glob ...string) ([]string, error) {
+	// Make sure we're up to date
+	err := g.pull(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	return g.s.MatchOptions(ctx, options, glob...)
+}
+
 func (g *GitRefStore) AddDependency(ctx context.Context, ref string, dependency string) error {
 	err := g.pull(ctx)
 	if err != nil {

@@ -103,6 +103,11 @@ func (s *stateListener) Match(ctx context.Context, glob ...string) ([]string, er
 	return s.store.Match(ctx, glob...)
 }
 
+// MatchOptions implements RefStore.
+func (s *stateListener) MatchOptions(ctx context.Context, options MatchOptions, glob ...string) ([]string, error) {
+	return s.store.MatchOptions(ctx, options, glob...)
+}
+
 // RemoveDependency implements RefStore.
 func (s *stateListener) RemoveDependency(ctx context.Context, ref string, dependency string) error {
 	return s.store.RemoveDependency(ctx, ref, dependency)

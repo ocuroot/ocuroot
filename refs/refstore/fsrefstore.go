@@ -433,6 +433,30 @@ func (f *FSStateStore) Match(ctx context.Context, glob ...string) ([]string, err
 	return matches, nil
 }
 
+func (f *FSStateStore) MatchOptions(ctx context.Context, options MatchOptions, glob ...string) ([]string, error) {
+	rawMatches, err := f.matchRefs(glob, refsDir)
+	if err != nil {
+		return nil, err
+	}
+
+	var matches []string
+	for _, ref := range rawMatches {
+		if options.NoLinks {
+			targetRef, err := f.resolveLink(ref)
+			if err != nil {
+				return nil, fmt.Errorf("failed to resolve link: %w", err)
+			}
+
+			if targetRef.String() != ref {
+				continue
+			}
+		}
+		matches = append(matches, ref)
+	}
+
+	return matches, nil
+}
+
 func (f *FSStateStore) matchRefs(globs []string, baseDir string) ([]string, error) {
 	var compiledGlobs []libglob.Glob
 	for _, glob := range globs {

@@ -182,6 +182,21 @@ func (s *CombinedRefStore) Match(ctx context.Context, glob ...string) ([]string,
 	return out, nil
 }
 
+// MatchOptions implements release.RefStore.
+func (s *CombinedRefStore) MatchOptions(ctx context.Context, options refstore.MatchOptions, glob ...string) ([]string, error) {
+	stateRefs, err := s.stateStore.MatchOptions(ctx, options, glob...)
+	if err != nil {
+		return nil, err
+	}
+	intentRefs, err := s.intentStore.MatchOptions(ctx, options, glob...)
+	if err != nil {
+		return nil, err
+	}
+	out := append(stateRefs, intentRefs...)
+	sort.Strings(out)
+	return out, nil
+}
+
 // RemoveDependency implements release.RefStore.
 func (s *CombinedRefStore) RemoveDependency(ctx context.Context, ref string, dependency string) error {
 	return s.storeForRef(ref).RemoveDependency(ctx, ref, dependency)
