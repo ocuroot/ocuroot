@@ -365,11 +365,13 @@ func createWorkSummary(status models.Status) WorkSummary {
 			ID:   models.EnvironmentID(newID()),
 			Name: "Test Environment",
 		},
-		Chain: &FunctionChainSummary{
-			ID:   models.FunctionChainID(newID()),
-			Name: "Test Chain",
-			Functions: []*models.Function{
-				createFunctionSummary(status),
+		Chains: []*FunctionChainSummary{
+			{
+				ID:   models.FunctionChainID(newID()),
+				Name: "Test Chain",
+				Functions: []*models.Function{
+					createFunctionSummary(status),
+				},
 			},
 		},
 	}
@@ -422,7 +424,7 @@ func createRelease(phaseStatuses [][]models.Status) *ReleaseSummary {
 					ID:   models.EnvironmentID(newID()),
 					Name: fmt.Sprintf("Environment %d-%d", i, j),
 				},
-				Chain: chain,
+				Chains: []*FunctionChainSummary{chain},
 			})
 		}
 

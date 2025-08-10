@@ -82,23 +82,25 @@ templ PreviewPipeline(props PreviewPipelineProps) {
 
 // ternary is a helper function to simulate a ternary operator
 // modalsForChain renders the modals for a chain's functions
-templ previewModalsForChain(chain *FunctionChainSummary) {
-	if len(chain.Functions) > 0 {
-		// First function's inputs
-		@components.Modal(fmt.Sprintf("chain-inputs-%s", chain.ID), "Chain Inputs") {
-			if len(chain.Functions[0].Inputs) > 0 {
-				@keyvalue.FromInputMap(chain.Functions[0].Inputs)
-			} else {
-				<p>No inputs</p>
-			}
-		}
-		// Last function's outputs
-		if chain.Status() == models.StatusComplete {
-			@components.Modal(fmt.Sprintf("chain-outputs-%s", chain.ID), "Chain Outputs") {
-				if len(chain.Functions[len(chain.Functions)-1].Outputs) > 0 {
-					@keyvalue.FromVarMap(chain.Functions[len(chain.Functions)-1].Outputs)
+templ previewModalsForChain(chain []*FunctionChainSummary) {
+	for _, c := range chain {
+		if len(c.Functions) > 0 {
+			// First function's inputs
+			@components.Modal(fmt.Sprintf("chain-inputs-%s", c.ID), "Chain Inputs") {
+				if len(c.Functions[0].Inputs) > 0 {
+					@keyvalue.FromInputMap(c.Functions[0].Inputs)
 				} else {
-					<p>No outputs</p>
+					<p>No inputs</p>
+				}
+			}
+			// Last function's outputs
+			if c.Status() == models.StatusComplete {
+				@components.Modal(fmt.Sprintf("chain-outputs-%s", c.ID), "Chain Outputs") {
+					if len(c.Functions[len(c.Functions)-1].Outputs) > 0 {
+						@keyvalue.FromVarMap(c.Functions[len(c.Functions)-1].Outputs)
+					} else {
+						<p>No outputs</p>
+					}
 				}
 			}
 		}
@@ -107,7 +109,7 @@ templ previewModalsForChain(chain *FunctionChainSummary) {
 
 // ChainHeader renders a simplified header for a function chain
 templ PreviewWorkHeader(work *WorkSummary) {
-	@previewModalsForChain(work.Chain)
+	@previewModalsForChain(work.Chains)
 	<div class="group relative mb-2">
 		<div class="border border-gray-200 rounded overflow-hidden">
 			<div class="bg-gray-50 hover:bg-gray-100 px-3 py-2 transition-all duration-150 ease-in-out cursor-pointer">
@@ -130,7 +132,7 @@ templ PreviewWorkHeader(work *WorkSummary) {
 								<span class="font-semibold text-gray-800">Call</span>
 							}
 						</div>
-						<div class="text-xs text-gray-500">{ work.Chain.Name }</div>
+						<div class="text-xs text-gray-500">{ work.Chains[0].Name }</div>
 					</div>
 					// <div class="flex items-center gap-2">
 					// 	@MapSummarizedStatusToProgress(work.Chain.Status())
@@ -140,7 +142,7 @@ templ PreviewWorkHeader(work *WorkSummary) {
 			<!-- Action drawer - slides down on hover -->
 			<div class="h-0 group-hover:h-10 overflow-hidden transition-all duration-150 ease-in-out">
 				<div class="bg-gray-200 px-3 py-2 flex items-center justify-end gap-1 border-t border-gray-200">
-					@PreviewChainActionIcons(work.Chain)
+					@PreviewChainActionIcons(work.Chains)
 				</div>
 			</div>
 		</div>
@@ -148,19 +150,21 @@ templ PreviewWorkHeader(work *WorkSummary) {
 }
 
 // PreviewChainActionIcons renders the action icons for a chain
-templ PreviewChainActionIcons(chain *FunctionChainSummary) {
-	if len(chain.Functions) > 0 {
-		<button
-			class="p-1 hover:bg-gray-300 rounded"
-			title="View inputs"
-			onclick={ components.OpenModal(fmt.Sprintf("chain-inputs-%s", chain.ID)) }
-		>
-			@icons.Inputs()
+templ PreviewChainActionIcons(chain []*FunctionChainSummary) {
+	for _, c := range chain {
+		if len(c.Functions) > 0 {
+			<button
+				class="p-1 hover:bg-gray-300 rounded"
+				title="View inputs"
+				onclick={ components.OpenModal(fmt.Sprintf("chain-inputs-%s", c.ID)) }
+			>
+				@icons.Inputs()
+			</button>
+		}
+		<button class="p-1 hover:bg-gray-300 rounded" title="View dependencies">
+			@icons.Dependencies()
 		</button>
 	}
-	<button class="p-1 hover:bg-gray-300 rounded" title="View dependencies">
-		@icons.Dependencies()
-	</button>
 }
 
 // PreviewRenderPhaseSummary renders a phase summary with its chains

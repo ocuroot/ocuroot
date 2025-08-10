@@ -149,28 +149,30 @@ func getFunctionBorderClass(status models.Status) string {
 }
 
 // modalsForChain renders the modals for a chain's functions
-templ modalsForChain(chain *FunctionChainSummary, logURL LogURLFunction) {
-	@components.Modal(fmt.Sprintf("modal-chain-logs-%s", chain.ID), fmt.Sprintf("Chain Logs: %s", chain.Name), "full") {
-		if logURL != nil {
-			@logs.LogView(logURL(chain), fmt.Sprintf("chain-logs-%s", chain.ID))
-		} else {
-			<p>No log URL provided</p>
-		}
-	}
-	if len(chain.Functions) > 0 {
-		// First function's inputs
-		@components.Modal(fmt.Sprintf("chain-inputs-%s", chain.ID), "Chain Inputs") {
-			if len(chain.Functions[0].Inputs) > 0 {
-				@keyvalue.FromInputMap(chain.Functions[0].Inputs)
+templ modalsForChain(chain []*FunctionChainSummary, logURL LogURLFunction) {
+	for _, c := range chain {
+		@components.Modal(fmt.Sprintf("modal-chain-logs-%s", c.ID), fmt.Sprintf("Chain Logs: %s", c.Name), "full") {
+			if logURL != nil {
+				@logs.LogView(logURL(c), fmt.Sprintf("chain-logs-%s", c.ID))
 			} else {
-				<p>No inputs</p>
+				<p>No log URL provided</p>
+			}
+		}
+		if len(c.Functions) > 0 {
+			// First function's inputs
+			@components.Modal(fmt.Sprintf("chain-inputs-%s", c.ID), "Chain Inputs") {
+				if len(c.Functions[0].Inputs) > 0 {
+					@keyvalue.FromInputMap(c.Functions[0].Inputs)
+				} else {
+					<p>No inputs</p>
+				}
 			}
 		}
 		// Last function's outputs
-		if chain.Status() == models.StatusComplete {
-			@components.Modal(fmt.Sprintf("chain-outputs-%s", chain.ID), "Chain Outputs") {
-				if len(chain.Functions[len(chain.Functions)-1].Outputs) > 0 {
-					@keyvalue.FromVarMap(chain.Functions[len(chain.Functions)-1].Outputs)
+		if c.Status() == models.StatusComplete {
+			@components.Modal(fmt.Sprintf("chain-outputs-%s", c.ID), "Chain Outputs") {
+				if len(c.Functions[len(c.Functions)-1].Outputs) > 0 {
+					@keyvalue.FromVarMap(c.Functions[len(c.Functions)-1].Outputs)
 				} else {
 					<p>No outputs</p>
 				}
@@ -189,6 +191,8 @@ templ MapStatusToProgress(status models.Status) {
 		case models.StatusComplete:
 			@progress.SmallComplete()
 		case models.StatusFailed:
+			@progress.SmallFailed()
+		case models.StatusFailedRetried:
 			@progress.SmallFailed()
 		default:
 			@progress.SmallPending()
@@ -215,8 +219,7 @@ templ RenderPhaseProgress(counts StatusCountMap) {
 
 // ChainHeader renders a simplified header for a function chain
 templ WorkHeader(work *WorkSummary, logURL LogURLFunction) {
-	@modalsForChain(work.Chain, logURL)
-	<a href={ fmt.Sprintf("/ref/%s", work.Chain.ID) }>
+	@modalsForChain(work.Chains, logURL)
 	<div class="group relative mb-2">
 		<div class="border border-gray-200 rounded overflow-hidden">
 			<div class="bg-gray-50 hover:bg-gray-100 px-3 py-2 transition-all duration-150 ease-in-out cursor-pointer">
@@ -239,10 +242,23 @@ templ WorkHeader(work *WorkSummary, logURL LogURLFunction) {
 								<span class="font-semibold text-gray-800">Call</span>
 							}
 						</div>
-						<div class="text-xs text-gray-500">{ work.Chain.Name }</div>
+						<div class="text-xs text-gray-500">{ work.Chains[0].Name }</div>
 					</div>
 					<div class="flex items-center gap-2">
-						@MapStatusToProgress(work.Chain.Status())
+						if len(work.Chains) > 3 {
+							<div style="margin-right: 4px;">...</div>
+							for _, chain := range work.Chains[len(work.Chains)-3:] {
+								<a style="margin-right: 4px;" href={ fmt.Sprintf("/ref/%s", chain.ID) }>
+									@MapStatusToProgress(chain.Status())
+								</a>
+							}
+						} else {
+							for _, chain := range work.Chains {
+								<a href={ fmt.Sprintf("/ref/%s", chain.ID) }>
+									@MapStatusToProgress(chain.Status())
+								</a>
+							}
+						}
 					</div>
 				</div>
 			</div>
@@ -254,7 +270,6 @@ templ WorkHeader(work *WorkSummary, logURL LogURLFunction) {
 			// </div>
 		</div>
 	</div>
-	</a>
 }
 
 // ChainActionIcons renders the action icons for a chain

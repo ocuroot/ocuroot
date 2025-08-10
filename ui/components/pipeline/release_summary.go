@@ -27,7 +27,11 @@ func (rs *ReleaseSummary) GetOutputForEnvironment(environmentName, outputName st
 	for _, phase := range rs.Phases {
 		for _, work := range phase.Work {
 			if work.Environment != nil && work.Environment.Name == environmentName {
-				if output, exists := work.Chain.Outputs()[outputName]; exists {
+				if len(work.Chains) == 0 {
+					continue
+				}
+				chain := work.Chains[len(work.Chains)-1]
+				if output, exists := chain.Outputs()[outputName]; exists {
 					return &output, nil
 				}
 				return nil, fmt.Errorf("output %s not found for environment %s", outputName, environmentName)
@@ -40,8 +44,12 @@ func (rs *ReleaseSummary) GetOutputForEnvironment(environmentName, outputName st
 func (rs *ReleaseSummary) GetOutputForWork(workName, outputName string) (*any, error) {
 	for _, phase := range rs.Phases {
 		for _, work := range phase.Work {
-			if work.Chain.Name == workName {
-				if output, exists := work.Chain.Outputs()[outputName]; exists {
+			if len(work.Chains) == 0 {
+				continue
+			}
+			chain := work.Chains[len(work.Chains)-1]
+			if chain.Name == workName {
+				if output, exists := chain.Outputs()[outputName]; exists {
 					return &output, nil
 				}
 				return nil, fmt.Errorf("output %s not found for work %s", outputName, workName)
@@ -55,8 +63,12 @@ func (rs *ReleaseSummary) GetOutputForWork(workName, outputName string) (*any, e
 func (rs *ReleaseSummary) FuncChainByID(id models.FunctionChainID) *FunctionChainSummary {
 	for _, phase := range rs.Phases {
 		for _, work := range phase.Work {
-			if work.Chain != nil && work.Chain.ID == id {
-				return work.Chain
+			if len(work.Chains) == 0 {
+				continue
+			}
+			chain := work.Chains[len(work.Chains)-1]
+			if chain.ID == id {
+				return chain
 			}
 		}
 	}
@@ -159,10 +171,14 @@ func (ps *PhaseSummary) Status() models.Status {
 func (ps *PhaseSummary) StatusCounts() StatusCountMap {
 	counts := NewStatusCountMap()
 
-	// Count all chains by environment
+	// Count latest result for all chains by environment
 	for _, work := range ps.Work {
-		if work.Chain != nil {
-			counts[work.Chain.Status()]++
+		if len(work.Chains) == 0 {
+			continue
+		}
+		chain := work.Chains[len(work.Chains)-1]
+		if chain != nil {
+			counts[chain.Status()]++
 		}
 	}
 
@@ -170,17 +186,17 @@ func (ps *PhaseSummary) StatusCounts() StatusCountMap {
 }
 
 type WorkSummary struct {
-	Environment *EnvironmentSummary   `json:"environment"`
-	Chain       *FunctionChainSummary `json:"chain"`
+	Environment *EnvironmentSummary     `json:"environment"`
+	Chains      []*FunctionChainSummary `json:"chain"`
 }
 
 func (ws *WorkSummary) AddSubPath(ref refs.Ref) refs.Ref {
-	if ws.Chain == nil {
+	if len(ws.Chains) == 0 {
 		return ref
 	}
 
 	if ws.Environment != nil {
 		return ref.SetSubPathType(refs.SubPathTypeDeploy).SetSubPath(ws.Environment.Name)
 	}
-	return ref.SetSubPathType(refs.SubPathTypeCall).SetSubPath(ws.Chain.Name)
+	return ref.SetSubPathType(refs.SubPathTypeCall).SetSubPath(ws.Chains[len(ws.Chains)-1].Name)
 }

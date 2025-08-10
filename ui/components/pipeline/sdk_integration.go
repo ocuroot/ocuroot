@@ -57,45 +57,54 @@ func SDKPackageToReleaseSummary(
 				workRuns = globFilter(childRefs, fmt.Sprintf("**/-/**/@*/call/%s/*", chainName))
 			}
 
-			id := models.NewID[models.FunctionChainID]()
-			if len(workRuns) > 0 {
-				id = models.FunctionChainID(workRuns[0])
-			}
-
-			ws.Chain = &FunctionChainSummary{
-				ID:   id,
-				Name: chainName,
-				Functions: []*models.Function{
-					{
-						ID:     models.NewID[models.FunctionID](),
-						Fn:     function,
-						Inputs: inputs,
-						Status: models.StatusPending,
+			if len(workRuns) == 0 {
+				ws.Chains = append(ws.Chains, &FunctionChainSummary{
+					ID:   models.NewID[models.FunctionChainID](),
+					Name: chainName,
+					Functions: []*models.Function{
+						{
+							ID:     models.NewID[models.FunctionID](),
+							Fn:     function,
+							Inputs: inputs,
+							Status: models.StatusPending,
+						},
 					},
-				},
-				Graph: sdkGraphToHandoffGraph(pkg.Functions[function.String()].Graph),
+				})
+				p.Work = append(p.Work, ws)
+				continue
 			}
 
-			if len(workRuns) > 0 {
-				workRuns = latestFirst(workRuns)
-				for _, run := range workRuns {
-					functions := globFilter(childRefs, fmt.Sprintf("%s/functions/*", run))
-					functions = earliestFirst(functions)
-					for index, fn := range functions {
-						var status models.Status = models.StatusPending
-						statusRefs := globFilter(childRefs, fmt.Sprintf("%s/status/*", fn))
-						if len(statusRefs) > 0 {
-							status = models.Status(path.Base(statusRefs[0]))
-						}
-						var fn *models.Function
-						if index == 0 {
-							fn = ws.Chain.Functions[0]
-							ws.Chain.Functions = nil
-						}
-						fn.Status = status
-						ws.Chain.Functions = append(ws.Chain.Functions, fn)
-					}
+			for _, run := range workRuns {
+				chain := &FunctionChainSummary{
+					ID:   models.FunctionChainID(run),
+					Name: chainName,
+					Functions: []*models.Function{
+						{
+							ID:     models.NewID[models.FunctionID](),
+							Fn:     function,
+							Inputs: inputs,
+							Status: models.StatusPending,
+						},
+					},
+					Graph: sdkGraphToHandoffGraph(pkg.Functions[function.String()].Graph),
 				}
+				functions := globFilter(childRefs, fmt.Sprintf("%s/functions/*", run))
+				functions = earliestFirst(functions)
+				for index, fn := range functions {
+					var status models.Status = models.StatusPending
+					statusRefs := globFilter(childRefs, fmt.Sprintf("%s/status/*", fn))
+					if len(statusRefs) > 0 {
+						status = models.Status(path.Base(statusRefs[0]))
+					}
+					var fn *models.Function
+					if index == 0 {
+						fn = chain.Functions[0]
+						chain.Functions = nil
+					}
+					fn.Status = status
+					chain.Functions = append(chain.Functions, fn)
+				}
+				ws.Chains = append(ws.Chains, chain)
 			}
 
 			p.Work = append(p.Work, ws)
