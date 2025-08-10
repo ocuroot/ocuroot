@@ -210,6 +210,36 @@ func CheckDependencies(ctx context.Context, store refstore.Store, fs FunctionSta
 	return true, nil
 }
 
+func (w *releaseStore) FailedFunctions(ctx context.Context) (map[refs.Ref]*models.Function, error) {
+	matchRef := w.ReleaseRef.String() + "/**/functions/*/status/failed"
+	failedFunctions, err := w.Store.Match(ctx, matchRef)
+	if err != nil {
+		return nil, err
+	}
+
+	out := make(map[refs.Ref]*models.Function)
+	for _, fn := range failedFunctions {
+		functionRef := strings.TrimSuffix(fn, "/status/failed")
+
+		var function FunctionState
+		err := w.Store.Get(ctx, functionRef, &function)
+		if err != nil {
+			return nil, err
+		}
+		// TODO: There should be a clearer indicator
+		if function.Current.Fn.Name == "" {
+			return nil, fmt.Errorf("function %s not found", functionRef)
+		}
+
+		fr, err := refs.Parse(functionRef)
+		if err != nil {
+			return nil, err
+		}
+		out[fr] = &function.Current
+	}
+	return out, nil
+}
+
 func (w *releaseStore) PendingFunctions(ctx context.Context) (map[refs.Ref]*models.Function, error) {
 	matchRef := w.ReleaseRef.String() + "/**/functions/*/status/pending"
 	pendingFunctions, err := w.Store.Match(ctx, matchRef)

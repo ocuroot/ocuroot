@@ -100,3 +100,16 @@ assert_equal() {
     fi
     return 0
 }
+
+assert_not_equal() {
+    local expected="$1"
+    local actual="$2"
+    local error_message="${3:-"Expected $expected, got $actual"}"
+
+    if [ "$expected" = "$actual" ]; then
+        echo "$error_message"
+        exit 1
+    fi
+    return 0
+}
+

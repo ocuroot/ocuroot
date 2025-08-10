@@ -293,6 +293,84 @@ func (r *ReleaseTracker) RunToPause(ctx context.Context, logger Logger) error {
 	return nil
 }
 
+func (r *ReleaseTracker) Retry(ctx context.Context, logger Logger) error {
+	failedFunctions, err := r.stateStore.FailedFunctions(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to get failed functions: %w", err)
+	}
+
+	if len(failedFunctions) == 0 {
+		return errors.New("no failed functions found")
+	}
+
+	for fnRef, fn := range failedFunctions {
+		log.Info("retrying function", "ref", fnRef.String(), "function", fn)
+
+		// Create an incremented chain ref for the retry
+		chainRef := ChainRefFromFunctionRef(fnRef)
+		chainRefStr := chainRef.String()
+		lastSlashIndex := strings.LastIndex(chainRefStr, "/")
+		if lastSlashIndex == -1 {
+			return fmt.Errorf("invalid chain ref format: %s", chainRefStr)
+		}
+		chainRefPrefix := chainRefStr[:lastSlashIndex+1] // includes the trailing slash
+
+		incrementedChainPath, err := refstore.IncrementPath(ctx, r.stateStore.Store, chainRefPrefix)
+		if err != nil {
+			return fmt.Errorf("failed to increment chain ref: %w", err)
+		}
+
+		incrementedChainRef, err := refs.Parse(incrementedChainPath)
+		if err != nil {
+			return fmt.Errorf("failed to parse incremented chain ref: %w", err)
+		}
+
+		// Create the function ref within the new incremented chain
+		incrementedFnRef := incrementedChainRef.JoinSubPath("functions").JoinSubPath(string(fn.ID))
+
+		// Update the original failed function to indicate it has been retried
+		originalFn := *fn
+		originalFn.Status = models.StatusFailedRetried
+		if err := UpdateFunctionStateUnderRef(ctx, r.stateStore.Store, fnRef, &originalFn); err != nil {
+			return fmt.Errorf("failed to update original function status: %w", err)
+		}
+
+		// Update the parent chain status to failed_retried as well
+		originalChainRef := ChainRefFromFunctionRef(fnRef)
+		if err := saveStatus(ctx, r.stateStore.Store, originalChainRef, models.StatusFailedRetried); err != nil {
+			return fmt.Errorf("failed to update original chain status: %w", err)
+		}
+
+		// Reset the function state for retry - create a clean copy
+		retryFn := models.Function{
+			ID:           fn.ID,
+			Fn:           fn.Fn,
+			Status:       models.StatusPending,
+			Dependencies: fn.Dependencies,
+			Inputs:       fn.Inputs,
+			Outputs:      nil, // Clear any previous outputs
+		}
+
+		// Store the function at the incremented ref
+		if err := UpdateFunctionStateUnderRef(ctx, r.stateStore.Store, incrementedFnRef, &retryFn); err != nil {
+			return fmt.Errorf("failed to store retry function: %w", err)
+		}
+
+		// Initialize the work state for the new chain using the standalone function
+		if err := InitializeFunctionChain(ctx, r.stateStore.Store, incrementedChainRef, &retryFn); err != nil {
+			return fmt.Errorf("failed to initialize retry chain: %w", err)
+		}
+
+		// The retry function is ready to execute since inputs were already populated
+		// in the previous failed run. It will be picked up by the normal execution flow.
+		log.Info("retry function created and ready for execution",
+			"ref", incrementedFnRef.String(),
+			"inputs_available", len(retryFn.Inputs) > 0)
+	}
+
+	return r.RunToPause(ctx, logger)
+}
+
 func (r *ReleaseTracker) Task(ctx context.Context, ref string, logger Logger) error {
 	err := r.stateStore.Store.StartTransaction(ctx)
 	if err != nil {

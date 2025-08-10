@@ -259,7 +259,7 @@ func runTask(ctx context.Context, tc release.TrackerConfig, ref string) error {
 	tracker, err := release.TrackerForExistingRelease(ctx, tc)
 	if err != nil {
 		if errors.Is(err, refstore.ErrRefNotFound) {
-			fmt.Println("The specified release was not found. " + tc.Ref.String())
+			log.Error("The specified release was not found", "ref", tc.Ref.String())
 			return nil
 		}
 		return fmt.Errorf("failed to get tracker: %w", err)
@@ -282,7 +282,7 @@ func continueRelease(ctx context.Context, tc release.TrackerConfig, logMode bool
 	tracker, err := release.TrackerForExistingRelease(ctx, tc)
 	if err != nil {
 		if errors.Is(err, refstore.ErrRefNotFound) {
-			fmt.Println("The specified release was not found. " + tc.Ref.String())
+			log.Error("The specified release was not found", "ref", tc.Ref.String())
 			return nil
 		}
 		return err
@@ -301,11 +301,10 @@ func continueRelease(ctx context.Context, tc release.TrackerConfig, logMode bool
 
 func triggerWork(ctx context.Context, readOnlyStore refstore.Store, configRef string, dryRun bool) error {
 	if dryRun {
-		fmt.Println("Repo:", configRef)
 		return nil
 	}
 
-	fmt.Println("Triggering work for repo: " + configRef)
+	log.Info("Triggering work for repo", "ref", configRef)
 	var repoConfig models.RepoConfig
 	if err := readOnlyStore.Get(ctx, configRef, &repoConfig); err != nil {
 		return fmt.Errorf("failed to get repo config (%v): %w", configRef, err)

@@ -36,6 +36,8 @@ create_environment() {
     assert_equal "0" "$?" "Failed to continue work"
 
     check_ref_exists "package1.ocu.star/@/deploy/production3"
+
+    echo "Test passed"
 }
 
 delete_environment() {

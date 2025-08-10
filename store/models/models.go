@@ -13,11 +13,12 @@ type Status string
 
 // Common status constants
 const (
-	StatusPending   Status = "pending"
-	StatusRunning   Status = "running"
-	StatusComplete  Status = "complete"
-	StatusFailed    Status = "failed"
-	StatusCancelled Status = "cancelled"
+	StatusPending       Status = "pending"
+	StatusRunning       Status = "running"
+	StatusComplete      Status = "complete"
+	StatusFailed        Status = "failed"
+	StatusFailedRetried Status = "failed_retried"
+	StatusCancelled     Status = "cancelled"
 )
 
 // Log represents a log entry for a function
