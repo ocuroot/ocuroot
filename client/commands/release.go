@@ -5,8 +5,10 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"sort"
 	"strings"
 
+	"github.com/charmbracelet/log"
 	"github.com/ocuroot/ocuroot/client/release"
 	"github.com/ocuroot/ocuroot/client/state"
 	"github.com/ocuroot/ocuroot/client/tui"
@@ -52,7 +54,7 @@ var NewReleaseCmd = &cobra.Command{
 				fmt.Println()
 				fmt.Printf("There are already %d releases for this commit (listed above).\nYou can force a new release with the --force flag\n", len(existingReleases))
 
-				return nil
+				return errors.New("release failed")
 			}
 		}
 
@@ -162,6 +164,68 @@ var ContinueReleaseCmd = &cobra.Command{
 	},
 }
 
+var RetryReleaseCmd = &cobra.Command{
+	Use:   "retry [release ref]",
+	Short: "Retry a failed release",
+	Long:  `Retry a failed release.`,
+	Args:  cobra.RangeArgs(0, 1),
+	RunE: func(cmd *cobra.Command, args []string) error {
+		ctx, span := tracer.Start(cmd.Context(), "ocuroot release retry")
+		defer span.End()
+
+		tc, err := getTrackerConfig(cmd, args)
+		if err != nil {
+			return err
+		}
+
+		if tc.Ref.ReleaseOrIntent.Type != refs.Release {
+			releasesForCommit, err := releasesForCommit(ctx, tc.Store, tc.Ref.Repo, tc.Commit)
+			if err != nil {
+				return fmt.Errorf("failed to get releases for commit: %w", err)
+			}
+
+			if len(releasesForCommit) == 0 {
+				log.Error("No releases found for commit", "repo", tc.Ref.Repo, "commit", tc.Commit)
+				return nil
+			}
+
+			sort.Slice(releasesForCommit, func(i, j int) bool {
+				return releasesForCommit[i].String() > releasesForCommit[j].String()
+			})
+
+			tc.Ref = releasesForCommit[0]
+		}
+
+		cmd.SilenceUsage = true
+
+		logMode := cmd.Flag("logmode").Changed
+
+		workTui := tui.StartWorkTui(logMode)
+		defer workTui.Cleanup()
+
+		tc.Store = tuiwork.WatchForChainUpdates(tc.Store, workTui)
+
+		tracker, err := release.TrackerForExistingRelease(ctx, tc)
+		if err != nil {
+			if errors.Is(err, refstore.ErrRefNotFound) {
+				fmt.Println("The specified release was not found. " + tc.Ref.String())
+				return nil
+			}
+			return err
+		}
+
+		err = tracker.Retry(
+			ctx,
+			tuiwork.TuiLogger(workTui),
+		)
+		if err != nil {
+			return err
+		}
+
+		return checkFinalReleaseState(ctx, tracker)
+	},
+}
+
 func checkFinalReleaseState(
 	ctx context.Context,
 	tracker *librelease.ReleaseTracker,
@@ -180,13 +244,13 @@ func checkFinalReleaseState(
 
 func init() {
 	ReleaseCmd.AddCommand(NewReleaseCmd)
+	ReleaseCmd.PersistentFlags().BoolP("logmode", "l", false, "Enable log mode when initializing the TUI")
 
-	NewReleaseCmd.Flags().BoolP("logmode", "l", false, "Enable log mode when initializing the TUI")
 	NewReleaseCmd.Flags().BoolP("force", "f", false, "Create a new release even if there are existing releases for this commit")
 
 	ReleaseCmd.AddCommand(ContinueReleaseCmd)
 
-	ContinueReleaseCmd.Flags().BoolP("logmode", "l", false, "Enable log mode when initializing the TUI")
+	ReleaseCmd.AddCommand(RetryReleaseCmd)
 
 	AddRefFlags(ReleaseCmd, true)
 
