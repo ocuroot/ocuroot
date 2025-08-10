@@ -221,7 +221,11 @@ func (f *FSStateStore) Delete(ctx context.Context, ref string) error {
 		return fmt.Errorf("delete by fragment not supported")
 	}
 
-	if err := os.Remove(f.pathToRef(parsedRef)); err != nil {
+	rpath := f.pathToRef(parsedRef)
+	if err := os.Remove(rpath); err != nil {
+		return err
+	}
+	if err := os.Remove(filepath.Dir(rpath)); err != nil && !errors.Is(err, fs.ErrNotExist) {
 		return err
 	}
 
