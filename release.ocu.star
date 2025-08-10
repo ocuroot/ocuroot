@@ -121,6 +121,7 @@ phase(
 def release(ctx):
     version = ctx.inputs.prerelease.split("-")[0]
 
+    download_links = ""
     for os in oses:
         for arch in arches:
             source_path = getattr(ctx.inputs, "bucket_path_{os}_{arch}".format(os=os, arch=arch))
@@ -135,6 +136,15 @@ def release(ctx):
                     dest_path=dest_path,    
                 )
             )
+            download_links += "https://downloads.ocuroot.com/ocuroot/{version}/{os}-{arch}/ocuroot\n".format(os=os, arch=arch, version=version)
+
+    # Create a release
+    target = host.shell("git rev-parse --abbrev-ref HEAD").stdout().strip()
+    host.shell("gh release create {version} --target {target} --verify-tag --title {version} --notes \"{download_links}\"".format(
+        version=version,
+        target=target,
+        download_links=download_links,
+    ))
 
     return done(
         outputs={
