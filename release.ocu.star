@@ -139,8 +139,8 @@ def release(ctx):
             download_links += "https://downloads.ocuroot.com/ocuroot/{version}/{os}-{arch}/ocuroot\n".format(os=os, arch=arch, version=version)
 
     # Create a release
-    target = host.shell("git rev-parse --abbrev-ref HEAD").stdout().strip()
-    host.shell("gh release create {version} --target {target} --verify-tag --title {version} --notes \"{download_links}\"".format(
+    target = host.shell("git rev-parse --abbrev-ref HEAD").stdout.strip()
+    host.shell("gh release create {version} --target {target} --title {version} --notes \"{download_links}\"".format(
         version=version,
         target=target,
         download_links=download_links,
