@@ -13,8 +13,6 @@ templ Environment(props RefPageProps) {
 }
 
 templ EnvironmentContent(env models.Environment, children []string) {
-    <h2>{ env.Name }</h2>
-    <div class="divider"></div>
     <h3>Attributes</h3>
     <pre><code class="language-json">{ toJson(env.Attributes) }</code></pre>
     <div class="divider"></div>

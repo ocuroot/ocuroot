@@ -8,7 +8,7 @@ import (
 )
 
 templ ReleaseCard(props RefPageProps) {
-    <p class="subtitle">Commit: <a href="#">{ props.Content.(release.ReleaseInfo).Commit }</a></p>
+    <p>Commit: <a href="#">{ props.Content.(release.ReleaseInfo).Commit }</a></p>
     @components.Card() {
         @pipeline.Pipeline(pipeline.PipelineProps{
 			Summary: ReleasePreview(props),

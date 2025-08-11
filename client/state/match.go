@@ -35,7 +35,10 @@ func (s *server) handleMatch(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if !partial {
-		content = InBody(content)
+		content = InBody(
+			MatchHeading(query),
+			content,
+		)
 	}
 	content.Render(r.Context(), w)
 }
