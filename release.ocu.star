@@ -25,7 +25,7 @@ phase(
 def increment_version(ctx):
     prerelease = next_prerelease_version(ctx.inputs.prev_prerelease, ctx.inputs.prev_version)
 
-    commit_summaries = host.shell("git log $(git rev-parse HEAD^)..{} --pretty=%s".format(ctx.inputs.prev_version)).stdout
+    commit_summaries = host.shell("git log {}..$(git rev-parse HEAD) --pretty=%s".format(ctx.inputs.prev_version)).stdout
 
     return done(
         outputs={
