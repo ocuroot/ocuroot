@@ -25,11 +25,7 @@ phase(
 def increment_version(ctx):
     prerelease = next_prerelease_version(ctx.inputs.prev_prerelease, ctx.inputs.prev_version)
 
-    commit_summaries = ctx.inputs.commit_summaries
-    if prerelease.endswith("-1"):
-        commit_summaries = ""
-        
-    commit_summaries += host.shell("git log $(git rev-parse HEAD^)..$(git rev-parse HEAD) --pretty=%s").stdout
+    commit_summaries = host.shell("git log $(git rev-parse HEAD^)..{} --pretty=%s".format(ctx.inputs.prev_version)).stdout
 
     return done(
         outputs={
@@ -47,7 +43,6 @@ phase(
         inputs={
             "prev_prerelease": input(ref="./@/call/increment_version#output/prerelease", default="0.3.4-1"),
             "prev_version": input(ref="./@/call/release#output/version", default="0.3.4"),
-            "commit_summaries": input(ref="./@/call/increment_version#output/commit_summaries", default=""),
         },
     )],
 )
