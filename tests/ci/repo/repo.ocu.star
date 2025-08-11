@@ -20,6 +20,7 @@ def setup_store():
         store.set(state_store, intent=intent_store)
 
 def do_trigger(commit):
+    print("triggering for commit:" + commit)
     git_remote_res = host.shell("git remote get-url origin", continue_on_error=True)
     git_remote = git_remote_res.stdout.strip()
     http.post("http://localhost:8081/api/jobs", body=json.encode({"repo_uri": git_remote, "commit": commit, "command": "./continue.sh"}))

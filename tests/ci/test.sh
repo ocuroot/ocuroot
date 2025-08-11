@@ -39,7 +39,7 @@ test_ocuroot_release() {
 }
 
 test_ocuroot_release_deps() {
-    echo "Test: Ocuroot Release  (with dependencies) via CI"
+    echo "Test: Ocuroot Release (with dependencies) via CI"
     echo ""
 
     # Start the CI server in background
@@ -138,6 +138,47 @@ test_ocuroot_release_deps_commits() {
     echo ""
 }
 
+test_intent_change() {
+    echo "Test: Intent change via CI"
+    echo ""
+
+    # Start the CI server in background
+    start_ci_server
+    trap cleanup_ci_server RETURN
+
+    TEST_REPO_DIR=$(create_repo)
+    echo "Test repository created at $TEST_REPO_DIR"
+
+    # Check out repo to make state available
+    REPO_DIR=$(checkout_repo "$TEST_REPO_DIR/repo.git")
+    pushd "$REPO_DIR" > /dev/null
+
+    JOB_ID=$(schedule_job "$TEST_REPO_DIR/repo.git" "master" "./release.sh")
+    assert_equal "0" "$?" "Failed to schedule job"
+
+    wait_for_all_jobs
+
+    assert_deployed "release.ocu.star" "staging"
+    assert_ref_equals "./-/release.ocu.star/@/deploy/staging#output/foo" "bar"
+
+    ocuroot state set "+/custom/foo" "baz"
+    assert_equal "0" "$?" "Failed to update state"
+
+    JOB_ID=$(schedule_job "$TEST_REPO_DIR/repo.git" "master" "./intent.sh")
+    assert_equal "0" "$?" "Failed to schedule intent update"
+
+    wait_for_all_jobs
+
+    assert_ref_equals "@/custom/foo" "baz"
+    assert_deployed "release.ocu.star" "staging"
+    assert_ref_equals "./-/release.ocu.star/@/deploy/staging#output/foo" "baz"
+
+    popd > /dev/null
+
+    echo "Test completed"
+    echo ""
+}
+
 # Get rid of any previous runs
 cleanup_dangling_ci
 
@@ -150,6 +191,7 @@ pushd "$(dirname "$0")" > /dev/null
 test_ocuroot_release
 test_ocuroot_release_deps
 test_ocuroot_release_deps_commits
+test_intent_change
 
 popd > /dev/null
 

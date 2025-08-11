@@ -12,12 +12,12 @@ import (
 )
 
 func Diff(ctx context.Context, store refstore.Store) ([]string, error) {
-	stateRefs, err := store.Match(ctx, "**/@/{deploy,custom,environment}/*")
+	stateRefs, err := store.Match(ctx, "**/@/{deploy,custom,environment}/*", "@/{custom,environment}/*")
 	if err != nil {
 		return nil, fmt.Errorf("failed to match state refs: %w", err)
 	}
 
-	intentRefs, err := store.Match(ctx, "**/+/{deploy,custom,environment}/*")
+	intentRefs, err := store.Match(ctx, "**/+/{deploy,custom,environment}/*", "+/{custom,environment}/*")
 	if err != nil {
 		return nil, fmt.Errorf("failed to match intent refs: %w", err)
 	}
@@ -74,28 +74,41 @@ func compareIntent(
 	stateRef.ReleaseOrIntent = refs.ReleaseOrIntent{
 		Type: refs.Release,
 	}
-	if intentRef.SubPathType == refs.SubPathTypeCustom {
-		var intentContent, stateContent any
-		if err := store.Get(ctx, intentRef.String(), &intentContent); err != nil {
-			if err == refstore.ErrRefNotFound {
-				return false, nil
-			}
-			return false, fmt.Errorf("failed to get intent content: %w", err)
-		}
-		if err := store.Get(ctx, stateRef.String(), &stateContent); err != nil {
-			if err == refstore.ErrRefNotFound {
-				return false, nil
-			}
-			return false, nil
-		}
-
-		if !reflect.DeepEqual(intentContent, stateContent) {
-			return false, nil
-		}
-	} else if intentRef.SubPathType == refs.SubPathTypeDeploy {
+	switch intentRef.SubPathType {
+	case refs.SubPathTypeCustom:
+		return compareExplicitIntent(ctx, store, intentRef, stateRef)
+	case refs.SubPathTypeDeploy:
 		return compareDeployIntent(ctx, store, intentRef, stateRef)
-	} else {
-		return false, fmt.Errorf("unsupported subpath type: %s", intentRef.SubPathType)
+	case refs.SubPathTypeEnvironment:
+		return compareExplicitIntent(ctx, store, intentRef, stateRef)
+	}
+	return false, fmt.Errorf("unsupported subpath type: %s", intentRef.SubPathType)
+}
+
+// compareExplicitIntent compares the contents of the refs directly.
+// This is used for state that should match exactly between intent and state.
+func compareExplicitIntent(
+	ctx context.Context,
+	store refstore.Store,
+	intentRef refs.Ref,
+	stateRef refs.Ref,
+) (bool, error) {
+	var intentContent, stateContent any
+	if err := store.Get(ctx, intentRef.String(), &intentContent); err != nil {
+		if err == refstore.ErrRefNotFound {
+			return false, nil
+		}
+		return false, fmt.Errorf("failed to get intent content: %w", err)
+	}
+	if err := store.Get(ctx, stateRef.String(), &stateContent); err != nil {
+		if err == refstore.ErrRefNotFound {
+			return false, nil
+		}
+		return false, fmt.Errorf("failed to get state content: %w")
+	}
+
+	if !reflect.DeepEqual(intentContent, stateContent) {
+		return false, nil
 	}
 
 	return true, nil
