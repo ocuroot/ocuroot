@@ -10,6 +10,8 @@ import (
     "github.com/ocuroot/ocuroot/store/models"
     "github.com/ocuroot/ocuroot/lib/release"
     "github.com/ocuroot/ocuroot/sdk"
+    "github.com/ocuroot/ocuroot/refs"
+    "github.com/gobwas/glob"
 )
 
 type RefPageProps struct {
@@ -20,17 +22,96 @@ type RefPageProps struct {
     ChildRefs []string
 }
 
+templ HeaderLink(ref string, glob glob.Glob, text string, url string) {
+    <div class="headeritem">
+        if !glob.Match(ref) {
+            <a href={ templ.SafeURL(url) }>{ text }</a>
+        } else {
+            <h1>{ text }</h1>
+        }
+    </div>
+}
+
+templ RefHeader(props RefPageProps) {
+    <div class="ref-header">
+    if rp, err := refs.Parse(props.Ref); err == nil {
+        if rp.Repo != "" {
+            @HeaderLink(
+                props.Ref, 
+                release.GlobRepoConfig, 
+                rp.Repo, 
+                fmt.Sprintf("/match/%s/-/**/@*", rp.Repo),
+            )
+        } 
+        if rp.Filename != "" {
+            @HeaderLink(
+                props.Ref, 
+                release.GlobPackage, 
+                rp.Filename, 
+                fmt.Sprintf("/match/%s/-/%s/@*", rp.Repo, rp.Filename),
+            )
+        }
+        if rp.ReleaseOrIntent.Value != "" {
+            @HeaderLink(
+                props.Ref, 
+                release.GlobRelease, 
+                fmt.Sprintf("Release %s", rp.ReleaseOrIntent.Value), 
+                fmt.Sprintf("/ref/%s/-/%s/@%s", rp.Repo, rp.Filename, rp.ReleaseOrIntent.Value),
+            )
+        }
+        if rp.SubPathType == refs.SubPathTypeCall {
+            @HeaderLink(
+                props.Ref, 
+                release.GlobCall, 
+                fmt.Sprintf("Call '%s'", strings.Split(rp.SubPath, "/")[0]), 
+                fmt.Sprintf("/ref/%s/-/%s/@%s/call/%s", rp.Repo, rp.Filename, rp.ReleaseOrIntent.Value, strings.Split(rp.SubPath, "/")[0]),
+            )
+            if len(strings.Split(rp.SubPath, "/")) > 1 {
+                @HeaderLink(
+                    props.Ref, 
+                    release.GlobChain, 
+                    fmt.Sprintf("#%s", strings.Split(rp.SubPath, "/")[1]), 
+                    fmt.Sprintf("/ref/%s/-/%s/@%s/call/%s/%s", rp.Repo, rp.Filename, rp.ReleaseOrIntent.Value, strings.Split(rp.SubPath, "/")[0], strings.Split(rp.SubPath, "/")[1]),
+                )
+            }
+        }
+        if rp.SubPathType == refs.SubPathTypeDeploy {
+            @HeaderLink(
+                props.Ref, 
+                release.GlobDeploymentState, 
+                fmt.Sprintf("Deploy to %s", strings.Split(rp.SubPath, "/")[0]), 
+                fmt.Sprintf("/ref/%s/-/%s/@%s/deploy/%s", rp.Repo, rp.Filename, rp.ReleaseOrIntent.Value, rp.SubPath),
+            )
+            if len(strings.Split(rp.SubPath, "/")) > 1 {
+                @HeaderLink(
+                    props.Ref, 
+                    release.GlobChain, 
+                    fmt.Sprintf("#%s", strings.Split(rp.SubPath, "/")[1]), 
+                    fmt.Sprintf("/ref/%s/-/%s/@%s/deploy/%s/%s", rp.Repo, rp.Filename, rp.ReleaseOrIntent.Value, strings.Split(rp.SubPath, "/")[0], strings.Split(rp.SubPath, "/")[1]),
+                )
+            }
+        }
+        if rp.SubPathType == refs.SubPathTypeEnvironment {
+            <a href={ fmt.Sprintf("/match/%s", GlobEnvironments) }>Environments</a>
+            <h1>{ rp.SubPath }</h1>
+        }
+        if rp.SubPathType == refs.SubPathTypeCustom {
+            if rp.Repo != "" {
+                <h1>Custom: '{rp.SubPath}'</h1>
+            } else {
+                <a href={ fmt.Sprintf("/match/%s", GlobCustomState) }>Custom state</a>
+                <h1>{ rp.SubPath }</h1>
+            }
+        }
+    } else if err != nil {
+        <p>Invalid ref: { props.ResolvedRef }</p>
+        <p>{ err.Error() }</p>
+    }
+    </div>
+}
+
 templ RefPage(props RefPageProps) {
 	@ViewBody(){
-        if props.Ref != "" {
-            <h1>{ props.Ref }</h1>
-            if props.ResolvedRef != "" && props.ResolvedRef != props.Ref {
-                <p class="subtitle">{ props.ResolvedRef }</p>
-            }
-        } else {
-            <h1>All State</h1>
-        }
-
         if props.Content != nil {
             @StateContentWithHeader(props)
         } else {
@@ -45,20 +126,7 @@ templ RefPage(props RefPageProps) {
 }
 
 templ StateContentWithHeader(props RefPageProps) {
-    switch props.Content.(type) {
-        case release.ReleaseInfo:
-            <h2>Release</h2>
-        case models.Work:
-        case models.Intent:
-            <h2>Intent</h2>
-        case []sdk.Log:
-            <h2>Logs</h2>
-        case release.FunctionState:
-            <h2>Function</h2>
-        case models.Environment:
-            <h2>Environment</h2>
-        default:
-    }
+    @RefHeader(props)
     @StateContent(props)
 }
 

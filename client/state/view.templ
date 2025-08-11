@@ -14,9 +14,11 @@ const (
     GlobCustomState = "**/@*/custom/*"
 )
 
-templ InBody(c templ.Component) {
+templ InBody(components ...templ.Component) {
     @ViewBody() {
-        @c
+        for _, c := range components {
+            @c
+        }
     }
 }
 

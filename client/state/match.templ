@@ -2,12 +2,70 @@ package state
 
 import (
     "fmt"
+    "strings"
     "github.com/ocuroot/ui/components/table"
+    "github.com/ocuroot/ocuroot/lib/release"
 )
 
-templ MatchPage(query string, refs []string) {
-    @ViewBody(){
-        @Match(query, refs)
+templ MatchHeading(query string) {
+    <div class="ref-header">
+        if release.GlobRepoConfig.Match(query) {
+            <h1>Repositories</h1>
+        } else if release.GlobRelease.Match(query) {
+            @RepoMatchHeading(query)
+            @FilenameMatchHeadingNoLink(query)
+            <h1>Releases</h1>
+        } else if release.GlobEnvironment.Match(query) {
+            <h1>Environments</h1>
+        } else if release.GlobDeploymentState.Match(query) {
+            <h1>Deployments</h1>
+        } else if release.GlobCustomState.Match(query) {
+            <h1>Custom state</h1>
+        } else {
+            <h1>Refs</h1>
+        }
+    </div>
+}
+
+templ RepoMatchHeading(query string) {
+    if !strings.HasPrefix(query, "**") {
+        {{ repo := strings.Split(query, "/-")[0] }}
+        <div class="headeritem">
+            <a href={ fmt.Sprintf("/match/%s/-/repo.ocu.star/@*", repo) }>{ repo }</a>
+        </div>
+    }
+}
+
+templ FilenameMatchHeading(query string) {
+    {{ 
+    segments := strings.Split(query, "/-")
+    repo := segments[0]
+    filename := "**"
+    if len(segments) >= 2 {
+        filename = strings.Split(segments[1], "/@")[0] 
+        filename = strings.TrimPrefix(filename, "/")
+    }
+    }}
+    if !strings.HasPrefix(filename, "**") && !strings.HasPrefix(filename, "repo.ocu.star") {
+        <div class="headeritem">
+            <a href={ fmt.Sprintf("/match/%s/-/%s/@*", repo, filename) }>{ filename }</a>
+        </div>
+    }
+}
+
+templ FilenameMatchHeadingNoLink(query string) {
+    {{ 
+    segments := strings.Split(query, "/-")
+    filename := "**"
+    if len(segments) >= 2 {
+        filename = strings.Split(segments[1], "/@")[0] 
+        filename = strings.TrimPrefix(filename, "/")
+    }
+    }}
+    if !strings.HasPrefix(filename, "**") && !strings.HasPrefix(filename, "repo.ocu.star") {
+        <div class="headeritem">
+            { filename }
+        </div>
     }
 }
 
