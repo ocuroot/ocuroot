@@ -104,7 +104,7 @@ func compareExplicitIntent(
 		if err == refstore.ErrRefNotFound {
 			return false, nil
 		}
-		return false, fmt.Errorf("failed to get state content: %w")
+		return false, fmt.Errorf("failed to get state content: %w", err)
 	}
 
 	if !reflect.DeepEqual(intentContent, stateContent) {

@@ -7,7 +7,6 @@ import (
 	"strings"
 
 	"github.com/charmbracelet/log"
-	"github.com/ocuroot/ocuroot/client/release"
 	librelease "github.com/ocuroot/ocuroot/lib/release"
 	"github.com/ocuroot/ocuroot/refs"
 	"github.com/ocuroot/ocuroot/refs/refstore"
@@ -16,10 +15,8 @@ import (
 	"github.com/ocuroot/ocuroot/ui/components/pipeline"
 )
 
-func ApplyIntent(ctx context.Context, tc release.TrackerConfig) error {
-	log.Info("Applying intent", "ref", tc.Ref.String())
-
-	ref := tc.Ref
+func ApplyIntent(ctx context.Context, ref refs.Ref, store refstore.Store) error {
+	log.Info("Applying intent", "ref", ref.String())
 
 	if ref.ReleaseOrIntent.Type == refs.Release {
 		return fmt.Errorf("ref is not an intent")
@@ -27,17 +24,17 @@ func ApplyIntent(ctx context.Context, tc release.TrackerConfig) error {
 
 	switch ref.SubPathType {
 	case refs.SubPathTypeCustom:
-		err := applyCustomIntent(ctx, tc)
+		err := applyCustomIntent(ctx, ref, store)
 		if err != nil {
 			return fmt.Errorf("failed to apply custom intent: %w", err)
 		}
 	case refs.SubPathTypeEnvironment:
-		err := applyEnvironmentIntent(ctx, tc)
+		err := applyEnvironmentIntent(ctx, ref, store)
 		if err != nil {
 			return fmt.Errorf("failed to apply environment intent: %w", err)
 		}
 	case refs.SubPathTypeDeploy:
-		err := applyDeployIntent(ctx, tc)
+		err := applyDeployIntent(ctx, ref, store)
 		if err != nil {
 			return fmt.Errorf("failed to apply deploy intent: %w", err)
 		}
@@ -48,16 +45,13 @@ func ApplyIntent(ctx context.Context, tc release.TrackerConfig) error {
 	return nil
 }
 
-func applyEnvironmentIntent(ctx context.Context, tc release.TrackerConfig) error {
-	log.Info("Applying environment intent", "ref", tc.Ref.String())
-
-	ref := tc.Ref
-	store := tc.Store
+func applyEnvironmentIntent(ctx context.Context, ref refs.Ref, store refstore.Store) error {
+	log.Info("Applying environment intent", "ref", ref.String())
 
 	var content any
 	if err := store.Get(ctx, ref.String(), &content); err != nil {
 		if err == refstore.ErrRefNotFound {
-			return applyDeletedEnvironmentIntent(ctx, tc)
+			return applyDeletedEnvironmentIntent(ctx, ref, store)
 		}
 		return fmt.Errorf("failed to get environment intent: %w", err)
 	}
@@ -103,10 +97,7 @@ func applyEnvironmentIntent(ctx context.Context, tc release.TrackerConfig) error
 	return nil
 }
 
-func applyDeletedEnvironmentIntent(ctx context.Context, tc release.TrackerConfig) error {
-	ref := tc.Ref
-	store := tc.Store
-
+func applyDeletedEnvironmentIntent(ctx context.Context, ref refs.Ref, store refstore.Store) error {
 	stateRef := ref.MakeRelease()
 
 	// Undeploy everything in this environment
@@ -124,10 +115,7 @@ func applyDeletedEnvironmentIntent(ctx context.Context, tc release.TrackerConfig
 			return fmt.Errorf("failed to delete deployment: %w", err)
 		}
 
-		err = applyDeletedDeployIntent(ctx, release.TrackerConfig{
-			Ref:   dp,
-			Store: store,
-		})
+		err = applyDeletedDeployIntent(ctx, dp, store)
 		if err != nil {
 			return fmt.Errorf("failed to apply deleted deploy intent: %w", err)
 		}
@@ -141,10 +129,7 @@ func applyDeletedEnvironmentIntent(ctx context.Context, tc release.TrackerConfig
 	return nil
 }
 
-func applyCustomIntent(ctx context.Context, tc release.TrackerConfig) error {
-	ref := tc.Ref
-	store := tc.Store
-
+func applyCustomIntent(ctx context.Context, ref refs.Ref, store refstore.Store) error {
 	var content any
 	if err := store.Get(ctx, ref.String(), &content); err != nil {
 		return fmt.Errorf("failed to get intent: %w", err)
@@ -158,14 +143,11 @@ func applyCustomIntent(ctx context.Context, tc release.TrackerConfig) error {
 	return nil
 }
 
-func applyDeployIntent(ctx context.Context, tc release.TrackerConfig) error {
-	ref := tc.Ref
-	store := tc.Store
-
+func applyDeployIntent(ctx context.Context, ref refs.Ref, store refstore.Store) error {
 	var intentContent models.Intent
 	if err := store.Get(ctx, ref.String(), &intentContent); err != nil {
 		if err == refstore.ErrRefNotFound {
-			return applyDeletedDeployIntent(ctx, tc)
+			return applyDeletedDeployIntent(ctx, ref, store)
 		}
 		return fmt.Errorf("failed to get intent: %w", err)
 	}
@@ -272,18 +254,18 @@ func applyDeployIntent(ctx context.Context, tc release.TrackerConfig) error {
 	return nil
 }
 
-func applyDeletedDeployIntent(ctx context.Context, tc release.TrackerConfig) error {
-	tc.Ref = tc.Ref.MakeRelease()
-	if tc.Ref.SubPathType != refs.SubPathTypeDeploy {
+func applyDeletedDeployIntent(ctx context.Context, ref refs.Ref, store refstore.Store) error {
+	ref = ref.MakeRelease()
+	if ref.SubPathType != refs.SubPathTypeDeploy {
 		return fmt.Errorf("deployment ID must be a deployment ref")
 	}
-	if strings.Contains(tc.Ref.SubPath, "/") {
+	if strings.Contains(ref.SubPath, "/") {
 		return fmt.Errorf("deployment ID must not contain a slash")
 	}
 
-	envName := tc.Ref.SubPath
+	envName := ref.SubPath
 
-	releaseStore, err := librelease.ReleaseStore(ctx, tc.Ref.String(), tc.Store)
+	releaseStore, err := librelease.ReleaseStore(ctx, ref.String(), store)
 	if err != nil {
 		return fmt.Errorf("failed to get release store: %w", err)
 	}
