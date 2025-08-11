@@ -21,7 +21,7 @@ func Sync(ctx context.Context, store refstore.Store) error {
 			return fmt.Errorf("failed to parse diff ref: %w", err)
 		}
 		if err := ApplyIntent(ctx, diffRef, store); err != nil {
-			return fmt.Errorf("failed to apply intent: %w", err)
+			return fmt.Errorf("failed to apply intent (%s): %w", diffRef.String(), err)
 		}
 	}
 

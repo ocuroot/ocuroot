@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"reflect"
 
+	"github.com/charmbracelet/log"
 	librelease "github.com/ocuroot/ocuroot/lib/release"
 	"github.com/ocuroot/ocuroot/refs"
 	"github.com/ocuroot/ocuroot/refs/refstore"
@@ -12,35 +13,47 @@ import (
 )
 
 func Diff(ctx context.Context, store refstore.Store) ([]string, error) {
-	stateRefs, err := store.Match(ctx, "**/@/{deploy,custom,environment}/*", "@/{custom,environment}/*")
+	stateRefs, err := store.Match(ctx, "**/@/{deploy}/*", "**/@*/custom/*", "@/{custom,environment}/*")
 	if err != nil {
 		return nil, fmt.Errorf("failed to match state refs: %w", err)
 	}
 
-	intentRefs, err := store.Match(ctx, "**/+/{deploy,custom,environment}/*", "+/{custom,environment}/*")
+	intentRefs, err := store.Match(ctx, "**/+/{deploy}/*", "**/+*/custom/*", "+/{custom,environment}/*")
 	if err != nil {
 		return nil, fmt.Errorf("failed to match intent refs: %w", err)
 	}
 
 	var (
-		intentToStateRefSet = make(map[string]string)
+		stateToIntentRefSet = make(map[string]string)
 	)
 
 	var diffs []string
 
 	for _, ref := range stateRefs {
-		// Convert ref to intent
+		log.Info("State ref", "ref", ref)
 		pr, err := refs.Parse(ref)
 		if err != nil {
 			return nil, fmt.Errorf("failed to parse state ref: %w", err)
 		}
 		pr = pr.MakeIntent()
-
-		intentToStateRefSet[pr.String()] = ref
+		stateToIntentRefSet[ref] = pr.String()
 	}
 
 	for _, ref := range intentRefs {
-		if _, exists := intentToStateRefSet[ref]; exists {
+		log.Info("Intent ref", "ref", ref)
+		ir, err := refs.Parse(ref)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse intent ref: %w", err)
+		}
+		ir = ir.MakeRelease()
+		resolvedRef, err := store.ResolveLink(ctx, ir.String())
+		if err != nil {
+			return nil, fmt.Errorf("failed to resolve intent ref: %w", err)
+		}
+
+		if _, exists := stateToIntentRefSet[resolvedRef]; exists {
+			// Update ref to make sure we capture links
+			stateToIntentRefSet[resolvedRef] = ref
 			continue
 		}
 
@@ -48,12 +61,16 @@ func Diff(ctx context.Context, store refstore.Store) ([]string, error) {
 		diffs = append(diffs, ref)
 	}
 
-	for intentRef := range intentToStateRefSet {
+	for stateRef, intentRef := range stateToIntentRefSet {
 		ir, err := refs.Parse(intentRef)
 		if err != nil {
 			return nil, fmt.Errorf("failed to parse intent ref: %w", err)
 		}
-		match, err := compareIntent(ctx, store, ir)
+		sr, err := refs.Parse(stateRef)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse state ref: %w", err)
+		}
+		match, err := compareIntent(ctx, store, ir, sr)
 		if err != nil {
 			return nil, fmt.Errorf("failed to compare intent: %w", err)
 		}
@@ -69,11 +86,8 @@ func compareIntent(
 	ctx context.Context,
 	store refstore.Store,
 	intentRef refs.Ref,
+	stateRef refs.Ref,
 ) (bool, error) {
-	stateRef := intentRef
-	stateRef.ReleaseOrIntent = refs.ReleaseOrIntent{
-		Type: refs.Release,
-	}
 	switch intentRef.SubPathType {
 	case refs.SubPathTypeCustom:
 		return compareExplicitIntent(ctx, store, intentRef, stateRef)
@@ -96,6 +110,7 @@ func compareExplicitIntent(
 	var intentContent, stateContent any
 	if err := store.Get(ctx, intentRef.String(), &intentContent); err != nil {
 		if err == refstore.ErrRefNotFound {
+			// It's ok if the state exists but the intent doesn't
 			return false, nil
 		}
 		return false, fmt.Errorf("failed to get intent content: %w", err)

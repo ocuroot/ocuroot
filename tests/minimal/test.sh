@@ -9,35 +9,26 @@ test_two_releases() {
     echo ""
     setup_test
 
-    echo "== release v1 =="
+    echo "== release v1 (using omnibus work command) =="
     ocuroot release new approvals.ocu.star
     assert_equal "0" "$?" "Failed to release v1"
 
     echo "== create approval intent =="
     ocuroot state set "minimal/repo/-/approvals.ocu.star/+v1/custom/approval" 1
     assert_equal "0" "$?" "Failed to create approval intent"
-    echo "== apply approval intent =="
-    ocuroot state apply "minimal/repo/-/approvals.ocu.star/+v1/custom/approval"
-    assert_equal "0" "$?" "Failed to apply approval intent"
-    echo "== continue release up to second approval =="
-    ocuroot release continue minimal/repo/-/approvals.ocu.star/@v1
-    assert_equal "0" "$?" "Failed to continue release up to second approval"
+    echo "== apply approval intent and continue work =="
+    ocuroot work any
+    assert_equal "0" "$?" "Failed to apply approval intent and continue work"
+
+    # Check that the work was applied
+    check_ref_exists "minimal/repo/-/approvals.ocu.star/@1/custom/approval"
+
     echo "== create approval2 intent =="
-    ocuroot state set "minimal/repo/-/approvals.ocu.star/+v1/custom/approval2" 1
+    ocuroot state set "minimal/repo/-/approvals.ocu.star/+1/custom/approval2" 1
     assert_equal "0" "$?" "Failed to create approval2 intent"
-    echo "== apply approval2 intent =="
-    ocuroot state apply "minimal/repo/-/approvals.ocu.star/+v1/custom/approval2"
-    assert_equal "0" "$?" "Failed to apply approval2 intent"
-
-    echo "== trigger work from state root =="
-    pushd ".store/state" > /dev/null
-    ocuroot work trigger
-    assert_equal "0" "$?" "Failed to trigger work"
-    popd > /dev/null
-
-    echo "== continue work =="
-    ocuroot work continue
-    assert_equal "0" "$?" "Failed to continue work"
+    echo "== apply approval intent and continue work =="
+    ocuroot work any
+    assert_equal "0" "$?" "Failed to apply approval intent and continue work"
 
     assert_deployed "approvals.ocu.star" "staging"
     assert_deployed "approvals.ocu.star" "production"

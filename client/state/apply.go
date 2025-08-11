@@ -26,17 +26,17 @@ func ApplyIntent(ctx context.Context, ref refs.Ref, store refstore.Store) error 
 	case refs.SubPathTypeCustom:
 		err := applyCustomIntent(ctx, ref, store)
 		if err != nil {
-			return fmt.Errorf("failed to apply custom intent: %w", err)
+			return fmt.Errorf("custom intent: %w", err)
 		}
 	case refs.SubPathTypeEnvironment:
 		err := applyEnvironmentIntent(ctx, ref, store)
 		if err != nil {
-			return fmt.Errorf("failed to apply environment intent: %w", err)
+			return fmt.Errorf("environment intent: %w", err)
 		}
 	case refs.SubPathTypeDeploy:
 		err := applyDeployIntent(ctx, ref, store)
 		if err != nil {
-			return fmt.Errorf("failed to apply deploy intent: %w", err)
+			return fmt.Errorf("deploy intent: %w", err)
 		}
 	default:
 		return fmt.Errorf("unknown subpath type: %s", ref.SubPathType)
