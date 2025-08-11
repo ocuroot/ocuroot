@@ -34,12 +34,14 @@ func (w *WorkTui) Cleanup() error {
 	// Only run this process once
 	select {
 	case <-w.tuiDone:
+		log.SetOutput(os.Stderr)
 		return w.program.ReleaseTerminal()
 	default:
 	}
 
 	w.program.Send(DoneEvent{})
 	<-w.tuiDone
+	log.SetOutput(os.Stderr)
 	return w.program.ReleaseTerminal()
 }
 
