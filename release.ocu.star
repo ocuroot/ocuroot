@@ -160,7 +160,7 @@ def release(ctx):
     commit_summaries=ctx.inputs.commit_summaries,
 )
 
-    host.shell("gh release create {version} --target {target} --title {version} --notes \"$RELEASE_NOTES\"".format(
+    host.shell("gh release create {version} --target {target} --title \"v{version}\" --notes \"$RELEASE_NOTES\"".format(
         version=version,
         target=target,
     ), env={"RELEASE_NOTES": release_notes})
