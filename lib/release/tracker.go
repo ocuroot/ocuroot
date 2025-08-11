@@ -672,7 +672,12 @@ func (r *ReleaseTracker) Run(
 		log.Info("Recording pending function", "id", nextFunction.ID, "fn", nextFunction.Fn)
 		nextFnRef := fnRef.SetSubPath(strings.Split(fnRef.SubPath, "/functions/")[0] + "/functions/" + string(nextFunction.ID))
 		if err := UpdateFunctionStateUnderRef(ctx, r.stateStore.Store, nextFnRef, nextFunction); err != nil {
-			return result, fmt.Errorf("failed to update function state: %w", err)
+			log.Error("failed to update function state", "error", err)
+			fn.Status = models.StatusFailed
+			logger(sdk.Log{
+				Timestamp: time.Now(),
+				Message:   err.Error(),
+			})
 		}
 	}
 

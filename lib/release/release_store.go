@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"path"
+	"regexp"
 	"strings"
 	"time"
 
@@ -365,12 +366,21 @@ func (w *releaseStore) GetFunctionChainStatus(ctx context.Context, chainRef refs
 	return GetFunctionChainStatus(ctx, w.Store, chainRef)
 }
 
+var validInputNameRegex = regexp.MustCompile(`^[a-zA-Z_][a-zA-Z0-9_]*$`)
+
 func (w *releaseStore) InitializeFunction(
 	ctx context.Context,
 	workState models.Work,
 	functionChainRef refs.Ref,
 	fn *models.Function,
 ) error {
+	// Validate contents of function
+	for inputName := range fn.Inputs {
+		if !validInputNameRegex.MatchString(inputName) {
+			return fmt.Errorf("invalid input name %q", inputName)
+		}
+	}
+
 	// Set the initial (pending) state for the function
 	functionRef := FunctionRefFromChainRef(functionChainRef, fn)
 	err := UpdateFunctionStateUnderRef(ctx, w.Store, functionRef, fn)
@@ -423,6 +433,12 @@ func InitializeFunctionChain(
 }
 
 func UpdateFunctionStateUnderRef(ctx context.Context, store refstore.Store, functionRef refs.Ref, function *models.Function) error {
+	for inputName := range function.Inputs {
+		if !validInputNameRegex.MatchString(inputName) {
+			return fmt.Errorf("invalid input name %q", inputName)
+		}
+	}
+
 	functionStatusRef := functionRef.JoinSubPath(statusPathSegment)
 
 	var s FunctionState
