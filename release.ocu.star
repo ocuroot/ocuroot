@@ -24,9 +24,17 @@ phase(
 
 def increment_version(ctx):
     prerelease = next_prerelease_version(ctx.inputs.prev_prerelease, ctx.inputs.prev_version)
+
+    commit_summaries = ctx.inputs.commit_summaries
+    if prerelease.endswith("-1"):
+        commit_summaries = ""
+        
+    commit_summaries += host.shell("git log $(git rev-parse HEAD^)..$(git rev-parse HEAD) --pretty=%s").stdout
+
     return done(
         outputs={
             "prerelease": prerelease,
+            "commit_summaries": commit_summaries,
         },
         tags=[prerelease],
     )
@@ -39,6 +47,7 @@ phase(
         inputs={
             "prev_prerelease": input(ref="./@/call/increment_version#output/prerelease", default="0.3.4-1"),
             "prev_version": input(ref="./@/call/release#output/version", default="0.3.4"),
+            "commit_summaries": input(ref="./@/call/increment_version#output/commit_summaries", default=""),
         },
     )],
 )
@@ -140,11 +149,21 @@ def release(ctx):
 
     # Create a release
     target = host.shell("git rev-parse --abbrev-ref HEAD").stdout.strip()
-    host.shell("gh release create {version} --target {target} --title {version} --notes \"{download_links}\"".format(
+
+    release_notes = """# Download links
+{download_links}
+
+# Commit summaries
+
+{commit_summaries}""".format(
+    download_links=download_links,
+    commit_summaries=ctx.inputs.commit_summaries,
+)
+
+    host.shell("gh release create {version} --target {target} --title {version} --notes \"$RELEASE_NOTES\"".format(
         version=version,
         target=target,
-        download_links=download_links,
-    ))
+    ), env={"RELEASE_NOTES": release_notes})
 
     return done(
         outputs={
@@ -156,6 +175,7 @@ def release(ctx):
 def release_inputs():
     inputs = {
         "prerelease": input(ref="./@/call/increment_version#output/prerelease"),
+        "commit_summaries": input(ref="./call/increment_version#output/commit_summaries"),
     }
 
     for os in oses:
