@@ -189,6 +189,14 @@ job_logs() {
     echo $logs_response | jq -r '.logs[]'
 }
 
+all_job_logs() {
+    local jobs_response=$(curl -s "http://localhost:$CI_PORT/api/jobs")
+    for job_id in $(echo $jobs_response | jq -r '.jobs[]'); do
+        echo "Logs for job $job_id:"
+        job_logs "$job_id"
+    done
+}
+
 job_status() {
     local job_id=$1
     local job_response=$(curl -s "http://localhost:$CI_PORT/api/jobs/$job_id")

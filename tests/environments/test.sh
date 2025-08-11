@@ -65,6 +65,37 @@ delete_environment() {
     check_ref_does_not_exist "package1.ocu.star/@/deploy/production2"
 }
 
+create_environment_omnibus() {
+    export OCU_REPO_COMMIT_OVERRIDE=${OCU_REPO_COMMIT_OVERRIDE:-commitid}
+
+    setup_test
+
+    ocuroot release new environments.ocu.star
+    assert_equal "0" "$?" "Failed to release environments"
+
+    ocuroot release new package1.ocu.star
+    assert_equal "0" "$?" "Failed to release package1"
+
+    ocuroot release new package2.ocu.star
+    assert_equal "0" "$?" "Failed to release package2"
+
+    check_ref_exists "package1.ocu.star/@/deploy/production2"
+    check_ref_exists "package2.ocu.star/@/deploy/production2"
+
+    ocuroot state set -f=json "+/environment/production3" '{"attributes": {"type": "prod"},"name": "production3"}'
+    assert_equal "0" "$?" "Failed to set environment"
+
+    ocuroot work any
+    assert_equal "0" "$?" "Failed to sync environment"
+
+    # The task must have been removed once fulfilled
+    check_ref_exists "package1.ocu.star/@/deploy/production3"
+    check_ref_does_not_exist "package1.ocu.star/@1/task/check_envs"
+
+    echo "Test passed"
+}
+
+
 setup_test() {
     rm -rf .store
 }
@@ -74,4 +105,5 @@ build_ocuroot
 pushd "$(dirname "$0")" > /dev/null
 delete_environment
 create_environment
+create_environment_omnibus
 popd > /dev/null

@@ -85,7 +85,7 @@ var NewReleaseCmd = &cobra.Command{
 					return err
 				}
 
-				if err := state.ApplyIntent(ctx, tc2); err != nil {
+				if err := state.ApplyIntent(ctx, tc2.Ref, tc2.Store); err != nil {
 					return err
 				}
 

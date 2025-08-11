@@ -226,7 +226,7 @@ var StateApplyIntentCmd = &cobra.Command{
 
 		cmd.SilenceUsage = true
 
-		if err := state.ApplyIntent(ctx, tc); err != nil {
+		if err := state.ApplyIntent(ctx, tc.Ref, tc.Store); err != nil {
 			return fmt.Errorf("failed to apply intent: %w", err)
 		}
 

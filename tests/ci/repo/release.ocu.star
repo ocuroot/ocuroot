@@ -10,7 +10,12 @@ def build(ctx):
 
 def up(ctx):
     print("Deploying to {}".format(ctx.inputs.environment["name"]))
-    return done()
+    print("foo: {}".format(ctx.inputs.foo))
+    return done(
+        outputs={
+            "foo": ctx.inputs.foo,
+        }
+    )
 
 def down(ctx):
     print("Undeploying from {}".format(ctx.inputs.environment["name"]))
@@ -28,6 +33,9 @@ phase(
             up=up,
             down=down,
             environment=environment,
+            inputs={
+                "foo": input(ref="@/custom/foo", default="bar"),
+            }
         ) for environment in staging
     ],
 )
@@ -39,6 +47,9 @@ phase(
             up=up,
             down=down,
             environment=environment,
+            inputs={
+                "foo": input(ref="@/custom/foo", default="bar"),
+            }
         ) for environment in prod
     ],
 )
