@@ -47,7 +47,7 @@ func ErrorPage(errorMessage string) templ.Component {
 				}()
 			}
 			ctx = templ.InitializeContext(ctx)
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<div class=\"container mx-auto px-4 py-10\"><div><h1 class=\"text-2xl font-bold text-red-600 mb-4\">Error Previewing Package</h1><div class=\"bg-red-50 p-4 rounded mb-6\"><h2 class=\"text-lg font-semibold mb-2\">Error Details</h2><pre class=\"whitespace-pre-wrap text-sm bg-gray-100 p-3 rounded border border-gray-300 overflow-auto max-h-96\">")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<div class=\"container\"><div><h1 class=\"text-2xl font-bold text-red-600 mb-4\">Error Previewing Package</h1><div class=\"bg-red-50 p-4 rounded mb-6\"><h2 class=\"text-lg font-semibold mb-2\">Error Details</h2><pre class=\"whitespace-pre-wrap text-sm bg-gray-100 p-3 rounded border border-gray-300 overflow-auto max-h-96\">")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
