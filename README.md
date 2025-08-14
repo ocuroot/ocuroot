@@ -61,7 +61,7 @@ References are of the form:
 For example, `github.com/ocuroot/example/-/frontend/release.ocu.star/@1.0.0/call/build#output/image` would
 refer to the container image for the 1.0.0 release of the frontend in an example repo.
 
-Intent References are denpted by the use of `+` instead of `@` for the release. So
+Intent References are denoted by the use of `+` instead of `@` for the release. So
 `github.com/ocuroot/example/-/frontend/release.ocu.star/+/deploy/production` would
 refer to the desired state for deploying the frontend to the production environment.
 
