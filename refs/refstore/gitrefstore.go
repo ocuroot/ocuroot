@@ -13,6 +13,13 @@ import (
 	"github.com/ocuroot/gittools"
 )
 
+type GitSupportFileWriter interface {
+	// AddSupportFiles creates a set of files in the git repository outside of
+	// the state store contents.
+	// It can be used to add CI configuration files to a repo, for example
+	AddSupportFiles(ctx context.Context, files map[string]string) error
+}
+
 type GitRefStore struct {
 	s      *FSStateStore
 	g      *gittools.Repo
@@ -24,6 +31,7 @@ type GitRefStore struct {
 	lastPull time.Time
 }
 
+var _ GitSupportFileWriter = (*GitRefStore)(nil)
 var _ Store = (*GitRefStore)(nil)
 
 func NewGitRefStore(
@@ -323,6 +331,7 @@ func (g *GitRefStore) GetDependencies(ctx context.Context, ref string) ([]string
 
 	return g.s.GetDependencies(ctx, ref)
 }
+
 func (g *GitRefStore) GetDependants(ctx context.Context, ref string) ([]string, error) {
 	// Make sure we're up to date
 	err := g.pull(ctx)
@@ -331,4 +340,24 @@ func (g *GitRefStore) GetDependants(ctx context.Context, ref string) ([]string, 
 	}
 
 	return g.s.GetDependants(ctx, ref)
+}
+
+func (g *GitRefStore) AddSupportFiles(ctx context.Context, files map[string]string) error {
+	for k, v := range files {
+		fp := filepath.Join(g.g.RepoPath, k)
+		if err := os.MkdirAll(filepath.Dir(fp), 0755); err != nil {
+			return err
+		}
+
+		if err := os.WriteFile(fp, []byte(v), 0644); err != nil {
+			return err
+		}
+	}
+
+	if g.transactionStarted {
+		g.transactionSteps = append(g.transactionSteps, "add support files")
+		return nil
+	}
+
+	return g.applyAsNeeded(ctx, "add support files")
 }

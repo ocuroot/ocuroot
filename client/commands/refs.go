@@ -96,10 +96,11 @@ func getTrackerConfigNoRef() (release.TrackerConfig, error) {
 	}
 
 	tc := release.TrackerConfig{
-		Commit:   commit,
-		RepoPath: repoRootPath,
-		Ref:      ref,
-		Store:    s,
+		Commit:      commit,
+		RepoPath:    repoRootPath,
+		Ref:         ref,
+		Store:       s,
+		StoreConfig: be.Store,
 	}
 
 	err = saveRepoConfig(tc, data)
@@ -108,64 +109,6 @@ func getTrackerConfigNoRef() (release.TrackerConfig, error) {
 	}
 
 	return tc, nil
-}
-
-func execRepoFileFromStore(ctx context.Context, readOnlyStore refstore.Store, repoConfigRef string) (*local.BackendOutputs, error) {
-	var repoConfig models.RepoConfig
-	if err := readOnlyStore.Get(ctx, repoConfigRef, &repoConfig); err != nil {
-		return nil, fmt.Errorf("failed to get repo config: %w", err)
-	}
-
-	backend, be := local.BackendForRepo()
-
-	_, err := sdk.LoadRepoFromBytes(
-		sdk.NewNullResolver(),
-		"repo.ocu.star",
-		repoConfig.Source,
-		backend,
-		func(thread *starlark.Thread, msg string) {},
-	)
-	if err != nil {
-		return nil, fmt.Errorf("failed to load repo: %w", err)
-	}
-	return be, nil
-}
-
-func getReadWriteStore() (refstore.Store, error) {
-	rw, isRepo, err := storeFromRepoOrStateRoot()
-	if err != nil {
-		return nil, err
-	}
-
-	if isRepo {
-		return rw, nil
-	}
-
-	allRepoConfigs, err := rw.Match(context.Background(), "**/repo.ocu.star/{+,@}*")
-	if err != nil {
-		return nil, err
-	}
-
-	for _, repoConfig := range allRepoConfigs {
-		fmt.Println(repoConfig)
-		be, err := execRepoFileFromStore(context.Background(), rw, repoConfig)
-		if err != nil {
-			return nil, err
-		}
-		if be.Store == nil {
-			continue
-		}
-		if be.Store.State.Git == nil {
-			continue
-		}
-		return release.NewRefStore(
-			be.Store,
-			repoConfig,
-			"",
-		)
-	}
-
-	return nil, fmt.Errorf("no git store found")
 }
 
 func storeFromRepoOrStateRoot() (store refstore.Store, isRepo bool, err error) {
@@ -300,10 +243,11 @@ func getTrackerConfig(cmd *cobra.Command, args []string) (release.TrackerConfig,
 	}
 
 	tc := release.TrackerConfig{
-		Commit:   commit,
-		RepoPath: repoRootPath,
-		Ref:      ref,
-		Store:    s,
+		Commit:      commit,
+		RepoPath:    repoRootPath,
+		Ref:         ref,
+		Store:       s,
+		StoreConfig: be.Store,
 	}
 
 	err = saveRepoConfig(tc, data)
@@ -343,6 +287,13 @@ func saveRepoConfig(tc release.TrackerConfig, data []byte) error {
 		if err = tc.Store.Link(context.Background(), repoRef.SetVersion("").String(), repoRef.String()); err != nil {
 			return fmt.Errorf("failed to link ref store: %w", err)
 		}
+
+		// Add support files if this is the first time we've seen this commit
+		if gitSupportFilesBackend, ok := tc.Store.(refstore.GitSupportFileWriter); ok && tc.StoreConfig != nil && tc.StoreConfig.State.Git != nil {
+			if err := gitSupportFilesBackend.AddSupportFiles(context.Background(), tc.StoreConfig.State.Git.SupportFiles); err != nil {
+				return fmt.Errorf("failed to add support files: %w", err)
+			}
+		}
 	}
 
 	repoRef = repoRef.MakeIntent()
@@ -352,6 +303,13 @@ func saveRepoConfig(tc release.TrackerConfig, data []byte) error {
 		}
 		if err := tc.Store.Link(context.Background(), repoRef.SetVersion("").String(), repoRef.String()); err != nil {
 			return fmt.Errorf("failed to link ref store: %w", err)
+		}
+
+		// Add support files if this is the first time we've seen this commit
+		if combinedSupportFilesBackend, ok := tc.Store.(release.CombinedSupportFilesBackend); ok && tc.StoreConfig != nil {
+			if err := combinedSupportFilesBackend.IntentAddSupportFiles(context.Background(), tc.StoreConfig); err != nil {
+				return fmt.Errorf("failed to add support files: %w", err)
+			}
 		}
 	}
 
