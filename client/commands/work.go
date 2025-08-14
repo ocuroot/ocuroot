@@ -72,8 +72,8 @@ finally it will trigger work for other commits ('ocuroot work trigger').
 			return fmt.Errorf("failed to get tracker config: %w", err)
 		}
 
-		log.Info("Starting release work")
-		if err := doReleaseWorkForCommit(ctx, tc, logMode); err != nil {
+		log.Info("Starting state sync")
+		if err := state.Sync(ctx, tc.Store); err != nil {
 			return err
 		}
 
@@ -82,8 +82,8 @@ finally it will trigger work for other commits ('ocuroot work trigger').
 			return err
 		}
 
-		log.Info("Starting state sync")
-		if err := state.Sync(ctx, tc.Store); err != nil {
+		log.Info("Starting release work")
+		if err := doReleaseWorkForCommit(ctx, tc, logMode); err != nil {
 			return err
 		}
 
