@@ -52,6 +52,12 @@ test_gitstate() {
     assert_not_deployed "basic.ocu.star" "production"
     assert_deployed "basic.ocu.star" "production2"
 
+    echo "== check for files in state store =="
+    check_file_in_remote "$STATE_REMOTE" "support.txt" "state"
+
+    echo "== check for files in intent store =="
+    check_file_in_remote "$INTENT_REMOTE" "support.txt" "intent"
+
     echo "Test succeeded"
     echo ""
 }

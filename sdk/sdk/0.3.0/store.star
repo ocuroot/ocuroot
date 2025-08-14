@@ -13,7 +13,7 @@ def _set_store(state,intent=None):
     """
     backend.store.set(json.encode({"state": state, "intent": intent}))
 
-def _git_store(remote_url, branch=None):
+def _git_store(remote_url, branch=None, support_files=None):
     """
     Creates a git store for the given remote URL.
     
@@ -28,6 +28,8 @@ def _git_store(remote_url, branch=None):
         "git": {
             "remote_url": remote_url,
             "branch": branch,
+            # TODO: Should this accept a function?
+            "support_files": support_files,
         }
     }
 

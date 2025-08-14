@@ -137,8 +137,9 @@ type Store struct {
 
 type StorageBackend struct {
 	Git *struct {
-		RemoteURL string `json:"remote_url"`
-		Branch    string `json:"branch"`
+		RemoteURL    string            `json:"remote_url"`
+		Branch       string            `json:"branch"`
+		SupportFiles map[string]string `json:"support_files,omitempty"`
 	} `json:"git,omitempty"`
 	Fs *struct {
 		Path string `json:"path"`

@@ -63,7 +63,13 @@ func newRefStoreFromBackend(
 	return nil, fmt.Errorf("only filesystem and git state stores are currently supported")
 }
 
+type CombinedSupportFilesBackend interface {
+	refstore.GitSupportFileWriter
+	IntentAddSupportFiles(ctx context.Context, config *sdk.Store) error
+}
+
 var _ refstore.Store = &CombinedRefStore{}
+var _ CombinedSupportFilesBackend = &CombinedRefStore{}
 
 type CombinedRefStore struct {
 	stateStore  refstore.Store
@@ -209,4 +215,18 @@ func (s *CombinedRefStore) Set(ctx context.Context, ref string, v any) error {
 
 func (s *CombinedRefStore) AddDependency(ctx context.Context, ref string, dependency string) error {
 	return s.storeForRef(ref).AddDependency(ctx, ref, dependency)
+}
+
+func (s *CombinedRefStore) IntentAddSupportFiles(ctx context.Context, config *sdk.Store) error {
+	if config.Intent.Git == nil {
+		return nil
+	}
+	if gitSupportFilesBackend, ok := s.intentStore.(refstore.GitSupportFileWriter); ok {
+		return gitSupportFilesBackend.AddSupportFiles(ctx, config.Intent.Git.SupportFiles)
+	}
+	return nil
+}
+
+func (s *CombinedRefStore) AddSupportFiles(ctx context.Context, files map[string]string) error {
+	return s.stateStore.(refstore.GitSupportFileWriter).AddSupportFiles(ctx, files)
 }

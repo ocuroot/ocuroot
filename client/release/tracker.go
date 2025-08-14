@@ -12,10 +12,11 @@ import (
 )
 
 type TrackerConfig struct {
-	Commit   string
-	RepoPath string
-	Ref      refs.Ref
-	Store    refstore.Store
+	Commit      string
+	RepoPath    string
+	Ref         refs.Ref
+	Store       refstore.Store
+	StoreConfig *sdk.Store
 }
 
 func TrackerForNewRelease(ctx context.Context, tc TrackerConfig) (*release.ReleaseTracker, []sdk.Environment, error) {
