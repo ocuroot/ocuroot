@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"path"
 	"regexp"
+	"strconv"
 	"strings"
 	"time"
 
@@ -597,7 +598,14 @@ func (r *releaseStore) SDKPackageToFunctionChains(ctx context.Context, pkg *sdk.
 			}
 			fc.Dependencies = previousPhaseRefs
 			functionChains[workRef] = fc
-			currentPhaseRefs = append(currentPhaseRefs, workRef.JoinSubPath("status", string(models.StatusComplete)))
+
+			// Create a matchable ref for the dependency
+			dependencyRef := workRef
+			if _, err := strconv.Atoi(path.Base(dependencyRef.SubPath)); err == nil {
+				dependencyRef.SubPath = path.Join(path.Dir(dependencyRef.SubPath), "*")
+			}
+			dependencyRef = dependencyRef.JoinSubPath("status", string(models.StatusComplete))
+			currentPhaseRefs = append(currentPhaseRefs, dependencyRef)
 		}
 		previousPhaseRefs = currentPhaseRefs
 	}

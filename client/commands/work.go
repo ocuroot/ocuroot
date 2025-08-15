@@ -150,7 +150,6 @@ func doReleaseWorkForCommit(ctx context.Context, tc release.TrackerConfig, logMo
 	}
 
 	for releaseRef := range releases {
-		fmt.Println("Continuing release: " + releaseRef.String())
 		tc.Ref = releaseRef
 
 		if err := continueRelease(ctx, tc, logMode); err != nil {

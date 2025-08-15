@@ -21,6 +21,24 @@ phase(
             up=up,
             down=down,
             environment=environment,
-        ) for environment in environments()
+        ) for environment in environments() 
     ],
 )
+
+def postrelease(ctx):
+    return done(
+        outputs={
+            "foo": "bar",
+        }
+    )
+
+phase(
+    "postrelease",
+    work=[
+        call(
+            fn=postrelease,
+            name="postrelease",
+        )
+    ],
+)
+
