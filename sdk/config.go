@@ -79,7 +79,7 @@ func LoadConfig(
 		}
 	}
 
-	pFile, mod, err := starlark.SourceProgramOptions(
+	_, mod, err := starlark.SourceProgramOptions(
 		syntax.LegacyFileOptions(),
 		filepath.Base(filename),
 		string(data),
@@ -94,8 +94,6 @@ func LoadConfig(
 	if err != nil {
 		return nil, err
 	}
-
-	c.trees = BuildStackTrees(pFile)
 
 	loader := NewModuleLoader(resolver.Child(filename), builtinsByVersion, nil)
 
@@ -280,21 +278,10 @@ func IdentifySDKVersion(filename string, data []byte) (string, error) {
 }
 
 type configLoader struct {
-	trees    []*CallStackTree
 	backend  Backend
 	resolver ModuleResolver
 	pkg      *Package
 	print    func(thread *starlark.Thread, msg string)
-}
-
-func (c *configLoader) callsForFunction(functionName string) []Call {
-	var callList []Call
-	for _, tree := range c.trees {
-		if tree.FunctionName == functionName {
-			callList = append(callList, tree.Calls...)
-		}
-	}
-	return callList
 }
 
 func renderFunction(thread *starlark.Thread, fn *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
