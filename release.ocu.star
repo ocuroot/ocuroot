@@ -57,7 +57,7 @@ def build(ctx):
 
     # Build the binary for this platform
     output = "./.build/{os}-{arch}/ocuroot".format(os=os, arch=arch)
-    host.shell("GOOS={os} GOARCH={arch} go build -o {output} ./cmd/ocuroot".format(os=os, arch=arch, output=output))
+    host.shell("GOOS={os} GOARCH={arch} go build -o {output} -ldflags=\"-X 'github.com/ocuroot/ocuroot/about.Version={version}'\" ./cmd/ocuroot".format(os=os, arch=arch, output=output, version=version))
     
     # Upload to R2
     bucket_path = "ocuroot_binaries:client-binaries/ocuroot/{version}/{os}-{arch}".format(
