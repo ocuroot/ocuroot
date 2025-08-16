@@ -86,7 +86,6 @@ func SDKPackageToReleaseSummary(
 							Status: models.StatusPending,
 						},
 					},
-					Graph: sdkGraphToHandoffGraph(pkg.Functions[function.String()].Graph),
 				}
 				functions := globFilter(childRefs, fmt.Sprintf("%s/functions/*", run))
 				functions = earliestFirst(functions)
@@ -114,17 +113,6 @@ func SDKPackageToReleaseSummary(
 	}
 
 	return summary
-}
-
-func sdkGraphToHandoffGraph(graph []sdk.HandoffEdge) []HandoffEdge {
-	out := make([]HandoffEdge, len(graph))
-	for i, edge := range graph {
-		out[i] = HandoffEdge{
-			From: edge.From,
-			To:   edge.To,
-		}
-	}
-	return out
 }
 
 func globFilter(refs []string, glob string) []string {

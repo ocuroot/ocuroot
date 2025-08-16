@@ -86,11 +86,10 @@ func (c *configLoader) LoadBuiltins(version string) (starlark.StringDict, error)
 	backendBuiltins := c.backendToBuiltins(c.backend)
 
 	defaultBuiltins := starlark.StringDict{
-		"struct":            starlark.NewBuiltin("struct", starlarkstruct.Make),
-		"render_function":   starlark.NewBuiltin("render_function", renderFunction),
-		"json":              starlarkjson.Module,
-		"get_handoff_graph": starlark.NewBuiltin("get_handoff_graph", c.getHandoffGraph),
-		"backend":           starlarkstruct.FromStringDict(starlark.String("backend"), backendBuiltins),
+		"struct":          starlark.NewBuiltin("struct", starlarkstruct.Make),
+		"render_function": starlark.NewBuiltin("render_function", renderFunction),
+		"json":            starlarkjson.Module,
+		"backend":         starlarkstruct.FromStringDict(starlark.String("backend"), backendBuiltins),
 	}
 
 	// Execute all the builtins

@@ -128,8 +128,6 @@ def _add_func(func):
         fd = {
             "function": func,
         }
-        g = get_handoff_graph(func["name"])
-        fd["graph"] = g
         functions[func["name"]+"/"+func["pos"]] = fd
 
     package["functions"] = functions

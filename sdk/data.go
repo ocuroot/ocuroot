@@ -51,16 +51,7 @@ type InputDescriptor struct {
 }
 
 type Function struct {
-	Function FunctionDef   `json:"function"`
-	Graph    []HandoffEdge `json:"graph"`
-}
-
-type HandoffEdge struct {
-	From          string `json:"from"`
-	To            string `json:"to"`
-	Annotation    string `json:"annotation"`
-	Delay         string `json:"delay"`
-	NeedsApproval bool   `json:"needs_approval,omitempty"`
+	Function FunctionDef `json:"function"`
 }
 
 type FunctionName string
