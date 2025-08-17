@@ -61,11 +61,11 @@ func (e *EnvironmentBackend) All(ctx context.Context) ([]sdk.Environment, error)
 	return environments, nil
 }
 
-var environmentNameRegex = regexp.MustCompile(`^[a-zA-Z0-9_]+$`)
+var environmentNameRegex = regexp.MustCompile(`^[a-zA-Z0-9_\.]+$`)
 
 func ValidateEnvironment(env sdk.Environment) error {
 	if !environmentNameRegex.MatchString(string(env.Name)) {
-		return fmt.Errorf("environment names may only contain letters, numbers and underscores: %s", env.Name)
+		return fmt.Errorf("environment names may only contain letters, numbers, periods and underscores: %s", env.Name)
 	}
 	return nil
 }
