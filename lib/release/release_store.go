@@ -282,9 +282,20 @@ func (w *releaseStore) PendingFunctions(ctx context.Context) (map[refs.Ref]*mode
 	return out, nil
 }
 
+var (
+	TagRegex        = regexp.MustCompile(`^[a-zA-Z0-9-_\.]+$`)
+	TagNumericRegex = regexp.MustCompile(`^[0-9]+$`)
+)
+
 // AddTags implements ReleaseStateStore.
 func (w *releaseStore) AddTags(ctx context.Context, tags []string) error {
 	for _, tag := range tags {
+		if !TagRegex.MatchString(tag) {
+			return fmt.Errorf("invalid tag: %s", tag)
+		}
+		if TagNumericRegex.MatchString(tag) {
+			return fmt.Errorf("tags must not be a number: %s", tag)
+		}
 		tagRef := w.ReleaseRef
 		tagRef.ReleaseOrIntent = refs.ReleaseOrIntent{
 			Type:  refs.Release,
