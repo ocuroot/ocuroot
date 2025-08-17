@@ -2,8 +2,10 @@ package release
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 
 	"github.com/charmbracelet/log"
 	"github.com/ocuroot/ocuroot/client/local"
@@ -59,8 +61,21 @@ func (e *EnvironmentBackend) All(ctx context.Context) ([]sdk.Environment, error)
 	return environments, nil
 }
 
+var environmentNameRegex = regexp.MustCompile(`^[a-zA-Z0-9_\.]+$`)
+
+func ValidateEnvironment(env sdk.Environment) error {
+	if !environmentNameRegex.MatchString(string(env.Name)) {
+		return fmt.Errorf("environment names may only contain letters, numbers, periods and underscores: %s", env.Name)
+	}
+	return nil
+}
+
 // Register implements sdk.EnvironmentBackend.
 func (e *EnvironmentBackend) Register(ctx context.Context, env sdk.Environment) error {
+	if err := ValidateEnvironment(env); err != nil {
+		return err
+	}
+
 	e.Outputs.Environments = append(e.Outputs.Environments, env)
 	return nil
 }

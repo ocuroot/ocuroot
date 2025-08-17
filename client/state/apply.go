@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/charmbracelet/log"
+	"github.com/ocuroot/ocuroot/client/release"
 	librelease "github.com/ocuroot/ocuroot/lib/release"
 	"github.com/ocuroot/ocuroot/refs"
 	"github.com/ocuroot/ocuroot/refs/refstore"
@@ -48,12 +49,19 @@ func ApplyIntent(ctx context.Context, ref refs.Ref, store refstore.Store) error 
 func applyEnvironmentIntent(ctx context.Context, ref refs.Ref, store refstore.Store) error {
 	log.Info("Applying environment intent", "ref", ref.String())
 
-	var content any
+	var content sdk.Environment
 	if err := store.Get(ctx, ref.String(), &content); err != nil {
 		if err == refstore.ErrRefNotFound {
 			return applyDeletedEnvironmentIntent(ctx, ref, store)
 		}
 		return fmt.Errorf("failed to get environment intent: %w", err)
+	}
+
+	if err := release.ValidateEnvironment(content); err != nil {
+		return fmt.Errorf("environment validation failed: %w", err)
+	}
+	if ref.SubPath != string(content.Name) {
+		return fmt.Errorf("environment name (%q) must match subpath (%q)", content.Name, ref.SubPath)
 	}
 
 	stateRef := ref.MakeRelease()
