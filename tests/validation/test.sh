@@ -11,6 +11,12 @@ bad_inputs() {
     ocuroot release new badinputsinnext.ocu.star
     assert_not_equal "0" "$?" "Expected a failure"
 
+    ocuroot release new tags.ocu.star
+    assert_not_equal "0" "$?" "Expected a failure"
+
+    ocuroot release new tagnumeric.ocu.star
+    assert_not_equal "0" "$?" "Expected a failure"
+
     ocuroot release new environments.ocu.star
     assert_not_equal "0" "$?" "Expected a failure"
 
