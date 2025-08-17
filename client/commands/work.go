@@ -72,6 +72,8 @@ finally it will trigger work for other commits ('ocuroot work trigger').
 			return fmt.Errorf("failed to get tracker config: %w", err)
 		}
 
+		cmd.SilenceUsage = true
+
 		log.Info("Starting state sync")
 		if err := state.Sync(ctx, tc.Store); err != nil {
 			return err
