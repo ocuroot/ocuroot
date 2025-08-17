@@ -2,6 +2,7 @@ package state
 
 import (
     "fmt"
+    "encoding/json"
 
     "github.com/ocuroot/ui/components"
     "github.com/ocuroot/ocuroot/lib/release"
@@ -27,8 +28,7 @@ templ FunctionStateContent(fs release.FunctionState, children []string) {
     <ul>
         for key, input := range fs.Current.Inputs {
             <div class="input">
-                <strong>{ key }</strong><br/>
-                @Input(input)
+                @Input(key, input)
             </div>
         }
     </ul>
@@ -37,8 +37,7 @@ templ FunctionStateContent(fs release.FunctionState, children []string) {
     <ul>
         for key, output := range fs.Current.Outputs {
             <div class="output">
-                <strong>{ key }</strong><br/>
-                <em>{ fmt.Sprint(output) }</em>
+                @Output(key, output)
             </div>
         }
     </ul>
@@ -52,16 +51,46 @@ templ FunctionStateContent(fs release.FunctionState, children []string) {
     </ul>
 }
 
-templ Input(desc sdk.InputDescriptor) {
-    if desc.Value != nil {
-        <em>{ fmt.Sprint(desc.Value) }</em>
-    } else if desc.Ref != nil && desc.Default != nil {
-        <em>{ fmt.Sprint(desc.Default) }</em>
-    } else if desc.Ref != nil {
-        @badges.Warning("Pending")
-    }
-
+templ Input(key string, desc sdk.InputDescriptor) {
+    <strong>{ key }</strong>
     if desc.Ref != nil {
         <a href={ fmt.Sprintf("/ref/%s", *desc.Ref) }>@badges.Neutral("Ref")</a>
     }
+    <br/>
+    
+    if desc.Value != nil {
+        @Value(desc.Value)
+    } else if desc.Ref != nil && desc.Default != nil {
+        @Value(desc.Default)
+    } else if desc.Ref != nil {
+        @badges.Warning("Pending")
+    }
+}
+
+templ Output(key string, v any) {
+    <strong>{ key }</strong><br/>
+    @Value(v)
+}
+
+templ Value(v any) {
+        switch v.(type) {
+        case string:
+            <pre class="text_value">{ v.(string) }</pre>
+        case int:
+            <em>{ v.(int) }</em>
+        case float64:
+            <em>{ v.(float64) }</em>
+        case bool:
+            <em>{ v.(bool) }</em>
+        default:
+            <pre class="json_value">{ JSONOutput(v) }</pre>
+    }
+}
+
+func JSONOutput(desc any) string {
+    out, err := json.MarshalIndent(desc, "", "    ")
+    if err != nil {
+        return fmt.Sprint(desc)
+    }
+    return string(out)
 }

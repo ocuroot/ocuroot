@@ -94,3 +94,9 @@
 .ref-header h2 {
     margin: 0;
 }
+
+pre.text_value, pre.json_value {
+    color: var(--text-secondary);
+    overflow: auto;
+    max-height: calc(10 * 1.6rem); /* 16px per line */
+}
