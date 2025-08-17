@@ -234,11 +234,31 @@ func (c *configLoader) hostBuiltins(backend Backend) starlark.Value {
 			}
 			return hostBackend.Shell(contextFromThread(thread), req, output)
 		})
+		hostBuiltins["working_dir"] = JSONBuiltin("host.working_dir", func(_ context.Context, _ any) (string, error) {
+			return hostBackend.WorkingDir(), nil
+		})
+		hostBuiltins["read_file"] = JSONBuiltin("host.read_file", func(_ context.Context, path string) (string, error) {
+			return hostBackend.ReadFile(context.Background(), path)
+		})
+		hostBuiltins["write_file"] = JSONBuiltin("host.write_file", func(_ context.Context, req WriteFileRequest) (any, error) {
+			return nil, hostBackend.WriteFile(context.Background(), req)
+		})
+		hostBuiltins["read_dir"] = JSONBuiltin("host.read_dir", func(_ context.Context, path string) ([]string, error) {
+			return hostBackend.ReadDir(context.Background(), path)
+		})
+		hostBuiltins["is_dir"] = JSONBuiltin("host.is_dir", func(_ context.Context, path string) (bool, error) {
+			return hostBackend.IsDir(context.Background(), path)
+		})
 	} else {
 		hostBuiltins["os"] = unimplementedFunction("host.os")
 		hostBuiltins["arch"] = unimplementedFunction("host.arch")
 		hostBuiltins["env"] = unimplementedFunction("host.env")
 		hostBuiltins["shell"] = unimplementedFunction("host.shell")
+		hostBuiltins["working_dir"] = unimplementedFunction("host.working_dir")
+		hostBuiltins["read_file"] = unimplementedFunction("host.read_file")
+		hostBuiltins["write_file"] = unimplementedFunction("host.write_file")
+		hostBuiltins["read_dir"] = unimplementedFunction("host.read_dir")
+		hostBuiltins["is_dir"] = unimplementedFunction("host.is_dir")
 	}
 	return starlarkstruct.FromStringDict(starlark.String("host"), hostBuiltins)
 }

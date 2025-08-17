@@ -202,6 +202,8 @@ func (s *SecretsBackend) Register(value string) {
 	s.Values = append(s.Values, value)
 }
 
+var _ sdk.HostBackend = (*HostBackend)(nil)
+
 type HostBackend struct {
 	WorkingDirectory string
 }
@@ -277,6 +279,59 @@ func (h *HostBackend) Env() map[string]string {
 		env[key] = value
 	}
 	return env
+}
+
+// IsDir implements sdk.HostBackend.
+func (h *HostBackend) IsDir(ctx context.Context, path string) (bool, error) {
+	info, err := os.Stat(filepath.Join(h.WorkingDirectory, path))
+	if err != nil {
+		return false, err
+	}
+	return info.IsDir(), nil
+}
+
+// ReadDir implements sdk.HostBackend.
+func (h *HostBackend) ReadDir(ctx context.Context, path string) ([]string, error) {
+	isDir, err := h.IsDir(ctx, path)
+	if err != nil {
+		return nil, err
+	}
+	if !isDir {
+		return nil, fmt.Errorf("path %s is not a directory", path)
+	}
+	entries, err := os.ReadDir(filepath.Join(h.WorkingDirectory, path))
+	if err != nil {
+		return nil, err
+	}
+	var names []string
+	for _, entry := range entries {
+		names = append(names, entry.Name())
+	}
+	return names, nil
+}
+
+// ReadFile implements sdk.HostBackend.
+func (h *HostBackend) ReadFile(ctx context.Context, path string) (string, error) {
+	data, err := os.ReadFile(filepath.Join(h.WorkingDirectory, path))
+	if err != nil {
+		return "", err
+	}
+	return string(data), nil
+}
+
+// WorkingDir implements sdk.HostBackend.
+func (h *HostBackend) WorkingDir() string {
+	return h.WorkingDirectory
+}
+
+// WriteFile implements sdk.HostBackend.
+func (h *HostBackend) WriteFile(ctx context.Context, req sdk.WriteFileRequest) error {
+	fp := filepath.Join(h.WorkingDirectory, req.Path)
+	if err := os.MkdirAll(filepath.Dir(fp), 0755); err != nil {
+		return err
+	}
+
+	return os.WriteFile(fp, []byte(req.Content), 0644)
 }
 
 type StoreBackend struct {

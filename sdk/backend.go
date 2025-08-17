@@ -101,6 +101,12 @@ type HostBackend interface {
 	OS() string
 	Arch() string
 	Env() map[string]string
+
+	WorkingDir() string
+	ReadFile(ctx context.Context, path string) (string, error)
+	WriteFile(ctx context.Context, req WriteFileRequest) error
+	ReadDir(ctx context.Context, path string) ([]string, error)
+	IsDir(ctx context.Context, path string) (bool, error)
 }
 
 type HTTPResponse struct {

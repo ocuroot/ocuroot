@@ -4,6 +4,22 @@ def build(ctx):
     print("Building minimal package")
     print(ctx)
 
+    # Read source file and write to output file
+    src = host.read_file("src.txt")
+    expected_src = "Content here"
+    if src != expected_src:
+        fail("Source file content does not match expected value. Got: " + src)
+    host.write_file(".build/output.txt", src)
+    dir_content = host.read_dir(".build")
+    if not host.is_dir(".build"):
+        fail(".build directory not found")
+    if len(dir_content) != 1:
+        fail("Expected 1 file in .build directory, got: " + str(len(dir_content)))
+    if "output.txt" not in dir_content:
+        fail("Output file not found in .build directory")
+    if host.read_file(".build/output.txt") != expected_src:
+        fail("Output file content does not match expected value. Got: " + host.read_file(".build/output.txt"))
+
     res = host.shell("pwd", mute=True)
     print("Current directory: ", res.stdout)
 

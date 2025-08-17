@@ -162,6 +162,7 @@ test_force_deploy() {
 setup_test() {
     # Clean up any previous runs
     rm -rf .store
+    rm -rf .build
 
     # Set up environments
     echo "ocuroot release new environments/package.ocu.star"
