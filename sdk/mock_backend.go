@@ -71,6 +71,31 @@ func (m *mockHostBackend) Shell(ctx context.Context, req HostShellRequest, stdou
 	return HostShellResponse{}, nil
 }
 
+func (m *mockHostBackend) WorkingDir() string {
+	return ""
+}
+
+func (m *mockHostBackend) ReadFile(ctx context.Context, path string) (string, error) {
+	return "", nil
+}
+
+func (m *mockHostBackend) ReadDir(ctx context.Context, path string) ([]string, error) {
+	return nil, nil
+}
+
+func (m *mockHostBackend) IsDir(ctx context.Context, path string) (bool, error) {
+	return false, nil
+}
+
+type WriteFileRequest struct {
+	Path    string
+	Content string
+}
+
+func (m *mockHostBackend) WriteFile(ctx context.Context, req WriteFileRequest) error {
+	return nil
+}
+
 type mockStoreBackend struct {
 }
 
