@@ -509,7 +509,7 @@ func reconcileDeployment(ctx context.Context, store refstore.Store, ref string) 
 	var changed bool
 	for k, v := range inputs {
 		// Ensure we don't create loops with the outputs of this chain
-		if isForSameWork(*v.Ref, parsedResolvedDeployment) {
+		if v.Ref != nil && isForSameWork(*v.Ref, parsedResolvedDeployment) {
 			continue
 		}
 
