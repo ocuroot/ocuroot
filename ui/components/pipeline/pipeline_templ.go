@@ -429,7 +429,7 @@ func WorkHeader(work *WorkSummary, logURL LogURLFunction) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 18, "<div class=\"group relative mb-2\"><div class=\"border border-gray-200 rounded overflow-hidden\"><div class=\"bg-gray-50 hover:bg-gray-100 px-3 py-2 transition-all duration-150 ease-in-out cursor-pointer\"><div class=\"flex justify-between items-start\"><div class=\"font-medium\"><div class=\"flex items-center mb-1\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 18, "<div class=\"group relative mb-2\"><div class=\"border border-gray-200 rounded overflow-hidden\"><div class=\"bg-gray-50 hover:bg-gray-100 px-3 py-2 transition-all duration-150 ease-in-out\"><div class=\"flex justify-between items-start\"><div class=\"font-medium\"><div class=\"flex items-center mb-1\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
