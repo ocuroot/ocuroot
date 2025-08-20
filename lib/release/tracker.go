@@ -19,8 +19,8 @@ import (
 	"go.opentelemetry.io/otel/trace"
 )
 
-func NewReleaseTracker(config *sdk.Config, pkg *sdk.Package, releaseRef refs.Ref, store refstore.Store) (*ReleaseTracker, error) {
-	resolvedReleaseRefString, err := store.ResolveLink(context.Background(), releaseRef.String())
+func NewReleaseTracker(ctx context.Context, config *sdk.Config, pkg *sdk.Package, releaseRef refs.Ref, store refstore.Store) (*ReleaseTracker, error) {
+	resolvedReleaseRefString, err := store.ResolveLink(ctx, releaseRef.String())
 	if err != nil {
 		return nil, err
 	}
@@ -30,7 +30,7 @@ func NewReleaseTracker(config *sdk.Config, pkg *sdk.Package, releaseRef refs.Ref
 		return nil, err
 	}
 
-	stateStore, err := ReleaseStore(context.Background(), resolvedReleaseRef.String(), store)
+	stateStore, err := ReleaseStore(ctx, resolvedReleaseRef.String(), store)
 	if err != nil {
 		return nil, err
 	}
@@ -96,8 +96,8 @@ type ReleaseInfo struct {
 	Package *sdk.Package `json:"package"`
 }
 
-func (r *ReleaseTracker) GetReleaseInfo() (*ReleaseInfo, error) {
-	return r.stateStore.GetReleaseInfo()
+func (r *ReleaseTracker) GetReleaseInfo(ctx context.Context) (*ReleaseInfo, error) {
+	return r.stateStore.GetReleaseInfo(ctx)
 }
 
 func (r *ReleaseTracker) InitRelease(ctx context.Context, commit string) error {
@@ -157,8 +157,8 @@ func (r *ReleaseTracker) InitRelease(ctx context.Context, commit string) error {
 	return nil
 }
 
-func (r *ReleaseTracker) GetReleaseSummary() (*pipeline.ReleaseSummary, error) {
-	return r.stateStore.GetReleaseState(context.Background())
+func (r *ReleaseTracker) GetReleaseSummary(ctx context.Context) (*pipeline.ReleaseSummary, error) {
+	return r.stateStore.GetReleaseState(ctx)
 }
 
 // UnfilteredNextFunctions returns all functions that are pending execution,

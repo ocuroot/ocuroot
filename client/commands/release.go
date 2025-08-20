@@ -18,6 +18,7 @@ import (
 	"github.com/ocuroot/ocuroot/refs/refstore"
 	"github.com/ocuroot/ocuroot/store/models"
 	"github.com/spf13/cobra"
+	"go.opentelemetry.io/otel/trace"
 )
 
 var ReleaseCmd = &cobra.Command{
@@ -33,10 +34,15 @@ var NewReleaseCmd = &cobra.Command{
 	`,
 	Args: cobra.RangeArgs(0, 1),
 	RunE: func(cmd *cobra.Command, args []string) error {
-		ctx, span := tracer.Start(cmd.Context(), "ocuroot release new")
+		ctx, span := tracer.Start(
+			cmd.Context(),
+			"ocuroot release new",
+			trace.WithNewRoot(),
+			trace.WithSpanKind(trace.SpanKindServer),
+		)
 		defer span.End()
 
-		tc, err := getTrackerConfig(cmd, args)
+		tc, err := getTrackerConfig(ctx, cmd, args)
 		if err != nil {
 			return err
 		}
@@ -63,7 +69,7 @@ var NewReleaseCmd = &cobra.Command{
 		workTui := tui.StartWorkTui(logMode)
 		defer workTui.Cleanup()
 
-		tc.Store = tuiwork.WatchForChainUpdates(tc.Store, workTui)
+		tc.Store = tuiwork.WatchForChainUpdates(ctx, tc.Store, workTui)
 
 		tracker, environments, err := release.TrackerForNewRelease(ctx, tc)
 		if err != nil {
@@ -119,7 +125,7 @@ var ContinueReleaseCmd = &cobra.Command{
 		ctx, span := tracer.Start(cmd.Context(), "ocuroot release continue")
 		defer span.End()
 
-		tc, err := getTrackerConfig(cmd, args)
+		tc, err := getTrackerConfig(ctx, cmd, args)
 		if err != nil {
 			return err
 		}
@@ -136,7 +142,7 @@ var ContinueReleaseCmd = &cobra.Command{
 		workTui := tui.StartWorkTui(logMode)
 		defer workTui.Cleanup()
 
-		tc.Store = tuiwork.WatchForChainUpdates(tc.Store, workTui)
+		tc.Store = tuiwork.WatchForChainUpdates(ctx, tc.Store, workTui)
 
 		tracker, err := release.TrackerForExistingRelease(ctx, tc)
 		if err != nil {
@@ -173,7 +179,7 @@ var RetryReleaseCmd = &cobra.Command{
 		ctx, span := tracer.Start(cmd.Context(), "ocuroot release retry")
 		defer span.End()
 
-		tc, err := getTrackerConfig(cmd, args)
+		tc, err := getTrackerConfig(ctx, cmd, args)
 		if err != nil {
 			return err
 		}
@@ -203,7 +209,7 @@ var RetryReleaseCmd = &cobra.Command{
 		workTui := tui.StartWorkTui(logMode)
 		defer workTui.Cleanup()
 
-		tc.Store = tuiwork.WatchForChainUpdates(tc.Store, workTui)
+		tc.Store = tuiwork.WatchForChainUpdates(ctx, tc.Store, workTui)
 
 		tracker, err := release.TrackerForExistingRelease(ctx, tc)
 		if err != nil {

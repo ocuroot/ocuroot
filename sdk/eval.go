@@ -15,7 +15,7 @@ func EvalWithGlobals(ctx context.Context, backend Backend, sdkVersion string, ex
 	c := &configLoader{
 		backend: backend,
 	}
-	builtinsByVersion, err := c.LoadBuiltinsForAllVersion()
+	builtinsByVersion, err := c.LoadBuiltinsForAllVersion(ctx)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -80,7 +80,7 @@ func Eval(ctx context.Context, backend Backend, sdkVersion string, expr string) 
 	c := &configLoader{
 		backend: backend,
 	}
-	builtinsByVersion, err := c.LoadBuiltinsForAllVersion()
+	builtinsByVersion, err := c.LoadBuiltinsForAllVersion(ctx)
 	if err != nil {
 		return nil, err
 	}

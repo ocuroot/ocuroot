@@ -1,6 +1,7 @@
 package sdk
 
 import (
+	"context"
 	"embed"
 	"fmt"
 	"sort"
@@ -58,7 +59,7 @@ func GetVersionStubs(version string) map[string]string {
 	return out
 }
 
-func (c *configLoader) LoadBuiltinsForAllVersion() (map[string]starlark.StringDict, error) {
+func (c *configLoader) LoadBuiltinsForAllVersion(ctx context.Context) (map[string]starlark.StringDict, error) {
 	// Execute all the builtins
 	files, err := Builtins.ReadDir("sdk")
 	if err != nil {
@@ -69,7 +70,7 @@ func (c *configLoader) LoadBuiltinsForAllVersion() (map[string]starlark.StringDi
 	for _, f := range files {
 		if f.IsDir() {
 			version := strings.ReplaceAll(f.Name(), "_", ".")
-			builtins, err := c.LoadBuiltins(version)
+			builtins, err := c.LoadBuiltins(ctx, version)
 			if err != nil {
 				return nil, err
 			}
@@ -80,10 +81,10 @@ func (c *configLoader) LoadBuiltinsForAllVersion() (map[string]starlark.StringDi
 	return builtinsByVersion, nil
 }
 
-func (c *configLoader) LoadBuiltins(version string) (starlark.StringDict, error) {
+func (c *configLoader) LoadBuiltins(ctx context.Context, version string) (starlark.StringDict, error) {
 	log.Info("Loading builtins", "version", version)
 
-	backendBuiltins := c.backendToBuiltins(c.backend)
+	backendBuiltins := c.backendToBuiltins(ctx, c.backend)
 
 	defaultBuiltins := starlark.StringDict{
 		"struct":          starlark.NewBuiltin("struct", starlarkstruct.Make),

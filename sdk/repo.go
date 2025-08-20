@@ -1,6 +1,7 @@
 package sdk
 
 import (
+	"context"
 	"fmt"
 	"path/filepath"
 
@@ -10,6 +11,7 @@ import (
 )
 
 func LoadRepo(
+	ctx context.Context,
 	resolver ModuleResolver,
 	filename string,
 	backend Backend,
@@ -21,7 +23,7 @@ func LoadRepo(
 		resolver: resolver,
 	}
 
-	builtinsByVersion, err := c.LoadBuiltinsForAllVersion()
+	builtinsByVersion, err := c.LoadBuiltinsForAllVersion(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -74,6 +76,7 @@ func LoadRepo(
 }
 
 func LoadRepoFromBytes(
+	ctx context.Context,
 	resolver ModuleResolver,
 	filename string,
 	data []byte,
@@ -86,7 +89,7 @@ func LoadRepoFromBytes(
 		resolver: resolver,
 	}
 
-	builtinsByVersion, err := c.LoadBuiltinsForAllVersion()
+	builtinsByVersion, err := c.LoadBuiltinsForAllVersion(ctx)
 	if err != nil {
 		return nil, err
 	}

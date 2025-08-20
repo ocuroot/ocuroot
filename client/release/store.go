@@ -49,18 +49,30 @@ func newRefStoreFromBackend(
 	repoURL string,
 	repoPath string,
 ) (refstore.Store, error) {
+	var (
+		store refstore.Store
+		err   error
+	)
 	if storeConfig.Fs != nil {
 		statePath := filepath.Join(repoPath, storeConfig.Fs.Path)
-		return refstore.NewFSRefStore(statePath)
+		store, err = refstore.NewFSRefStore(statePath)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create state store: %w", err)
+		}
 	}
 	if storeConfig.Git != nil {
-		return refstore.NewGitRefStore(
+		store, err = refstore.NewGitRefStore(
 			filepath.Join(client.HomeDir(), "state", repoURL),
 			storeConfig.Git.RemoteURL,
 			storeConfig.Git.Branch,
 		)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create state store: %w", err)
+		}
 	}
-	return nil, fmt.Errorf("only filesystem and git state stores are currently supported")
+	store = refstore.StoreWithOtel(store)
+
+	return store, nil
 }
 
 type CombinedSupportFilesBackend interface {

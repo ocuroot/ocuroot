@@ -33,20 +33,20 @@ type stateListener struct {
 	transactionRefs []string
 }
 
-func (s *stateListener) updateIfMatches(ref string, inTransaction bool) {
+func (s *stateListener) updateIfMatches(ctx context.Context, ref string, inTransaction bool) {
 	if inTransaction {
 		s.transactionRefs = append(s.transactionRefs, ref)
 		return
 	}
 
 	if len(s.filters) == 0 {
-		s.callback(context.Background(), ref)
+		s.callback(ctx, ref)
 		return
 	}
 
 	for _, filter := range s.filters {
 		if filter.Match(ref) {
-			s.callback(context.Background(), ref)
+			s.callback(ctx, ref)
 			return
 		}
 	}
@@ -64,7 +64,7 @@ func (s *stateListener) Close() error {
 
 // Delete implements RefStore.
 func (s *stateListener) Delete(ctx context.Context, ref string) error {
-	s.updateIfMatches(ref, s.inTransaction)
+	s.updateIfMatches(ctx, ref, s.inTransaction)
 	return s.store.Delete(ctx, ref)
 }
 
@@ -120,7 +120,7 @@ func (s *stateListener) ResolveLink(ctx context.Context, ref string) (string, er
 
 // Set implements RefStore.
 func (s *stateListener) Set(ctx context.Context, ref string, v any) error {
-	s.updateIfMatches(ref, s.inTransaction)
+	s.updateIfMatches(ctx, ref, s.inTransaction)
 	return s.store.Set(ctx, ref, v)
 }
 
@@ -133,7 +133,7 @@ func (s *stateListener) StartTransaction(ctx context.Context) error {
 // CommitTransaction implements RefStore.
 func (s *stateListener) CommitTransaction(ctx context.Context, message string) error {
 	for _, ref := range s.transactionRefs {
-		s.updateIfMatches(ref, false)
+		s.updateIfMatches(ctx, ref, false)
 	}
 	s.inTransaction = false
 	s.transactionRefs = nil

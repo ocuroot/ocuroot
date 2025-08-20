@@ -48,7 +48,7 @@ func TrackerForNewRelease(ctx context.Context, tc TrackerConfig) (*release.Relea
 		return nil, nil, fmt.Errorf("package not found")
 	}
 
-	tracker, err := release.NewReleaseTracker(config, config.Package, tc.Ref, tc.Store)
+	tracker, err := release.NewReleaseTracker(ctx, config, config.Package, tc.Ref, tc.Store)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to create release tracker: %w", err)
 	}
@@ -76,12 +76,12 @@ func TrackerForExistingRelease(ctx context.Context, tc TrackerConfig) (*release.
 		return nil, fmt.Errorf("package not found")
 	}
 
-	tracker, err := release.NewReleaseTracker(config, config.Package, tc.Ref, tc.Store)
+	tracker, err := release.NewReleaseTracker(ctx, config, config.Package, tc.Ref, tc.Store)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create release tracker: %w", err)
 	}
 
-	releaseSummary, err := tracker.GetReleaseInfo()
+	releaseSummary, err := tracker.GetReleaseInfo(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get release info: %w", err)
 	}

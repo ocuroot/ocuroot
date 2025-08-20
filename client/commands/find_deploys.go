@@ -24,7 +24,7 @@ Example:
 	Args: cobra.ExactArgs(2),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx := cmd.Context()
-		tc, err := getTrackerConfigNoRef()
+		tc, err := getTrackerConfigNoRef(ctx)
 		if err != nil {
 			return fmt.Errorf("failed to get tracker config: %w", err)
 		}

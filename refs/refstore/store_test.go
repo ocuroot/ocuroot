@@ -100,6 +100,8 @@ func createTestRefs(t *testing.T, store Store, refsAndValues ...any) {
 }
 
 func testStoreLink(t *testing.T, store Store) {
+	ctx := context.Background()
+
 	ref := "github.com/example/repo.git/1/package/first/@abc123/deploy/staging"
 	ref2 := "github.com/example/repo.git/1/package/first/@abc123/deploy/staging/child"
 	link := "github.com/example/repo.git/1/package/first/@/deploy/staging"
@@ -113,16 +115,16 @@ func testStoreLink(t *testing.T, store Store) {
 		ref3, "value3",
 	)
 
-	if err := store.Link(context.Background(), link, ref); err != nil {
+	if err := store.Link(ctx, link, ref); err != nil {
 		t.Errorf("failed to link: %v", err)
 	}
-	if err := store.Link(context.Background(), link2, ref3); err != nil {
+	if err := store.Link(ctx, link2, ref3); err != nil {
 		t.Errorf("failed to link: %v", err)
 	}
 	// TODO: Allow removing links
 
 	var got string
-	if err := store.Get(context.Background(), link, &got); err != nil {
+	if err := store.Get(ctx, link, &got); err != nil {
 		t.Errorf("failed to get link: %v", err)
 	}
 	if got != "value1" {
@@ -130,7 +132,7 @@ func testStoreLink(t *testing.T, store Store) {
 	}
 
 	var got2 string
-	if err := store.Get(context.Background(), filepath.Join(link, "child"), &got2); err != nil {
+	if err := store.Get(ctx, filepath.Join(link, "child"), &got2); err != nil {
 		t.Errorf("failed to get link: %v", err)
 	}
 	if got2 != "value2" {
@@ -138,7 +140,7 @@ func testStoreLink(t *testing.T, store Store) {
 	}
 
 	var got3 string
-	if err := store.Get(context.Background(), link2, &got3); err != nil {
+	if err := store.Get(ctx, link2, &got3); err != nil {
 		t.Errorf("failed to get link: %v", err)
 	}
 	if got3 != "value3" {
@@ -146,7 +148,7 @@ func testStoreLink(t *testing.T, store Store) {
 	}
 
 	// Confirm GetLinks works
-	links, err := store.GetLinks(context.Background(), ref)
+	links, err := store.GetLinks(ctx, ref)
 	if err != nil {
 		t.Errorf("failed to get links: %v", err)
 	}
@@ -155,11 +157,11 @@ func testStoreLink(t *testing.T, store Store) {
 	}
 
 	// Confirm that changing the value retains links
-	if err := store.Set(context.Background(), ref, "value4"); err != nil {
+	if err := store.Set(ctx, ref, "value4"); err != nil {
 		t.Errorf("failed to set key: %v", err)
 	}
 
-	links, err = store.GetLinks(context.Background(), ref)
+	links, err = store.GetLinks(ctx, ref)
 	if err != nil {
 		t.Errorf("failed to get links: %v", err)
 	}
@@ -167,19 +169,19 @@ func testStoreLink(t *testing.T, store Store) {
 		t.Errorf("unexpected links after set: got %v, want %v", links, []string{link})
 	}
 
-	if err := store.Link(context.Background(), link, ref2); err != nil {
+	if err := store.Link(ctx, link, ref2); err != nil {
 		t.Errorf("failed to link: %v", err)
 	}
 
 	var got4 string
-	if err := store.Get(context.Background(), link, &got4); err != nil {
+	if err := store.Get(ctx, link, &got4); err != nil {
 		t.Errorf("failed to get link: %v", err)
 	}
 	if got4 != "value2" {
 		t.Errorf("unexpected value for link: got %q, want %q", got4, "value2")
 	}
 
-	links, err = store.GetLinks(context.Background(), ref)
+	links, err = store.GetLinks(ctx, ref)
 	if err != nil {
 		t.Errorf("failed to get links: %v", err)
 	}
@@ -187,7 +189,7 @@ func testStoreLink(t *testing.T, store Store) {
 		t.Errorf("unexpected links: got %v, want %v", links, []string{})
 	}
 
-	links, err = store.GetLinks(context.Background(), ref2)
+	links, err = store.GetLinks(ctx, ref2)
 	if err != nil {
 		t.Errorf("failed to get links: %v", err)
 	}

@@ -39,7 +39,7 @@ var WorkContinueCmd = &cobra.Command{
 
 		logMode := cmd.Flag("logmode").Changed
 
-		tc, err := getTrackerConfig(cmd, args)
+		tc, err := getTrackerConfig(ctx, cmd, args)
 		if err != nil {
 			return fmt.Errorf("failed to get tracker config: %w", err)
 		}
@@ -67,7 +67,7 @@ finally it will trigger work for other commits ('ocuroot work trigger').
 
 		logMode := cmd.Flag("logmode").Changed
 
-		tc, err := getTrackerConfig(cmd, args)
+		tc, err := getTrackerConfig(ctx, cmd, args)
 		if err != nil {
 			return fmt.Errorf("failed to get tracker config: %w", err)
 		}
@@ -170,7 +170,7 @@ var WorkTriggerCommand = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx := cmd.Context()
 
-		store, err := getReadOnlyStore()
+		store, err := getReadOnlyStore(ctx)
 		if err != nil {
 			return fmt.Errorf("failed to get read only store: %w", err)
 		}
@@ -294,7 +294,7 @@ var WorkTasksCmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx := cmd.Context()
 
-		tc, err := getTrackerConfig(cmd, args)
+		tc, err := getTrackerConfig(ctx, cmd, args)
 		if err != nil {
 			return fmt.Errorf("failed to get tracker config: %w", err)
 		}
@@ -365,7 +365,7 @@ func continueRelease(ctx context.Context, tc release.TrackerConfig, logMode bool
 	workTui := tui.StartWorkTui(logMode)
 	defer workTui.Cleanup()
 
-	tc.Store = tuiwork.WatchForChainUpdates(tc.Store, workTui)
+	tc.Store = tuiwork.WatchForChainUpdates(ctx, tc.Store, workTui)
 
 	tracker, err := release.TrackerForExistingRelease(ctx, tc)
 	if err != nil {
@@ -401,6 +401,7 @@ func triggerWork(ctx context.Context, readOnlyStore refstore.Store, configRef st
 	backend, be := local.BackendForRepo()
 
 	_, err := sdk.LoadRepoFromBytes(
+		ctx,
 		sdk.NewNullResolver(),
 		"repo.ocu.star",
 		repoConfig.Source,

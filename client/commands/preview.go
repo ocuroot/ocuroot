@@ -19,7 +19,8 @@ var PreviewCmd = &cobra.Command{
 	Long:  `Preview command allows you to visualize package configurations before deploying.`,
 	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
-		tc, err := getTrackerConfig(cmd, args)
+		ctx := cmd.Context()
+		tc, err := getTrackerConfig(ctx, cmd, args)
 		if err != nil {
 			return err
 		}

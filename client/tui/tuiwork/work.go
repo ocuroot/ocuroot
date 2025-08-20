@@ -147,6 +147,8 @@ func (task *Task) Render(spinner spinner.Model, final bool) string {
 }
 
 func (t *Task) message() string {
+	ctx := context.TODO()
+
 	var message string
 	if t.Status != WorkStatusDone && t.Status != WorkStatusPending {
 		return ""
@@ -154,7 +156,7 @@ func (t *Task) message() string {
 
 	// Get chain outputs and render as a message
 	var chainWork models.Work
-	if err := t.Store.Get(context.Background(), t.ChainRef.String(), &chainWork); err != nil {
+	if err := t.Store.Get(ctx, t.ChainRef.String(), &chainWork); err != nil {
 		log.Error("failed to get chain work", "ref", t.ChainRef.String(), "error", err)
 		return "failed to get chain work"
 	}
@@ -179,7 +181,7 @@ func (t *Task) message() string {
 
 	if t.Status == WorkStatusPending {
 		var fn librelease.FunctionState
-		if err := t.Store.Get(context.Background(), chainWork.Entrypoint.String(), &fn); err != nil {
+		if err := t.Store.Get(ctx, chainWork.Entrypoint.String(), &fn); err != nil {
 			log.Error("failed to get function summary", "chainRef", t.ChainRef.String(), "entrypoint", chainWork.Entrypoint.String(), "error", err)
 			return "failed to get function summary"
 		}
@@ -193,7 +195,7 @@ func (t *Task) message() string {
 		sort.Strings(keys)
 		for _, k := range keys {
 			v := fn.Current.Inputs[k]
-			retrieved, err := librelease.RetrieveInput(context.Background(), t.Store, v)
+			retrieved, err := librelease.RetrieveInput(ctx, t.Store, v)
 			if err != nil {
 				log.Error("failed to retrieve input", "ref", v.Ref.String(), "error", err)
 				return "failed to retrieve input"

@@ -13,17 +13,17 @@ import (
 	"go.starlark.net/starlarkstruct"
 )
 
-func (c *configLoader) backendToBuiltins(backend Backend) starlark.StringDict {
+func (c *configLoader) backendToBuiltins(ctx context.Context, backend Backend) starlark.StringDict {
 	out := starlark.StringDict{}
 
 	out["thread"] = c.threadBuiltins()
 	out["refs"] = c.refsBuiltins(backend)
-	out["repo"] = c.repoBuiltins(backend)
+	out["repo"] = c.repoBuiltins(ctx, backend)
 	out["environments"] = c.environmentBuiltins(backend)
 	out["packages"] = c.packageBuiltins(backend)
 	out["secrets"] = c.secretBuiltins(backend)
 	out["http"] = c.httpBuiltins(backend)
-	out["host"] = c.hostBuiltins(backend)
+	out["host"] = c.hostBuiltins(ctx, backend)
 	out["store"] = c.storeBuiltins(backend)
 	out["debug"] = c.debugBuiltins(backend)
 
@@ -116,7 +116,7 @@ func (c *configLoader) refsBuiltins(backend Backend) starlark.Value {
 	return starlarkstruct.FromStringDict(starlark.String("refs"), refsBuiltins)
 }
 
-func (c *configLoader) repoBuiltins(backend Backend) starlark.Value {
+func (c *configLoader) repoBuiltins(ctx context.Context, backend Backend) starlark.Value {
 	repoBuiltins := starlark.StringDict{}
 	if repoBackend := backend.Repo; repoBackend != nil {
 		repoBuiltins["alias"] = JSONBuiltin("repo.alias", func(ctx context.Context, alias string) (any, error) {
@@ -128,7 +128,7 @@ func (c *configLoader) repoBuiltins(backend Backend) starlark.Value {
 			if err != nil {
 				return nil, err
 			}
-			repoBackend.Trigger(context.Background(), triggerFN)
+			repoBackend.Trigger(ctx, triggerFN)
 			return starlark.None, nil
 		})
 	} else {
@@ -208,7 +208,7 @@ func (cw CustomWriter) Write(p []byte) (n int, err error) {
 	return cw(p)
 }
 
-func (c *configLoader) hostBuiltins(backend Backend) starlark.Value {
+func (c *configLoader) hostBuiltins(ctx context.Context, backend Backend) starlark.Value {
 	hostBuiltins := starlark.StringDict{}
 	if hostBackend := backend.Host; hostBackend != nil {
 		hostBuiltins["os"] = JSONBuiltin("host.os", func(_ context.Context, _ any) (string, error) {
@@ -238,16 +238,16 @@ func (c *configLoader) hostBuiltins(backend Backend) starlark.Value {
 			return hostBackend.WorkingDir(), nil
 		})
 		hostBuiltins["read_file"] = JSONBuiltin("host.read_file", func(_ context.Context, path string) (string, error) {
-			return hostBackend.ReadFile(context.Background(), path)
+			return hostBackend.ReadFile(ctx, path)
 		})
 		hostBuiltins["write_file"] = JSONBuiltin("host.write_file", func(_ context.Context, req WriteFileRequest) (any, error) {
-			return nil, hostBackend.WriteFile(context.Background(), req)
+			return nil, hostBackend.WriteFile(ctx, req)
 		})
 		hostBuiltins["read_dir"] = JSONBuiltin("host.read_dir", func(_ context.Context, path string) ([]string, error) {
-			return hostBackend.ReadDir(context.Background(), path)
+			return hostBackend.ReadDir(ctx, path)
 		})
 		hostBuiltins["is_dir"] = JSONBuiltin("host.is_dir", func(_ context.Context, path string) (bool, error) {
-			return hostBackend.IsDir(context.Background(), path)
+			return hostBackend.IsDir(ctx, path)
 		})
 	} else {
 		hostBuiltins["os"] = unimplementedFunction("host.os")

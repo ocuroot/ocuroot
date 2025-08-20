@@ -101,8 +101,8 @@ func TuiLogger(tuiWork tui.Tui) func(fnRef refs.Ref, msg sdk.Log) {
 	}
 }
 
-func WatchForChainUpdates(store refstore.Store, tuiWork tui.Tui) refstore.Store {
-	updater := tuiStateChange(store, tuiWork)
+func WatchForChainUpdates(ctx context.Context, store refstore.Store, tuiWork tui.Tui) refstore.Store {
+	updater := tuiStateChange(ctx, store, tuiWork)
 
 	store, err := refstore.ListenToStateChanges(
 		func(ctx context.Context, ref string) {
@@ -125,9 +125,8 @@ func WatchForChainUpdates(store refstore.Store, tuiWork tui.Tui) refstore.Store 
 	return store
 }
 
-func tuiStateChange(store refstore.Store, tuiWork tui.Tui) func(ref refs.Ref) {
+func tuiStateChange(ctx context.Context, store refstore.Store, tuiWork tui.Tui) func(ref refs.Ref) {
 	return func(ref refs.Ref) {
-		ctx := context.Background()
 		chainRef := librelease.ChainRefFromFunctionRef(ref)
 
 		out := initEvent(chainRef, tuiWork, store)

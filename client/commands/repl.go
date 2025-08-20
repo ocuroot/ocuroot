@@ -45,7 +45,7 @@ Examples:
 			return runSingleCommand(ctx, filePath, command)
 		} else {
 			// Interactive REPL mode
-			return runStarlarkReplWithFile(filePath)
+			return runStarlarkReplWithFile(ctx, filePath)
 		}
 	},
 }
@@ -53,7 +53,7 @@ Examples:
 // runSingleCommand executes a single Starlark command and exits
 func runSingleCommand(ctx context.Context, filePath string, command string) error {
 	// Get tracker config to load repo.ocu.star and set up state store
-	tc, err := getTrackerConfigNoRef()
+	tc, err := getTrackerConfigNoRef(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to get tracker config: %w", err)
 	}
@@ -69,6 +69,7 @@ func runSingleCommand(ctx context.Context, filePath string, command string) erro
 
 		// Load the .ocu.star file using sdk.LoadConfig to get user-defined functions
 		config, err := sdk.LoadConfig(
+			ctx,
 			sdk.NewFSResolver(os.DirFS(tc.RepoPath)),
 			filePath,
 			backend,
@@ -88,7 +89,7 @@ func runSingleCommand(ctx context.Context, filePath string, command string) erro
 		latestVersion := versions[len(versions)-1]
 
 		// Create globals that combine SDK builtins with user-defined functions
-		globals, err = createGlobalsWithUserFunctions(backend, latestVersion, config)
+		globals, err = createGlobalsWithUserFunctions(ctx, backend, latestVersion, config)
 		if err != nil {
 			return fmt.Errorf("failed to create globals: %w", err)
 		}
@@ -140,9 +141,9 @@ func runSingleCommand(ctx context.Context, filePath string, command string) erro
 	return nil
 }
 
-func runStarlarkReplWithFile(filePath string) error {
+func runStarlarkReplWithFile(ctx context.Context, filePath string) error {
 	// Get tracker config to load repo.ocu.star and set up state store
-	tc, err := getTrackerConfigNoRef()
+	tc, err := getTrackerConfigNoRef(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to get tracker config: %w", err)
 	}
@@ -156,6 +157,7 @@ func runStarlarkReplWithFile(filePath string) error {
 
 	// Load the .ocu.star file using sdk.LoadConfig to get user-defined functions
 	config, err := sdk.LoadConfig(
+		ctx,
 		sdk.NewFSResolver(os.DirFS(tc.RepoPath)),
 		filePath,
 		backend,
@@ -175,7 +177,7 @@ func runStarlarkReplWithFile(filePath string) error {
 	latestVersion := versions[len(versions)-1]
 
 	// Create globals that combine SDK builtins with user-defined functions
-	globals, err := createGlobalsWithUserFunctions(backend, latestVersion, config)
+	globals, err := createGlobalsWithUserFunctions(ctx, backend, latestVersion, config)
 	if err != nil {
 		return fmt.Errorf("failed to create globals: %w", err)
 	}
@@ -193,9 +195,9 @@ func runStarlarkReplWithFile(filePath string) error {
 }
 
 // createGlobalsWithUserFunctions creates a globals dict that combines SDK builtins with user-defined functions
-func createGlobalsWithUserFunctions(backend sdk.Backend, sdkVersion string, config *sdk.Config) (starlark.StringDict, error) {
+func createGlobalsWithUserFunctions(ctx context.Context, backend sdk.Backend, sdkVersion string, config *sdk.Config) (starlark.StringDict, error) {
 	// Get SDK builtins using EvalWithGlobals
-	_, globals, err := sdk.EvalWithGlobals(context.Background(), backend, sdkVersion, "None", make(starlark.StringDict))
+	_, globals, err := sdk.EvalWithGlobals(ctx, backend, sdkVersion, "None", make(starlark.StringDict))
 	if err != nil {
 		return nil, fmt.Errorf("failed to get SDK builtins: %w", err)
 	}

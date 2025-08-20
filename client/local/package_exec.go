@@ -16,6 +16,7 @@ func ExecutePackage(ctx context.Context, root string, ref refs.Ref, backend sdk.
 	configFile := ref.Filename
 	log.Info("Loading config", "root", root, "filename", configFile, "ref", ref)
 	config, err := sdk.LoadConfig(
+		ctx,
 		sdk.NewFSResolver(os.DirFS(root)),
 		configFile,
 		backend,

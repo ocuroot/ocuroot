@@ -55,7 +55,7 @@ Example:
 		ctx, span := tracer.Start(cmd.Context(), "ocuroot deploy down")
 		defer span.End()
 
-		tc, err := getTrackerConfig(cmd, args)
+		tc, err := getTrackerConfig(ctx, cmd, args)
 		if err != nil {
 			return err
 		}

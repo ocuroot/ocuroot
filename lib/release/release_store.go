@@ -42,9 +42,9 @@ type releaseStore struct {
 	Store      refstore.Store
 }
 
-func (r *releaseStore) GetReleaseInfo() (*ReleaseInfo, error) {
+func (r *releaseStore) GetReleaseInfo(ctx context.Context) (*ReleaseInfo, error) {
 	var releaseInfo ReleaseInfo
-	err := r.Store.Get(context.Background(), r.ReleaseRef.String(), &releaseInfo)
+	err := r.Store.Get(ctx, r.ReleaseRef.String(), &releaseInfo)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get release state: %w", err)
 	}
@@ -64,7 +64,7 @@ func (w *releaseStore) InitDeploymentUp(ctx context.Context, env string) error {
 		}
 	}()
 
-	ri, err := w.GetReleaseInfo()
+	ri, err := w.GetReleaseInfo(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to get release state: %w", err)
 	}
@@ -113,7 +113,7 @@ func (w *releaseStore) InitDeploymentDown(ctx context.Context, env string) error
 		return fmt.Errorf("failed to get entrypoint: %w", err)
 	}
 
-	ri, err := w.GetReleaseInfo()
+	ri, err := w.GetReleaseInfo(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to get release state: %w", err)
 	}

@@ -109,7 +109,7 @@ func previewHandler(ctx context.Context, request mcp.CallToolRequest) (*mcp.Call
 	fmt.Println("repo: ", repoRootPath)
 	fmt.Println("ref: ", ref)
 
-	tc, err := getTrackerConfigNoRef()
+	tc, err := getTrackerConfigNoRef(ctx)
 	if err != nil {
 		return nil, err
 	}

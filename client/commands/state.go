@@ -25,7 +25,8 @@ var StateGetCmd = &cobra.Command{
 	Long:  `Get state for a specific ref.`,
 	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
-		tc, err := getTrackerConfig(cmd, args)
+		ctx := cmd.Context()
+		tc, err := getTrackerConfig(ctx, cmd, args)
 		if err != nil {
 			return fmt.Errorf("failed to get tracker config: %w", err)
 		}
@@ -56,7 +57,8 @@ var StateMatchCmd = &cobra.Command{
 	Long:  `List refs matching the specified glob.`,
 	Args:  cobra.RangeArgs(0, 1),
 	RunE: func(cmd *cobra.Command, args []string) error {
-		tc, err := getTrackerConfigNoRef()
+		ctx := cmd.Context()
+		tc, err := getTrackerConfigNoRef(ctx)
 		if err != nil {
 			return fmt.Errorf("failed to get tracker config: %w", err)
 		}
@@ -95,7 +97,7 @@ var StateDiffCmd = &cobra.Command{
 	Long:  `Diff intent with current state.`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx := cmd.Context()
-		tc, err := getTrackerConfigNoRef()
+		tc, err := getTrackerConfigNoRef(ctx)
 		if err != nil {
 			return fmt.Errorf("failed to get tracker config: %w", err)
 		}
@@ -122,7 +124,7 @@ var StateDeleteIntentCmd = &cobra.Command{
 	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx := cmd.Context()
-		tc, err := getTrackerConfig(cmd, args)
+		tc, err := getTrackerConfig(ctx, cmd, args)
 		if err != nil {
 			return fmt.Errorf("failed to get tracker config: %w", err)
 		}
@@ -160,7 +162,7 @@ Set value to '-' to pass the value from stdin.
 			return fmt.Errorf("unsupported format: %s", format)
 		}
 
-		tc, err := getTrackerConfig(cmd, args)
+		tc, err := getTrackerConfig(ctx, cmd, args)
 		if err != nil {
 			return fmt.Errorf("failed to get tracker config: %w", err)
 		}
@@ -219,7 +221,7 @@ var StateApplyIntentCmd = &cobra.Command{
 	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx := cmd.Context()
-		tc, err := getTrackerConfig(cmd, args)
+		tc, err := getTrackerConfig(ctx, cmd, args)
 		if err != nil {
 			return fmt.Errorf("failed to get tracker config: %w", err)
 		}
@@ -240,7 +242,8 @@ var StateViewCmd = &cobra.Command{
 	Long:  `View state in a web browser.`,
 	Args:  cobra.ExactArgs(0),
 	RunE: func(cmd *cobra.Command, args []string) error {
-		tc, err := getTrackerConfigNoRef()
+		ctx := cmd.Context()
+		tc, err := getTrackerConfigNoRef(ctx)
 		if err != nil {
 			return fmt.Errorf("failed to get tracker config: %w", err)
 		}

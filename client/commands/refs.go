@@ -48,7 +48,7 @@ func AddRefFlags(cmd *cobra.Command, persistent bool) {
 	flags.String("release", "", "ID or tag of the release. Can also be specified via a full ref in the first parameter.")
 }
 
-func getTrackerConfigNoRef() (release.TrackerConfig, error) {
+func getTrackerConfigNoRef(ctx context.Context) (release.TrackerConfig, error) {
 	wd, err := os.Getwd()
 	if err != nil {
 		return release.TrackerConfig{}, err
@@ -68,6 +68,7 @@ func getTrackerConfigNoRef() (release.TrackerConfig, error) {
 	backend, be := local.BackendForRepo()
 
 	data, err := sdk.LoadRepo(
+		ctx,
 		sdk.NewFSResolver(os.DirFS(repoRootPath)),
 		"repo.ocu.star",
 		backend,
@@ -103,7 +104,7 @@ func getTrackerConfigNoRef() (release.TrackerConfig, error) {
 		StoreConfig: be.Store,
 	}
 
-	err = saveRepoConfig(tc, data)
+	err = saveRepoConfig(ctx, tc, data)
 	if err != nil {
 		return release.TrackerConfig{}, fmt.Errorf("failed to save repo config: %w", err)
 	}
@@ -111,7 +112,7 @@ func getTrackerConfigNoRef() (release.TrackerConfig, error) {
 	return tc, nil
 }
 
-func storeFromRepoOrStateRoot() (store refstore.Store, isRepo bool, err error) {
+func storeFromRepoOrStateRoot(ctx context.Context) (store refstore.Store, isRepo bool, err error) {
 	wd, err := os.Getwd()
 	if err != nil {
 		return nil, false, err
@@ -123,7 +124,7 @@ func storeFromRepoOrStateRoot() (store refstore.Store, isRepo bool, err error) {
 		return nil, false, err
 	}
 	if err == nil {
-		s, err := loadStoreFromRepoRoot(repoRootPath)
+		s, err := loadStoreFromRepoRoot(ctx, repoRootPath)
 		if err != nil {
 			return nil, false, err
 		}
@@ -145,19 +146,20 @@ func storeFromRepoOrStateRoot() (store refstore.Store, isRepo bool, err error) {
 
 // TODO: Get a read/write store by loading repo config
 // There should be an alternative function to this one
-func getReadOnlyStore() (refstore.Store, error) {
-	store, _, err := storeFromRepoOrStateRoot()
+func getReadOnlyStore(ctx context.Context) (refstore.Store, error) {
+	store, _, err := storeFromRepoOrStateRoot(ctx)
 	if err != nil {
 		return nil, err
 	}
 	return refstore.NewReadOnlyStore(store), nil
 }
 
-func loadStoreFromRepoRoot(repoRootPath string) (refstore.Store, error) {
+func loadStoreFromRepoRoot(ctx context.Context, repoRootPath string) (refstore.Store, error) {
 	// Create a backend that is just enough for loading repo config
 	backend, be := local.BackendForRepo()
 
 	_, err := sdk.LoadRepo(
+		ctx,
 		sdk.NewFSResolver(os.DirFS(repoRootPath)),
 		"repo.ocu.star",
 		backend,
@@ -190,7 +192,8 @@ func loadStoreFromRepoRoot(repoRootPath string) (refstore.Store, error) {
 	return s, nil
 }
 
-func getTrackerConfig(cmd *cobra.Command, args []string) (release.TrackerConfig, error) {
+func getTrackerConfig(ctx context.Context, cmd *cobra.Command, args []string) (release.TrackerConfig, error) {
+
 	wd, err := os.Getwd()
 	if err != nil {
 		return release.TrackerConfig{}, err
@@ -218,6 +221,7 @@ func getTrackerConfig(cmd *cobra.Command, args []string) (release.TrackerConfig,
 	backend, be := local.BackendForRepo()
 
 	data, err := sdk.LoadRepo(
+		ctx,
 		sdk.NewFSResolver(os.DirFS(repoRootPath)),
 		"repo.ocu.star",
 		backend,
@@ -250,7 +254,7 @@ func getTrackerConfig(cmd *cobra.Command, args []string) (release.TrackerConfig,
 		StoreConfig: be.Store,
 	}
 
-	err = saveRepoConfig(tc, data)
+	err = saveRepoConfig(ctx, tc, data)
 	if err != nil {
 		return release.TrackerConfig{}, fmt.Errorf("failed to save repo config: %w", err)
 	}
@@ -258,7 +262,7 @@ func getTrackerConfig(cmd *cobra.Command, args []string) (release.TrackerConfig,
 	return tc, nil
 }
 
-func saveRepoConfig(tc release.TrackerConfig, data []byte) error {
+func saveRepoConfig(ctx context.Context, tc release.TrackerConfig, data []byte) error {
 	// Write the repo file to the state stores for later use
 	repoRef := tc.Ref
 	repoRef.Filename = "repo.ocu.star"
@@ -272,42 +276,42 @@ func saveRepoConfig(tc release.TrackerConfig, data []byte) error {
 		Source: data,
 	}
 
-	err := tc.Store.StartTransaction(context.Background())
+	err := tc.Store.StartTransaction(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to start transaction: %w", err)
 	}
 	defer func() {
-		tc.Store.CommitTransaction(context.Background(), "Save repo config")
+		tc.Store.CommitTransaction(ctx, "Save repo config")
 	}()
 
-	if err := tc.Store.Get(context.Background(), repoRef.String(), &models.RepoConfig{}); err == refstore.ErrRefNotFound {
-		if err = tc.Store.Set(context.Background(), repoRef.String(), repoConfig); err != nil {
+	if err := tc.Store.Get(ctx, repoRef.String(), &models.RepoConfig{}); err == refstore.ErrRefNotFound {
+		if err = tc.Store.Set(ctx, repoRef.String(), repoConfig); err != nil {
 			return fmt.Errorf("failed to set ref store: %w", err)
 		}
-		if err = tc.Store.Link(context.Background(), repoRef.SetVersion("").String(), repoRef.String()); err != nil {
+		if err = tc.Store.Link(ctx, repoRef.SetVersion("").String(), repoRef.String()); err != nil {
 			return fmt.Errorf("failed to link ref store: %w", err)
 		}
 
 		// Add support files if this is the first time we've seen this commit
 		if gitSupportFilesBackend, ok := tc.Store.(refstore.GitSupportFileWriter); ok && tc.StoreConfig != nil && tc.StoreConfig.State.Git != nil {
-			if err := gitSupportFilesBackend.AddSupportFiles(context.Background(), tc.StoreConfig.State.Git.SupportFiles); err != nil {
+			if err := gitSupportFilesBackend.AddSupportFiles(ctx, tc.StoreConfig.State.Git.SupportFiles); err != nil {
 				return fmt.Errorf("failed to add support files: %w", err)
 			}
 		}
 	}
 
 	repoRef = repoRef.MakeIntent()
-	if err := tc.Store.Get(context.Background(), repoRef.String(), &models.RepoConfig{}); err == refstore.ErrRefNotFound {
-		if err := tc.Store.Set(context.Background(), repoRef.String(), repoConfig); err != nil {
+	if err := tc.Store.Get(ctx, repoRef.String(), &models.RepoConfig{}); err == refstore.ErrRefNotFound {
+		if err := tc.Store.Set(ctx, repoRef.String(), repoConfig); err != nil {
 			return fmt.Errorf("failed to set ref store: %w", err)
 		}
-		if err := tc.Store.Link(context.Background(), repoRef.SetVersion("").String(), repoRef.String()); err != nil {
+		if err := tc.Store.Link(ctx, repoRef.SetVersion("").String(), repoRef.String()); err != nil {
 			return fmt.Errorf("failed to link ref store: %w", err)
 		}
 
 		// Add support files if this is the first time we've seen this commit
 		if combinedSupportFilesBackend, ok := tc.Store.(release.CombinedSupportFilesBackend); ok && tc.StoreConfig != nil {
-			if err := combinedSupportFilesBackend.IntentAddSupportFiles(context.Background(), tc.StoreConfig); err != nil {
+			if err := combinedSupportFilesBackend.IntentAddSupportFiles(ctx, tc.StoreConfig); err != nil {
 				return fmt.Errorf("failed to add support files: %w", err)
 			}
 		}

@@ -27,7 +27,7 @@ func (s *server) handleMatch(w http.ResponseWriter, r *http.Request) {
 	case release.GlobRepoConfig.Match(query):
 		content = s.buildRepositoryTable(matches)
 	case release.GlobDeploymentState.Match(query):
-		content = s.buildDeploymentTable(matches)
+		content = s.buildDeploymentTable(r.Context(), matches)
 	case release.GlobRelease.Match(query):
 		content = s.buildReleaseTable(matches)
 	default:
@@ -89,10 +89,10 @@ func (s *server) buildReleaseTable(matches []string) templ.Component {
 	return ResultTable([]string{"Repo", "Filename", "Version"}, tableContent)
 }
 
-func (s *server) buildDeploymentTable(matches []string) templ.Component {
+func (s *server) buildDeploymentTable(ctx context.Context, matches []string) templ.Component {
 	var tableContent []ResultTableRow
 	for _, match := range matches {
-		resolved, err := s.store.ResolveLink(context.Background(), match)
+		resolved, err := s.store.ResolveLink(ctx, match)
 		if err != nil {
 			continue
 		}

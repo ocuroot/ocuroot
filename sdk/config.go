@@ -38,6 +38,7 @@ type FunctionContext struct {
 type Logger func(log Log)
 
 func LoadConfig(
+	ctx context.Context,
 	resolver ModuleResolver,
 	filename string,
 	backend Backend,
@@ -54,7 +55,7 @@ func LoadConfig(
 	}
 	out.globalFuncs = map[string]*starlark.Function{}
 
-	builtinsByVersion, err := c.LoadBuiltinsForAllVersion()
+	builtinsByVersion, err := c.LoadBuiltinsForAllVersion(ctx)
 	if err != nil {
 		return nil, err
 	}
