@@ -1,5 +1,8 @@
 #!/bin/bash
 
+# Avoid confusion between main and master in some git configs
+export DEFAULT_BRANCH_NAME=dbranch
+
 source $(dirname "$0")/../test_helpers.sh
 source $(dirname "$0")/test_helpers.sh
 
@@ -14,7 +17,7 @@ test_ocuroot_release() {
     TEST_REPO_DIR=$(create_repo)
     echo "Test repository created at $TEST_REPO_DIR"
 
-    JOB_ID=$(schedule_job "$TEST_REPO_DIR/repo.git" "master" "./release.sh")
+    JOB_ID=$(schedule_job "$TEST_REPO_DIR/repo.git" "$DEFAULT_BRANCH_NAME" "./release.sh")
     assert_equal "0" "$?" "Failed to schedule job"
 
     wait_for_all_jobs
@@ -49,7 +52,7 @@ test_ocuroot_release_deps() {
     TEST_REPO_DIR=$(create_repo)
     echo "Test repository created at $TEST_REPO_DIR"
 
-    JOB_ID=$(schedule_job "$TEST_REPO_DIR/repo.git" "master" "./release-deps.sh")
+    JOB_ID=$(schedule_job "$TEST_REPO_DIR/repo.git" "$DEFAULT_BRANCH_NAME" "./release-deps.sh")
     assert_equal "0" "$?" "Failed to schedule job"
 
     wait_for_all_jobs
@@ -110,7 +113,7 @@ test_ocuroot_release_deps_commits() {
             checkout_and_modify_repo "$TEST_REPO_DIR/repo.git" "message-frontend.txt" "$j"
         fi
 
-        JOB_ID=$(schedule_job "$TEST_REPO_DIR/repo.git" "master" "./release-deps.sh")
+        JOB_ID=$(schedule_job "$TEST_REPO_DIR/repo.git" $DEFAULT_BRANCH_NAME "./release-deps.sh")
         assert_equal "0" "$?" "Failed to schedule job"
 
         wait_for_all_jobs
@@ -153,7 +156,7 @@ test_intent_change() {
     REPO_DIR=$(checkout_repo "$TEST_REPO_DIR/repo.git")
     pushd "$REPO_DIR" > /dev/null
 
-    JOB_ID=$(schedule_job "$TEST_REPO_DIR/repo.git" "master" "./release.sh")
+    JOB_ID=$(schedule_job "$TEST_REPO_DIR/repo.git" "$DEFAULT_BRANCH_NAME" "./release.sh")
     assert_equal "0" "$?" "Failed to schedule job"
 
     wait_for_all_jobs
@@ -164,7 +167,7 @@ test_intent_change() {
     ocuroot state set "+/custom/foo" "baz"
     assert_equal "0" "$?" "Failed to update state"
 
-    JOB_ID=$(schedule_job "$TEST_REPO_DIR/repo.git" "master" "./intent.sh")
+    JOB_ID=$(schedule_job "$TEST_REPO_DIR/repo.git" "$DEFAULT_BRANCH_NAME" "./intent.sh")
     assert_equal "0" "$?" "Failed to schedule intent update"
 
     wait_for_all_jobs

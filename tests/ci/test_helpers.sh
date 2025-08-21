@@ -82,7 +82,7 @@ create_repo() {
     echo "Creating bare repository..." >&2
     mkdir -p "repo.git"
     pushd "repo.git" > /dev/null
-    git init --bare >&2
+    git -c init.defaultBranch=$DEFAULT_BRANCH_NAME init --bare >&2
     assert_equal "0" "$?" "Failed to initialize bare repository"
     popd > /dev/null
     
@@ -126,7 +126,9 @@ create_repo() {
     assert_equal "0" "$?" "Failed to commit files"
     
     # Push to the bare repository
-    git push origin master:master >&2
+    CURRENT_BRANCH=$(git branch --show-current)
+    echo $CURRENT_BRANCH >&2
+    git push origin "$CURRENT_BRANCH:$CURRENT_BRANCH" >&2
     assert_equal "0" "$?" "Failed to push to repository"
     
     # Get the commit hash
@@ -161,7 +163,9 @@ checkout_and_modify_repo() {
     git commit -m "Test commit modifying $file_path" >&2
     assert_equal "0" "$?" "Failed to commit file"
     
-    git push origin master:master >&2
+    CURRENT_BRANCH=$(git branch --show-current)
+    echo $CURRENT_BRANCH >&2
+    git push origin "$CURRENT_BRANCH:$CURRENT_BRANCH" >&2
     assert_equal "0" "$?" "Failed to push to repository"
     
     popd > /dev/null
