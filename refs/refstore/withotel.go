@@ -191,3 +191,16 @@ func (w *WithOtel) Unlink(ctx context.Context, ref string) error {
 
 	return w.Store.Unlink(ctx, ref)
 }
+
+func (w *WithOtel) AddSupportFiles(ctx context.Context, files map[string]string) error {
+	if gitSupportFileWriter, ok := w.Store.(GitSupportFileWriter); ok {
+		_, span := w.tracer.Start(
+			ctx,
+			"RefStore.AddSupportFiles",
+		)
+		defer span.End()
+
+		return gitSupportFileWriter.AddSupportFiles(ctx, files)
+	}
+	return nil
+}
