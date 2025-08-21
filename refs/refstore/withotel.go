@@ -25,12 +25,10 @@ type WithOtel struct {
 
 // AddDependency implements Store.
 func (w *WithOtel) AddDependency(ctx context.Context, ref string, dependency string) error {
-	_, span := w.tracer.Start(
-		ctx,
-		"RefStore.AddDependency",
-		trace.WithAttributes(attribute.String("ref", ref), attribute.String("dependency", dependency)),
-	)
-	defer span.End()
+	span := trace.SpanFromContext(ctx)
+	if span.IsRecording() {
+		span.AddEvent("RefStore.AddDependency", trace.WithAttributes(attribute.String("ref", ref), attribute.String("dependency", dependency)))
+	}
 
 	return w.Store.AddDependency(ctx, ref, dependency)
 }
@@ -54,12 +52,10 @@ func (w *WithOtel) CommitTransaction(ctx context.Context, message string) error 
 
 // Delete implements Store.
 func (w *WithOtel) Delete(ctx context.Context, ref string) error {
-	_, span := w.tracer.Start(
-		ctx,
-		"RefStore.Delete",
-		trace.WithAttributes(attribute.String("ref", ref)),
-	)
-	defer span.End()
+	span := trace.SpanFromContext(ctx)
+	if span.IsRecording() {
+		span.AddEvent("RefStore.Delete", trace.WithAttributes(attribute.String("ref", ref)))
+	}
 
 	return w.Store.Delete(ctx, ref)
 }
@@ -106,12 +102,10 @@ func (w *WithOtel) GetLinks(ctx context.Context, ref string) ([]string, error) {
 
 // Link implements Store.
 func (w *WithOtel) Link(ctx context.Context, ref string, target string) error {
-	_, span := w.tracer.Start(
-		ctx,
-		"RefStore.Link",
-		trace.WithAttributes(attribute.String("ref", ref), attribute.String("target", target)),
-	)
-	defer span.End()
+	span := trace.SpanFromContext(ctx)
+	if span.IsRecording() {
+		span.AddEvent("RefStore.Link", trace.WithAttributes(attribute.String("ref", ref), attribute.String("target", target)))
+	}
 
 	return w.Store.Link(ctx, ref, target)
 }
@@ -138,12 +132,10 @@ func (w *WithOtel) MatchOptions(ctx context.Context, options MatchOptions, glob 
 
 // RemoveDependency implements Store.
 func (w *WithOtel) RemoveDependency(ctx context.Context, ref string, dependency string) error {
-	_, span := w.tracer.Start(
-		ctx,
-		"RefStore.RemoveDependency",
-		trace.WithAttributes(attribute.String("ref", ref), attribute.String("dependency", dependency)),
-	)
-	defer span.End()
+	span := trace.SpanFromContext(ctx)
+	if span.IsRecording() {
+		span.AddEvent("RefStore.RemoveDependency", trace.WithAttributes(attribute.String("ref", ref), attribute.String("dependency", dependency)))
+	}
 
 	return w.Store.RemoveDependency(ctx, ref, dependency)
 }
@@ -160,12 +152,10 @@ func (w *WithOtel) ResolveLink(ctx context.Context, ref string) (string, error) 
 
 // Set implements Store.
 func (w *WithOtel) Set(ctx context.Context, ref string, v any) error {
-	_, span := w.tracer.Start(
-		ctx,
-		"RefStore.Set",
-		trace.WithAttributes(attribute.String("ref", ref)),
-	)
-	defer span.End()
+	span := trace.SpanFromContext(ctx)
+	if span.IsRecording() {
+		span.AddEvent("RefStore.Set", trace.WithAttributes(attribute.String("ref", ref)))
+	}
 
 	return w.Store.Set(ctx, ref, v)
 }
@@ -183,11 +173,10 @@ func (w *WithOtel) StartTransaction(ctx context.Context) error {
 
 // Unlink implements Store.
 func (w *WithOtel) Unlink(ctx context.Context, ref string) error {
-	_, span := w.tracer.Start(
-		ctx,
-		"RefStore.Unlink",
-	)
-	defer span.End()
+	span := trace.SpanFromContext(ctx)
+	if span.IsRecording() {
+		span.AddEvent("RefStore.Unlink", trace.WithAttributes(attribute.String("ref", ref)))
+	}
 
 	return w.Store.Unlink(ctx, ref)
 }
