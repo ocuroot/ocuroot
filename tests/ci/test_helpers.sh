@@ -214,7 +214,7 @@ job_detail() {
 }
 
 wait_for_all_jobs() {
-    curl "http://localhost:$CI_PORT/api/wait"
+    curl -s "http://localhost:$CI_PORT/api/wait"
     assert_equal "0" "$?" "Failed to wait for all jobs with CURL"
 }
 
