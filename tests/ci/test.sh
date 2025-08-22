@@ -1,5 +1,9 @@
 #!/bin/bash
 
+export ENABLE_OTEL=true
+export OCUROOT_CHECK_STAGED_FILES=true
+export OCUROOT_DEBUG_TRACES=true
+
 # Avoid confusion between main and master in some git configs
 export DEFAULT_BRANCH_NAME=dbranch
 

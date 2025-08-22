@@ -121,12 +121,12 @@ func storeFromRepoOrStateRoot(ctx context.Context) (store refstore.Store, isRepo
 	// Get a read only store from the repo root if available
 	repoRootPath, err := client.FindRepoRoot(wd)
 	if err != nil && !errors.Is(err, client.ErrRootNotFound) {
-		return nil, false, err
+		return nil, false, fmt.Errorf("failed to find repo root: %w", err)
 	}
 	if err == nil {
 		s, err := loadStoreFromRepoRoot(ctx, repoRootPath)
 		if err != nil {
-			return nil, false, err
+			return nil, false, fmt.Errorf("failed to load store from repo root: %w", err)
 		}
 		return s, true, nil
 	}
@@ -134,18 +134,17 @@ func storeFromRepoOrStateRoot(ctx context.Context) (store refstore.Store, isRepo
 	// Get a read only store from the state root
 	stateRootPath, err := client.FindStateStoreRoot(wd)
 	if err != nil {
-		return nil, false, err
+		return nil, false, fmt.Errorf("failed to find state store root: %w", err)
 	}
 
 	fs, err := refstore.NewFSRefStore(stateRootPath)
 	if err != nil {
-		return nil, false, err
+		return nil, false, fmt.Errorf("failed to create fs ref store: %w", err)
 	}
 	return fs, false, nil
 }
 
-// TODO: Get a read/write store by loading repo config
-// There should be an alternative function to this one
+// Get a read/write store by loading repo config
 func getReadOnlyStore(ctx context.Context) (refstore.Store, error) {
 	store, _, err := storeFromRepoOrStateRoot(ctx)
 	if err != nil {
@@ -262,7 +261,7 @@ func getTrackerConfig(ctx context.Context, cmd *cobra.Command, args []string) (r
 	return tc, nil
 }
 
-func saveRepoConfig(ctx context.Context, tc release.TrackerConfig, data []byte) error {
+func saveRepoConfig(ctx context.Context, tc release.TrackerConfig, data []byte) (err error) {
 	// Write the repo file to the state stores for later use
 	repoRef := tc.Ref
 	repoRef.Filename = "repo.ocu.star"
@@ -276,12 +275,15 @@ func saveRepoConfig(ctx context.Context, tc release.TrackerConfig, data []byte) 
 		Source: data,
 	}
 
-	err := tc.Store.StartTransaction(ctx)
+	err = tc.Store.StartTransaction(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to start transaction: %w", err)
 	}
 	defer func() {
-		tc.Store.CommitTransaction(ctx, "Save repo config")
+		// TODO: We need a way to revert a transaction
+		if err == nil {
+			err = tc.Store.CommitTransaction(ctx, "Save repo config")
+		}
 	}()
 
 	if err := tc.Store.Get(ctx, repoRef.String(), &models.RepoConfig{}); err == refstore.ErrRefNotFound {

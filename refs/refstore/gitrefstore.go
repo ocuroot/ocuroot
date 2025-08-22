@@ -10,8 +10,16 @@ import (
 	"strings"
 	"time"
 
-	"github.com/ocuroot/gittools"
+	"github.com/ocuroot/ocuroot/refs"
+	"go.opentelemetry.io/otel/attribute"
+
+	"go.opentelemetry.io/otel/trace"
 )
+
+// CheckedStagedFiles uses `git add .` to validate that we have the correct set of staged files
+// for each commit.
+// Enabling this will make commits slower, but may be useful for debugging status problems.
+var CheckStagedFiles = os.Getenv("OCUROOT_CHECK_STAGED_FILES") != ""
 
 type GitSupportFileWriter interface {
 	// AddSupportFiles creates a set of files in the git repository outside of
@@ -21,14 +29,13 @@ type GitSupportFileWriter interface {
 }
 
 type GitRefStore struct {
-	s      *FSStateStore
-	g      *gittools.Repo
-	branch string
+	s *FSStateStore
+	g GitRepo
 
+	lastPull           time.Time
 	transactionStarted bool
 	transactionSteps   []string
-
-	lastPull time.Time
+	transactionFiles   []string
 }
 
 var _ GitSupportFileWriter = (*GitRefStore)(nil)
@@ -42,24 +49,42 @@ func NewGitRefStore(
 	// Create a branch-specific path to avoid FSRefStore collision
 	branchSpecificPath := filepath.Join(baseDir, "branches", branch)
 
-	r, branch, err := getRepoForRemote(branchSpecificPath, remote, branch)
+	r, err := NewGitRepoForRemote(branchSpecificPath, remote, branch)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create git ref store: %w", err)
 	}
+	r = GitRepoWithOtel(r)
+
+	var addInfoFile bool
+	if _, err = os.Stat(filepath.Join(r.RepoPath(), storeInfoFile)); err != nil {
+		if os.IsNotExist(err) {
+			addInfoFile = true
+		} else {
+			return nil, fmt.Errorf("failed to check for store info file: %w", err)
+		}
+	}
 
 	fsStore, err := NewFSRefStore(
-		r.RepoPath,
+		r.RepoPath(),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create state store: %w", err)
 	}
 
 	g := &GitRefStore{
-		s:        fsStore,
-		g:        r,
-		branch:   branch,
+		s: fsStore,
+		g: r,
+
 		lastPull: time.Now(),
 	}
+
+	if addInfoFile {
+		err = g.applyFilesAsNeeded(context.Background(), []string{storeInfoFile}, "add store info file")
+		if err != nil {
+			return nil, fmt.Errorf("failed to add store info file: %w", err)
+		}
+	}
+
 	return g, nil
 }
 
@@ -71,114 +96,74 @@ func getStatePath(baseDir, remote string) (string, error) {
 	return filepath.Join(baseDir, "state", remoteURL.Host, remoteURL.Path), nil
 }
 
-func getRepoForRemote(baseDir, remote, branch string) (*gittools.Repo, string, error) {
-	statePath, err := getStatePath(baseDir, remote)
-	if err != nil {
-		return nil, "", err
-	}
-
-	var r *gittools.Repo
-
-	var shouldClone bool
-	if _, err := os.Stat(filepath.Join(statePath, ".git")); err != nil {
-		if os.IsNotExist(err) {
-			shouldClone = true
-		} else {
-			return nil, "", err
-		}
-	}
-
-	client := gittools.NewClient()
-
-	// Make sure we have a copy of the repo available
-	if shouldClone {
-		r, err = client.Clone(remote, statePath)
-		if err != nil {
-			return nil, "", err
-		}
-	} else {
-		r, err = gittools.Open(statePath)
-		if err != nil {
-			return nil, "", err
-		}
-	}
-
-	if !shouldClone {
-		// Make sure we're up to date
-		if err := r.Pull("origin", branch); err != nil {
-			// Attempt to clone a fresh copy
-			if err := os.RemoveAll(statePath); err != nil {
-				return nil, "", err
-			}
-
-			r, err = client.Clone(remote, statePath)
-			if err != nil {
-				return nil, "", err
-			}
-		}
-	}
-
-	// Checkout the appropriate branch
-	if branch != "" {
-		if err := r.Checkout(branch); err != nil {
-			return nil, "", err
-		}
-	} else {
-		branch, err = r.CurrentBranch()
-		if err != nil {
-			return nil, "", err
-		}
-	}
-
-	return r, branch, nil
-}
-
 func (g *GitRefStore) StartTransaction(ctx context.Context) error {
 	g.transactionStarted = true
 	return nil
 }
 
 func (g *GitRefStore) CommitTransaction(ctx context.Context, message string) error {
-	if err := g.apply(ctx, strings.Join(append([]string{message}, g.transactionSteps...), "\n")); err != nil {
-		return err
+	span := trace.SpanFromContext(ctx)
+	if span != nil {
+		span.SetAttributes(
+			attribute.StringSlice("transaction.steps", g.transactionSteps),
+			attribute.StringSlice("transaction.files", g.transactionFiles),
+		)
+	}
+
+	if err := g.apply(ctx, g.transactionFiles, strings.Join(append([]string{message}, g.transactionSteps...), "\n")); err != nil {
+		return fmt.Errorf("failed to apply transaction: %w", err)
 	}
 
 	g.transactionStarted = false
 	g.transactionSteps = nil
+	g.transactionFiles = nil
 	return nil
 }
 
-func (g *GitRefStore) applyAsNeeded(ctx context.Context, message string) error {
+func (g *GitRefStore) applyFilesAsNeeded(ctx context.Context, paths []string, message string) error {
 	if g.transactionStarted {
 		g.transactionSteps = append(g.transactionSteps, message)
+		g.transactionFiles = append(g.transactionFiles, paths...)
 		return nil
 	}
-	return g.apply(ctx, message)
+	return g.apply(ctx, paths, message)
 }
 
-func (g *GitRefStore) pull(ctx context.Context) error {
-	if time.Since(g.lastPull) < 5*time.Second {
-		return nil
+func (g *GitRefStore) applyAsNeeded(ctx context.Context, refs []string, message string) error {
+	var paths []string
+	for _, ref := range refs {
+		path, err := g.s.ActualPath(ref)
+		if err != nil {
+			return err
+		}
+		paths = append(paths, path)
 	}
-	g.lastPull = time.Now()
-	return g.g.Pull("origin", g.branch)
+
+	return g.applyFilesAsNeeded(ctx, paths, message)
 }
 
-func (g *GitRefStore) apply(ctx context.Context, message string) error {
-	g.lastPull = time.Now()
-	if err := g.g.Pull("origin", g.branch); err != nil {
+func (g *GitRefStore) apply(ctx context.Context, paths []string, message string) error {
+	if err := g.pullWithoutDebounce(ctx); err != nil {
+		return err
+	}
+
+	if err := g.g.add(ctx, paths); err != nil {
+		return err
+	}
+
+	if err := g.g.checkStagedFiles(); err != nil {
 		return err
 	}
 
 	stack := debug.Stack()
-	if err := g.g.CommitAll(message + "\n\n" + string(stack)); err != nil {
+	if err := g.g.commit(ctx, message+"\n\n"+string(stack)); err != nil {
 		// If nothing has changed, ignore the error
 		if strings.Contains(err.Error(), "nothing to commit") {
 			return nil
 		}
 		return err
 	}
-	return g.g.Push("origin", g.branch)
+	return g.g.push(ctx, "origin")
 }
 
 func (g *GitRefStore) Close() error {
@@ -207,12 +192,7 @@ func (g *GitRefStore) Set(ctx context.Context, ref string, v any) error {
 		return err
 	}
 
-	if g.transactionStarted {
-		g.transactionSteps = append(g.transactionSteps, "set "+ref)
-		return nil
-	}
-
-	return g.applyAsNeeded(ctx, "update state at "+ref)
+	return g.applyAsNeeded(ctx, []string{ref}, "update state at "+ref)
 }
 
 func (g *GitRefStore) Delete(ctx context.Context, ref string) error {
@@ -226,7 +206,7 @@ func (g *GitRefStore) Delete(ctx context.Context, ref string) error {
 		return err
 	}
 
-	return g.applyAsNeeded(ctx, "delete state at "+ref)
+	return g.applyAsNeeded(ctx, []string{ref}, "delete state at "+ref)
 }
 
 func (g *GitRefStore) Link(ctx context.Context, ref string, target string) error {
@@ -235,13 +215,37 @@ func (g *GitRefStore) Link(ctx context.Context, ref string, target string) error
 	if err != nil {
 		return err
 	}
+	refParsed, err := refs.Parse(ref)
+	if err != nil {
+		return err
+	}
+	refResolved, err := g.ResolveLink(ctx, ref)
+	if err != nil {
+		return err
+	}
+	refParsedResolved, err := refs.Parse(refResolved)
+	if err != nil {
+		return err
+	}
+	refResolvedFile := g.s.pathToRef(refParsedResolved)
+	refFile := g.s.pathToRef(refParsed)
 
 	err = g.s.Link(ctx, ref, target)
 	if err != nil {
 		return err
 	}
+	targetResolved, err := g.ResolveLink(ctx, target)
+	if err != nil {
+		return err
+	}
 
-	return g.applyAsNeeded(ctx, "link "+ref+" to "+target)
+	targetParsed, err := refs.Parse(targetResolved)
+	if err != nil {
+		return err
+	}
+	targetFile := g.s.pathToRef(targetParsed)
+
+	return g.applyFilesAsNeeded(ctx, []string{refFile, refResolvedFile, targetFile}, "link "+ref+" to "+target)
 }
 
 func (g *GitRefStore) Unlink(ctx context.Context, ref string) error {
@@ -255,7 +259,7 @@ func (g *GitRefStore) Unlink(ctx context.Context, ref string) error {
 		return err
 	}
 
-	return g.applyAsNeeded(ctx, "unlink "+ref)
+	return g.applyAsNeeded(ctx, []string{ref}, "unlink "+ref)
 }
 
 func (g *GitRefStore) GetLinks(ctx context.Context, ref string) ([]string, error) {
@@ -308,7 +312,9 @@ func (g *GitRefStore) AddDependency(ctx context.Context, ref string, dependency 
 		return err
 	}
 
-	return g.applyAsNeeded(ctx, "add dependency "+dependency+" to "+ref)
+	dependencyMarkerPath, dependantMarkerPath := g.s.ActualDependencyPaths(ctx, ref, dependency)
+
+	return g.applyFilesAsNeeded(ctx, []string{dependencyMarkerPath, dependantMarkerPath}, "add dependency "+dependency+" to "+ref)
 }
 func (g *GitRefStore) RemoveDependency(ctx context.Context, ref string, dependency string) error {
 	err := g.pull(ctx)
@@ -320,7 +326,9 @@ func (g *GitRefStore) RemoveDependency(ctx context.Context, ref string, dependen
 		return err
 	}
 
-	return g.applyAsNeeded(ctx, "remove dependency "+dependency+" from "+ref)
+	dependencyMarkerPath, dependantMarkerPath := g.s.ActualDependencyPaths(ctx, ref, dependency)
+
+	return g.applyFilesAsNeeded(ctx, []string{dependencyMarkerPath, dependantMarkerPath}, "remove dependency "+dependency+" from "+ref)
 }
 func (g *GitRefStore) GetDependencies(ctx context.Context, ref string) ([]string, error) {
 	// Make sure we're up to date
@@ -343,8 +351,9 @@ func (g *GitRefStore) GetDependants(ctx context.Context, ref string) ([]string, 
 }
 
 func (g *GitRefStore) AddSupportFiles(ctx context.Context, files map[string]string) error {
+	var paths []string
 	for k, v := range files {
-		fp := filepath.Join(g.g.RepoPath, k)
+		fp := filepath.Join(g.g.RepoPath(), k)
 		if err := os.MkdirAll(filepath.Dir(fp), 0755); err != nil {
 			return err
 		}
@@ -352,12 +361,20 @@ func (g *GitRefStore) AddSupportFiles(ctx context.Context, files map[string]stri
 		if err := os.WriteFile(fp, []byte(v), 0644); err != nil {
 			return err
 		}
+		paths = append(paths, fp)
 	}
 
-	if g.transactionStarted {
-		g.transactionSteps = append(g.transactionSteps, "add support files")
+	return g.applyFilesAsNeeded(ctx, paths, "add support files")
+}
+
+func (g *GitRefStore) pull(ctx context.Context) error {
+	if time.Since(g.lastPull) < 5*time.Second {
 		return nil
 	}
+	return g.pullWithoutDebounce(ctx)
+}
 
-	return g.applyAsNeeded(ctx, "add support files")
+func (g *GitRefStore) pullWithoutDebounce(ctx context.Context) error {
+	g.lastPull = time.Now()
+	return g.g.pull(ctx)
 }

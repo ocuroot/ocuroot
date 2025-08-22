@@ -2,25 +2,28 @@ package refstore
 
 import (
 	"context"
+	"os"
 	"strings"
 
-	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
 )
 
+var DEBUG_TRACES = os.Getenv("OCUROOT_DEBUG_TRACES") != ""
+
 func StoreWithOtel(store Store) Store {
-	return &WithOtel{
-		tracer: otel.Tracer(name),
-		Store:  store,
+	if DEBUG_TRACES {
+		return &WithOtel{
+			Store: store,
+		}
 	}
+	return store
 }
 
 var _ Store = (*WithOtel)(nil)
 
 type WithOtel struct {
-	tracer trace.Tracer
-	Store  Store
+	Store Store
 }
 
 // AddDependency implements Store.
@@ -40,7 +43,7 @@ func (w *WithOtel) Close() error {
 
 // CommitTransaction implements Store.
 func (w *WithOtel) CommitTransaction(ctx context.Context, message string) error {
-	_, span := w.tracer.Start(
+	_, span := tracer.Start(
 		ctx,
 		"RefStore.CommitTransaction",
 		trace.WithAttributes(attribute.String("message", message)),
@@ -162,7 +165,7 @@ func (w *WithOtel) Set(ctx context.Context, ref string, v any) error {
 
 // StartTransaction implements Store.
 func (w *WithOtel) StartTransaction(ctx context.Context) error {
-	_, span := w.tracer.Start(
+	_, span := tracer.Start(
 		ctx,
 		"RefStore.StartTransaction",
 	)
@@ -183,7 +186,7 @@ func (w *WithOtel) Unlink(ctx context.Context, ref string) error {
 
 func (w *WithOtel) AddSupportFiles(ctx context.Context, files map[string]string) error {
 	if gitSupportFileWriter, ok := w.Store.(GitSupportFileWriter); ok {
-		_, span := w.tracer.Start(
+		_, span := tracer.Start(
 			ctx,
 			"RefStore.AddSupportFiles",
 		)
@@ -192,4 +195,75 @@ func (w *WithOtel) AddSupportFiles(ctx context.Context, files map[string]string)
 		return gitSupportFileWriter.AddSupportFiles(ctx, files)
 	}
 	return nil
+}
+
+var _ GitRepo = (*GitRepoWrapperWithOtel)(nil)
+
+func GitRepoWithOtel(repo GitRepo) GitRepo {
+	if DEBUG_TRACES {
+		return &GitRepoWrapperWithOtel{
+			r: repo,
+		}
+	}
+	return repo
+}
+
+type GitRepoWrapperWithOtel struct {
+	r GitRepo
+}
+
+// Branch implements GitRepo.
+func (g *GitRepoWrapperWithOtel) Branch() string {
+	return g.r.Branch()
+}
+
+// RepoPath implements GitRepo.
+func (g *GitRepoWrapperWithOtel) RepoPath() string {
+	return g.r.RepoPath()
+}
+
+// add implements GitRepo.
+func (g *GitRepoWrapperWithOtel) add(ctx context.Context, paths []string) error {
+	_, span := tracer.Start(ctx, "git.add", trace.WithAttributes(
+		attribute.StringSlice("paths", paths),
+	))
+	defer span.End()
+
+	return g.r.add(ctx, paths)
+}
+
+// checkStagedFiles implements GitRepo.
+func (g *GitRepoWrapperWithOtel) checkStagedFiles() error {
+	return g.r.checkStagedFiles()
+}
+
+// commit implements GitRepo.
+func (g *GitRepoWrapperWithOtel) commit(ctx context.Context, message string) error {
+	_, span := tracer.Start(ctx, "git.commit", trace.WithAttributes(
+		attribute.String("message", message),
+	))
+	defer span.End()
+
+	return g.r.commit(ctx, message)
+}
+
+// pull implements GitRepo.
+func (g *GitRepoWrapperWithOtel) pull(ctx context.Context) error {
+	_, span := tracer.Start(ctx, "git.pull", trace.WithAttributes(
+		attribute.String("remote", "origin"),
+		attribute.String("branch", g.r.Branch()),
+	))
+	defer span.End()
+
+	return g.r.pull(ctx)
+}
+
+// push implements GitRepo.
+func (g *GitRepoWrapperWithOtel) push(ctx context.Context, remote string) error {
+	_, span := tracer.Start(ctx, "git.push", trace.WithAttributes(
+		attribute.String("remote", remote),
+	))
+	defer span.End()
+
+	return g.r.push(ctx, remote)
 }

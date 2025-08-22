@@ -40,6 +40,8 @@ func TestGitRefStore(t *testing.T) {
 }
 
 func TestGitRefStoreWithTransaction(t *testing.T) {
+	CheckStagedFiles = true
+
 	tempDir, err := os.MkdirTemp("", "ocuroot_test")
 	if err != nil {
 		t.Fatal(err)

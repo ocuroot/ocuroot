@@ -3,6 +3,7 @@ package release
 import (
 	"context"
 	"fmt"
+	"os"
 	"path/filepath"
 	"sort"
 
@@ -11,6 +12,8 @@ import (
 	"github.com/ocuroot/ocuroot/refs/refstore"
 	"github.com/ocuroot/ocuroot/sdk"
 )
+
+var DEBUG_TRACES = os.Getenv("OCUROOT_DEBUG_TRACES") != ""
 
 func NewRefStore(
 	storeConfig *sdk.Store,

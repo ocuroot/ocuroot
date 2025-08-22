@@ -8,7 +8,7 @@ import (
 const name = "github.com/ocuroot/ocuroot/refs/refstore"
 
 var (
-	// tracer = otel.Tracer(name)
+	tracer = otel.Tracer(name)
 	meter  = otel.Meter(name)
 	logger = otelslog.NewLogger(name)
 )

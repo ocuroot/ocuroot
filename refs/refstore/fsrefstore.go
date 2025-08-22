@@ -27,6 +27,12 @@ const (
 )
 
 var _ Store = (*FSStateStore)(nil)
+var _ PathResolver = (*FSStateStore)(nil)
+
+type PathResolver interface {
+	ActualPath(ref string) (string, error)
+	ActualDependencyPaths(ctx context.Context, ref string, dependency string) (string, string)
+}
 
 type StoreInfo struct {
 	Version int `json:"version"`
@@ -169,6 +175,7 @@ func (f *FSStateStore) Set(ctx context.Context, ref string, v any) error {
 	if err != nil {
 		return fmt.Errorf("failed to resolve link: %v", err)
 	}
+	fp := f.pathToRef(parsedRef)
 
 	if parsedRef.Fragment != "" {
 		return fmt.Errorf("setting by fragment not supported")
@@ -178,8 +185,6 @@ func (f *FSStateStore) Set(ctx context.Context, ref string, v any) error {
 	if err != nil {
 		return err
 	}
-
-	fp := f.pathToRef(parsedRef)
 
 	// Create all necessary parent directories.
 	if err := os.MkdirAll(filepath.Dir(fp), 0755); err != nil {
@@ -511,9 +516,15 @@ func (f *FSStateStore) matchRefs(globs []string, baseDir string) ([]string, erro
 	return matchingRefs, nil
 }
 
-func (f *FSStateStore) AddDependency(ctx context.Context, ref string, dependency string) error {
+func (f *FSStateStore) ActualDependencyPaths(ctx context.Context, ref string, dependency string) (string, string) {
 	dependencyMarkerPath := filepath.Join(f.pathToDependencies(), ref, dependency, refMarkerFile)
 	dependantMarkerPath := filepath.Join(f.pathToDependants(), dependency, ref, refMarkerFile)
+
+	return dependencyMarkerPath, dependantMarkerPath
+}
+
+func (f *FSStateStore) AddDependency(ctx context.Context, ref string, dependency string) error {
+	dependencyMarkerPath, dependantMarkerPath := f.ActualDependencyPaths(ctx, ref, dependency)
 
 	if err := os.MkdirAll(filepath.Dir(dependencyMarkerPath), 0755); err != nil {
 		return err
@@ -587,6 +598,14 @@ func (f *FSStateStore) getMarkedRefsUnderPath(p string) ([]string, error) {
 func (f *FSStateStore) GetDependants(ctx context.Context, ref string) ([]string, error) {
 	dependencyStartPath := filepath.Join(f.pathToDependants(), ref)
 	return f.getMarkedRefsUnderPath(dependencyStartPath)
+}
+
+func (f *FSStateStore) ActualPath(ref string) (string, error) {
+	parsedRef, err := f.resolveLink(ref)
+	if err != nil {
+		return "", fmt.Errorf("failed to resolve link: %v", err)
+	}
+	return filepath.Join(refsDir, parsedRef.String(), contentFile), nil
 }
 
 func (f *FSStateStore) pathToRef(ref refs.Ref) string {
