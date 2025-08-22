@@ -52,13 +52,13 @@ func (r *releaseStore) GetReleaseInfo(ctx context.Context) (*ReleaseInfo, error)
 }
 
 func (w *releaseStore) InitDeploymentUp(ctx context.Context, env string) error {
-	err := w.Store.StartTransaction(ctx)
+	err := w.Store.StartTransaction(ctx, "initializing deployment")
 	if err != nil {
 		return fmt.Errorf("failed to start transaction: %w", err)
 	}
 
 	defer func() {
-		commitErr := w.Store.CommitTransaction(ctx, "initializing deployment")
+		commitErr := w.Store.CommitTransaction(ctx)
 		if commitErr != nil {
 			log.Error("failed to commit transaction", "error", commitErr)
 		}
@@ -134,13 +134,13 @@ func (w *releaseStore) InitDeploymentDown(ctx context.Context, env string) error
 		return fmt.Errorf("release has no down function %s", env)
 	}
 
-	err = w.Store.StartTransaction(ctx)
+	err = w.Store.StartTransaction(ctx, "initializing deployment (down)")
 	if err != nil {
 		return fmt.Errorf("failed to start transaction: %w", err)
 	}
 
 	defer func() {
-		commitErr := w.Store.CommitTransaction(ctx, "initializing deployment (down)")
+		commitErr := w.Store.CommitTransaction(ctx)
 		if commitErr != nil {
 			log.Error("failed to commit transaction", "error", commitErr)
 		}

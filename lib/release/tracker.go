@@ -103,13 +103,13 @@ func (r *ReleaseTracker) GetReleaseInfo(ctx context.Context) (*ReleaseInfo, erro
 func (r *ReleaseTracker) InitRelease(ctx context.Context, commit string) error {
 	var err error
 
-	err = r.stateStore.Store.StartTransaction(ctx)
+	err = r.stateStore.Store.StartTransaction(ctx, "initializing release")
 	if err != nil {
 		return fmt.Errorf("failed to start transaction: %w", err)
 	}
 
 	defer func() {
-		commitErr := r.stateStore.Store.CommitTransaction(ctx, "initializing release")
+		commitErr := r.stateStore.Store.CommitTransaction(ctx)
 		if commitErr != nil {
 			log.Error("failed to commit transaction", "error", commitErr)
 		}
@@ -175,11 +175,11 @@ func (r *ReleaseTracker) UnfilteredNextFunctions(ctx context.Context) (map[refs.
 // FilteredNextFunctions returns all functions that are pending execution,
 // but only those that have all their inputs available.
 func (r *ReleaseTracker) FilteredNextFunctions(ctx context.Context) (map[refs.Ref]*models.Function, error) {
-	if err := r.stateStore.Store.StartTransaction(ctx); err != nil {
+	if err := r.stateStore.Store.StartTransaction(ctx, "populating inputs"); err != nil {
 		return nil, err
 	}
 	defer func() {
-		if err := r.stateStore.Store.CommitTransaction(ctx, "populating inputs"); err != nil {
+		if err := r.stateStore.Store.CommitTransaction(ctx); err != nil {
 			log.Error("failed to commit transaction", "error", err)
 		}
 	}()
@@ -372,13 +372,13 @@ func (r *ReleaseTracker) Retry(ctx context.Context, logger Logger) error {
 }
 
 func (r *ReleaseTracker) Task(ctx context.Context, ref string, logger Logger) error {
-	err := r.stateStore.Store.StartTransaction(ctx)
+	err := r.stateStore.Store.StartTransaction(ctx, "running task")
 	if err != nil {
 		return fmt.Errorf("failed to start transaction: %w", err)
 	}
 
 	defer func() {
-		commitErr := r.stateStore.Store.CommitTransaction(ctx, "running task")
+		commitErr := r.stateStore.Store.CommitTransaction(ctx)
 		if commitErr != nil {
 			log.Error("failed to commit transaction", "error", commitErr)
 		}
@@ -571,7 +571,7 @@ func (r *ReleaseTracker) Run(
 
 	log.Info("running function", "function", fn.Fn.Name)
 
-	if err := r.stateStore.Store.StartTransaction(ctx); err != nil {
+	if err := r.stateStore.Store.StartTransaction(ctx, "function started\n\n"+fnRef.String()); err != nil {
 		return sdk.WorkResult{}, fmt.Errorf("failed to start transaction: %w", err)
 	}
 
@@ -583,7 +583,7 @@ func (r *ReleaseTracker) Run(
 	if err := r.updateIntent(ctx, fnRef, fn); err != nil {
 		return sdk.WorkResult{}, fmt.Errorf("failed to update intent state: %w", err)
 	}
-	if err := r.stateStore.Store.CommitTransaction(ctx, "function started\n\n"+fnRef.String()); err != nil {
+	if err := r.stateStore.Store.CommitTransaction(ctx); err != nil {
 		log.Error("failed to commit transaction", "error", err)
 	}
 
@@ -599,11 +599,11 @@ func (r *ReleaseTracker) Run(
 		}
 	}
 
-	if err := r.stateStore.Store.StartTransaction(ctx); err != nil {
+	if err := r.stateStore.Store.StartTransaction(ctx, "function finished\n\n"+fnRef.String()); err != nil {
 		return sdk.WorkResult{}, fmt.Errorf("failed to start transaction: %w", err)
 	}
 	defer func() {
-		if err := r.stateStore.Store.CommitTransaction(ctx, "function finished\n\n"+fnRef.String()); err != nil {
+		if err := r.stateStore.Store.CommitTransaction(ctx); err != nil {
 			log.Error("failed to commit transaction", "error", err)
 		}
 	}()

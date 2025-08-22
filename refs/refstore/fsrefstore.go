@@ -93,12 +93,12 @@ type FSStateStore struct {
 	BasePath string
 }
 
-func (f *FSStateStore) StartTransaction(ctx context.Context) error {
+func (f *FSStateStore) StartTransaction(ctx context.Context, message string) error {
 	// TODO: Implement
 	return nil
 }
 
-func (f *FSStateStore) CommitTransaction(ctx context.Context, message string) error {
+func (f *FSStateStore) CommitTransaction(ctx context.Context) error {
 	// TODO: Implement
 	return nil
 }

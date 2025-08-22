@@ -125,17 +125,17 @@ func (s *stateListener) Set(ctx context.Context, ref string, v any) error {
 }
 
 // StartTransaction implements RefStore.
-func (s *stateListener) StartTransaction(ctx context.Context) error {
+func (s *stateListener) StartTransaction(ctx context.Context, message string) error {
 	s.inTransaction = true
-	return s.store.StartTransaction(ctx)
+	return s.store.StartTransaction(ctx, message)
 }
 
 // CommitTransaction implements RefStore.
-func (s *stateListener) CommitTransaction(ctx context.Context, message string) error {
+func (s *stateListener) CommitTransaction(ctx context.Context) error {
 	for _, ref := range s.transactionRefs {
 		s.updateIfMatches(ctx, ref, false)
 	}
 	s.inTransaction = false
 	s.transactionRefs = nil
-	return s.store.CommitTransaction(ctx, message)
+	return s.store.CommitTransaction(ctx)
 }

@@ -68,11 +68,11 @@ func TestGitRefStoreWithTransaction(t *testing.T) {
 		}
 	}()
 
-	if err := store.StartTransaction(context.Background()); err != nil {
+	if err := store.StartTransaction(context.Background(), "test"); err != nil {
 		t.Fatal(err)
 	}
 	DoTestStore(t, store)
-	if err := store.CommitTransaction(context.Background(), "test"); err != nil {
+	if err := store.CommitTransaction(context.Background()); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -106,7 +106,7 @@ func TestGitRefStoreTransaction(t *testing.T) {
 
 	ctx := context.Background()
 
-	if err := store.StartTransaction(ctx); err != nil {
+	if err := store.StartTransaction(ctx, "test"); err != nil {
 		t.Fatal(err)
 	}
 
@@ -122,7 +122,7 @@ func TestGitRefStoreTransaction(t *testing.T) {
 		t.Fatalf("expected test, got %s", got)
 	}
 
-	if err := store.CommitTransaction(ctx, "test"); err != nil {
+	if err := store.CommitTransaction(ctx); err != nil {
 		t.Fatal(err)
 	}
 

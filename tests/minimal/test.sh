@@ -1,5 +1,8 @@
 #!/bin/bash
 
+export ENABLE_OTEL=true
+export OCUROOT_DEBUG_TRACES=true
+
 export OCU_REPO_COMMIT_OVERRIDE=${OCU_REPO_COMMIT_OVERRIDE:-commitid}
 
 source $(dirname "$0")/../test_helpers.sh

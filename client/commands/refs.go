@@ -275,14 +275,14 @@ func saveRepoConfig(ctx context.Context, tc release.TrackerConfig, data []byte) 
 		Source: data,
 	}
 
-	err = tc.Store.StartTransaction(ctx)
+	err = tc.Store.StartTransaction(ctx, "Save repo config")
 	if err != nil {
 		return fmt.Errorf("failed to start transaction: %w", err)
 	}
 	defer func() {
 		// TODO: We need a way to revert a transaction
 		if err == nil {
-			err = tc.Store.CommitTransaction(ctx, "Save repo config")
+			err = tc.Store.CommitTransaction(ctx)
 		}
 	}()
 

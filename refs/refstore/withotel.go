@@ -23,7 +23,8 @@ func StoreWithOtel(store Store) Store {
 var _ Store = (*WithOtel)(nil)
 
 type WithOtel struct {
-	Store Store
+	Store              Store
+	transactionMessage string
 }
 
 // AddDependency implements Store.
@@ -42,15 +43,16 @@ func (w *WithOtel) Close() error {
 }
 
 // CommitTransaction implements Store.
-func (w *WithOtel) CommitTransaction(ctx context.Context, message string) error {
+func (w *WithOtel) CommitTransaction(ctx context.Context) error {
 	_, span := tracer.Start(
 		ctx,
 		"RefStore.CommitTransaction",
-		trace.WithAttributes(attribute.String("message", message)),
+		trace.WithAttributes(attribute.String("message", w.transactionMessage)),
 	)
 	defer span.End()
 
-	return w.Store.CommitTransaction(ctx, message)
+	w.transactionMessage = ""
+	return w.Store.CommitTransaction(ctx)
 }
 
 // Delete implements Store.
@@ -164,14 +166,16 @@ func (w *WithOtel) Set(ctx context.Context, ref string, v any) error {
 }
 
 // StartTransaction implements Store.
-func (w *WithOtel) StartTransaction(ctx context.Context) error {
+func (w *WithOtel) StartTransaction(ctx context.Context, message string) error {
 	_, span := tracer.Start(
 		ctx,
 		"RefStore.StartTransaction",
+		trace.WithAttributes(attribute.String("message", message)),
 	)
 	defer span.End()
 
-	return w.Store.StartTransaction(ctx)
+	w.transactionMessage = message
+	return w.Store.StartTransaction(ctx, message)
 }
 
 // Unlink implements Store.

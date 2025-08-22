@@ -69,13 +69,13 @@ func applyEnvironmentIntent(ctx context.Context, ref refs.Ref, store refstore.St
 		return fmt.Errorf("failed to set state: %w", err)
 	}
 
-	err := store.StartTransaction(ctx)
+	err := store.StartTransaction(ctx, "scheduling recalculation of deployments")
 	if err != nil {
 		return fmt.Errorf("failed to start transaction: %w", err)
 	}
 
 	defer func() {
-		commitErr := store.CommitTransaction(ctx, "scheduling recalculation of deployments")
+		commitErr := store.CommitTransaction(ctx)
 		if commitErr != nil {
 			log.Error("failed to commit transaction", "error", commitErr)
 		}

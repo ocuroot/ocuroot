@@ -26,7 +26,7 @@ func (r *ReadOnlyStore) Close() error {
 }
 
 // CommitTransaction implements RefStore.
-func (r *ReadOnlyStore) CommitTransaction(ctx context.Context, message string) error {
+func (r *ReadOnlyStore) CommitTransaction(ctx context.Context) error {
 	return ErrReadOnly
 }
 
@@ -91,6 +91,6 @@ func (r *ReadOnlyStore) Set(ctx context.Context, ref string, v any) error {
 }
 
 // StartTransaction implements RefStore.
-func (r *ReadOnlyStore) StartTransaction(ctx context.Context) error {
+func (r *ReadOnlyStore) StartTransaction(ctx context.Context, message string) error {
 	return ErrReadOnly
 }

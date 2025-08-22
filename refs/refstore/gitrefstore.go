@@ -33,6 +33,7 @@ type GitRefStore struct {
 	g GitRepo
 
 	lastPull           time.Time
+	transactionMessage string
 	transactionStarted bool
 	transactionSteps   []string
 	transactionFiles   []string
@@ -96,12 +97,13 @@ func getStatePath(baseDir, remote string) (string, error) {
 	return filepath.Join(baseDir, "state", remoteURL.Host, remoteURL.Path), nil
 }
 
-func (g *GitRefStore) StartTransaction(ctx context.Context) error {
+func (g *GitRefStore) StartTransaction(ctx context.Context, message string) error {
 	g.transactionStarted = true
+	g.transactionMessage = message
 	return nil
 }
 
-func (g *GitRefStore) CommitTransaction(ctx context.Context, message string) error {
+func (g *GitRefStore) CommitTransaction(ctx context.Context) error {
 	span := trace.SpanFromContext(ctx)
 	if span != nil {
 		span.SetAttributes(
@@ -110,10 +112,11 @@ func (g *GitRefStore) CommitTransaction(ctx context.Context, message string) err
 		)
 	}
 
-	if err := g.apply(ctx, g.transactionFiles, strings.Join(append([]string{message}, g.transactionSteps...), "\n")); err != nil {
+	if err := g.apply(ctx, g.transactionFiles, strings.Join(append([]string{g.transactionMessage}, g.transactionSteps...), "\n")); err != nil {
 		return fmt.Errorf("failed to apply transaction: %w", err)
 	}
 
+	g.transactionMessage = ""
 	g.transactionStarted = false
 	g.transactionSteps = nil
 	g.transactionFiles = nil

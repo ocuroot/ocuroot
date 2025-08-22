@@ -91,21 +91,21 @@ type CombinedRefStore struct {
 	intentStore refstore.Store
 }
 
-func (s *CombinedRefStore) StartTransaction(ctx context.Context) error {
-	if err := s.stateStore.StartTransaction(ctx); err != nil {
+func (s *CombinedRefStore) StartTransaction(ctx context.Context, message string) error {
+	if err := s.stateStore.StartTransaction(ctx, message); err != nil {
 		return err
 	}
-	if err := s.intentStore.StartTransaction(ctx); err != nil {
+	if err := s.intentStore.StartTransaction(ctx, message); err != nil {
 		return err
 	}
 	return nil
 }
 
-func (s *CombinedRefStore) CommitTransaction(ctx context.Context, message string) error {
-	if err := s.stateStore.CommitTransaction(ctx, message); err != nil {
+func (s *CombinedRefStore) CommitTransaction(ctx context.Context) error {
+	if err := s.stateStore.CommitTransaction(ctx); err != nil {
 		return err
 	}
-	if err := s.intentStore.CommitTransaction(ctx, message); err != nil {
+	if err := s.intentStore.CommitTransaction(ctx); err != nil {
 		return err
 	}
 	return nil

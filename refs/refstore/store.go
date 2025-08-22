@@ -8,8 +8,8 @@ import (
 var ErrRefNotFound = errors.New("ref not found")
 
 type Store interface {
-	StartTransaction(ctx context.Context) error
-	CommitTransaction(ctx context.Context, message string) error
+	StartTransaction(ctx context.Context, message string) error
+	CommitTransaction(ctx context.Context) error
 
 	Get(ctx context.Context, ref string, v any) error
 	Set(ctx context.Context, ref string, v any) error
