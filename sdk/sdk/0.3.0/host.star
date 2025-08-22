@@ -1,4 +1,4 @@
-def _os():
+def os():
     """
     os returns the OS of the host.
     The value is retrieved using the Go runtime.GOOS constant.
@@ -8,7 +8,7 @@ def _os():
     """
     return json.decode(backend.host.os())
 
-def _arch():
+def arch():
     """
     arch returns the architecture of the host.
     The value is retrieved using the Go runtime.GOARCH constant.
@@ -18,7 +18,7 @@ def _arch():
     """
     return json.decode(backend.host.arch())
 
-def _env():
+def env():
     """
     env returns the environment variables of the host as a dictionary.
 
@@ -27,7 +27,7 @@ def _env():
     """
     return json.decode(backend.host.env())
 
-def _shell(command, shell="sh", dir=".", env={}, mute=False, continue_on_error=False):
+def shell(command, shell="sh", dir=".", env={}, mute=False, continue_on_error=False):
     """
     shell runs a shell command on the host.
 
@@ -62,18 +62,18 @@ def _shell(command, shell="sh", dir=".", env={}, mute=False, continue_on_error=F
         exit_code = respDict["exit_code"],
     )
 
-def _working_dir():
+def pwd():
     """
-    working_dir returns the current working directory of the host.
+    pwd returns the current working directory of the host.
 
     Returns:
         The current working directory of the host
     """
     return json.decode(backend.host.working_dir())
 
-def _read_file(path):
+def read(path):
     """
-    read_file reads the contents of a file on the host.
+    read reads the contents of a file on the host.
 
     Args:
         path: The path to the file to read
@@ -83,9 +83,9 @@ def _read_file(path):
     """
     return json.decode(backend.host.read_file(json.encode(path)))
 
-def _write_file(path, content):
+def write(path, content):
     """
-    write_file writes the contents of a file on the host.
+    write writes the contents of a file on the host.
 
     Args:
         path: The path to the file to write
@@ -101,7 +101,7 @@ def _write_file(path, content):
         })
     ))
 
-def _read_dir(path):
+def read_dir(path):
     """
     read_dir reads the contents of a directory on the host.
 
@@ -113,7 +113,7 @@ def _read_dir(path):
     """
     return json.decode(backend.host.read_dir(json.encode(path)))
 
-def _is_dir(path):
+def is_dir(path):
     """
     is_dir checks if a path is a directory on the host.
 
@@ -126,13 +126,13 @@ def _is_dir(path):
     return json.decode(backend.host.is_dir(json.encode(path)))    
 
 host = struct(
-    os = _os,
-    arch = _arch,
-    env = _env,
-    shell = _shell,
-    working_dir = _working_dir,
-    read_file = _read_file,
-    write_file = _write_file,
-    read_dir = _read_dir,
-    is_dir = _is_dir,
+    os = os,
+    arch = arch,
+    env = env,
+    shell = shell,
+    pwd = pwd,
+    read_file = read,
+    write_file = write,
+    read_dir = read_dir,
+    is_dir = is_dir,
 )

@@ -16,11 +16,27 @@ def phase(name, work=[]):
         A dictionary representing the phase
     """
     
-    # Add this phase to the list stored on the thread
     package = backend.thread.get("package", default={
         "phases": [],
         "functions": {},
     })
+
+    # Create new phases for any work items that are not in this phase
+    registered_work = backend.thread.get("work", default=[])
+    for w in registered_work:
+        match = False
+        for r in work:
+            if r["work_id"] == w["work_id"]:
+                match = True
+                break
+        if not match:
+            package["phases"].append({
+                "name": "",
+                "work": [w],
+            })
+    backend.thread.set("work", [])
+
+    # Add this phase to the list stored on the thread
     package["phases"].append({
         "name": name,
         "work": work,
@@ -68,7 +84,8 @@ def deploy(environment=None, up=_default_up, down=_default_down, inputs={}):
     _add_func(r_up)
     _add_func(r_down)
 
-    return {
+    work = {
+        "work_id": backend.ulid(),
         "deploy": {
             "environment": environment.name,
             "up": r_up,
@@ -76,6 +93,13 @@ def deploy(environment=None, up=_default_up, down=_default_down, inputs={}):
             "inputs": checked_inputs,
         },
     }
+
+    # Add this work item to the list stored on the thread
+    work_items = backend.thread.get("work", default=[])
+    work_items.append(work)
+    backend.thread.set("work", work_items)
+
+    return work
 
 
 def call(fn, name, annotation="", inputs={}):
@@ -101,7 +125,8 @@ def call(fn, name, annotation="", inputs={}):
     fn = render_function(fn)["function"]
     _add_func(fn)
 
-    return {
+    work = {
+        "work_id": backend.ulid(),
         "call": {
             "fn": fn,
             "name": name,
@@ -109,6 +134,13 @@ def call(fn, name, annotation="", inputs={}):
             "inputs": checked_inputs,
         },
     }
+
+    # Add this work item to the list stored on the thread
+    work_items = backend.thread.get("work", default=[])
+    work_items.append(work)
+    backend.thread.set("work", work_items)
+
+    return work
 
 def _env_or_name(env):
     if type(env) == str:

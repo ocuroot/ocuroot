@@ -6,10 +6,7 @@ envs = environments()
 staging = [e for e in envs if e.attributes["type"] == "staging"]
 prod = [e for e in envs if e.attributes["type"] == "prod"]
 
-phase(
-    name="build",
-    work=[call(build, name="build")],
-)
+call(build, name="build")
 
 phase(
     name="staging",

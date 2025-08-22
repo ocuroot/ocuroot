@@ -5,27 +5,27 @@ def build(ctx):
     print(ctx)
 
     # Read source file and write to output file
-    src = host.read_file("src.txt")
+    src = read("src.txt")
     expected_src = "Content here"
     if src != expected_src:
         fail("Source file content does not match expected value. Got: " + src)
-    host.write_file(".build/output.txt", src)
-    dir_content = host.read_dir(".build")
-    if not host.is_dir(".build"):
+    write(".build/output.txt", src)
+    dir_content = read_dir(".build")
+    if not is_dir(".build"):
         fail(".build directory not found")
     if len(dir_content) != 1:
         fail("Expected 1 file in .build directory, got: " + str(len(dir_content)))
     if "output.txt" not in dir_content:
         fail("Output file not found in .build directory")
-    if host.read_file(".build/output.txt") != expected_src:
-        fail("Output file content does not match expected value. Got: " + host.read_file(".build/output.txt"))
+    if read(".build/output.txt") != expected_src:
+        fail("Output file content does not match expected value. Got: " + read(".build/output.txt"))
 
-    res = host.shell("pwd", mute=True)
+    res = shell("pwd", mute=True)
     print("Current directory: ", res.stdout)
 
     print("host information:")
-    print("OS: ", host.os())
-    print("Arch: ", host.arch())
+    print("OS: ", os())
+    print("Arch: ", arch())
 
     return done(
         outputs={
@@ -47,7 +47,7 @@ def up(ctx):
 
     # Output some log lines and force a pause
     for i in range(1,5):
-        host.shell("sleep 0.01")
+        shell("sleep 0.01")
         print("Starlark print: " + str(i))
 
     return next(up_stage2, inputs=outputs)

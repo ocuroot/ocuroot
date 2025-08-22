@@ -119,28 +119,25 @@ which may be calls to functions or deployments. These items may be executed conc
 
 ```python
 def build(ctx):
-    # ... build code goes here ...
+    shell("./build.sh")
 
     # All functions for call or deploy must return done when complete.
     return done()
 
-phase(
-    name="build",
-    work=[call(build, name="build")],
-)
+call(build, name="build")
 
 envs = environments()
 
 def up(ctx):
-    print("Deploying to " + ctx.inputs.environment["name"])
-    # ... deploy code goes here ...
-
+    e = ctx.inputs.environment
+    print("Deploying to " + e["name"])
+    shell("./deploy.sh {}".format(e["name"]))
     return done()
 
 def down(ctx):
-    print("Tearing down " + ctx.inputs.environment["name"])
-    # ... teardown code goes here ...
-
+    e = ctx.inputs.environment
+    print("Tearing down " + e["name"])
+    shell("./undeploy.sh {}".format(e["name"]))
     return done()
 
 phase(

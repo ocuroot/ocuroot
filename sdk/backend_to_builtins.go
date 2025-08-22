@@ -2,6 +2,7 @@ package sdk
 
 import (
 	"context"
+	"crypto/rand"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -9,6 +10,7 @@ import (
 
 	"github.com/charmbracelet/log"
 	"github.com/ocuroot/ocuroot/refs"
+	"github.com/oklog/ulid/v2"
 	"go.starlark.net/starlark"
 	"go.starlark.net/starlarkstruct"
 )
@@ -26,6 +28,14 @@ func (c *configLoader) backendToBuiltins(ctx context.Context, backend Backend) s
 	out["host"] = c.hostBuiltins(ctx, backend)
 	out["store"] = c.storeBuiltins(backend)
 	out["debug"] = c.debugBuiltins(backend)
+
+	out["ulid"] = JSONBuiltin("ulid", func(_ context.Context, _ any) (string, error) {
+		id, err := ulid.New(ulid.Now(), rand.Reader)
+		if err != nil {
+			return "", err
+		}
+		return id.String(), nil
+	})
 
 	return out
 }
