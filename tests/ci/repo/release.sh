@@ -1,7 +1,10 @@
 #!/bin/bash
 
-export OCUROOT_HOME=$(mktemp -d)
-echo "OCUROOT_HOME: $OCUROOT_HOME"
+export OCUROOT_HOME="$1"
+if [ -z "$OCUROOT_HOME" ]; then
+  export OCUROOT_HOME=$(mktemp -d)
+fi
+mkdir -p "$OCUROOT_HOME"
 
 echo "== environments =="
 ocuroot release new environments.ocu.star

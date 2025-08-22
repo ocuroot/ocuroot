@@ -73,27 +73,33 @@ cleanup_ci_server() {
 }
 
 create_repo() {
-    # Create a temporary directory for the test
-    TEST_REPO_DIR=$(mktemp -d)
+    local test_data_dir=$1
 
-    pushd "$TEST_REPO_DIR" > /dev/null
-    
+    mkdir -p "$test_data_dir"
+    pushd "$test_data_dir" > /dev/null
+
+    # Create a temporary directory for the test
+    TEST_REPO_DIR="source_remote"
+    WORKING_DIR="init_clone"
+
+    mkdir -p "$TEST_REPO_DIR"
+
     # Create a bare git repository
     echo "Creating bare repository..." >&2
-    mkdir -p "repo.git"
-    pushd "repo.git" > /dev/null
+    mkdir -p "$TEST_REPO_DIR/repo.git"
+    pushd "$TEST_REPO_DIR/repo.git" > /dev/null
     git -c init.defaultBranch=$DEFAULT_BRANCH_NAME init --bare >&2
     assert_equal "0" "$?" "Failed to initialize bare repository"
     popd > /dev/null
-    
+
     # Clone the repository for working
     echo "Cloning working repository..." >&2
-    git clone "$TEST_REPO_DIR/repo.git" "working" >&2
+    git clone "$TEST_REPO_DIR/repo.git" "$WORKING_DIR" >&2
     assert_equal "0" "$?" "Failed to clone repository"
     
     # Create state and intent branches in the bare repository
     echo "Creating state and intent branches..." >&2
-    pushd "repo.git" > /dev/null
+    pushd "$TEST_REPO_DIR/repo.git" > /dev/null
     # Create empty commits for state and intent branches
     # First create an empty tree
     EMPTY_TREE=$(git hash-object -t tree /dev/null)
@@ -106,7 +112,7 @@ create_repo() {
     
     popd > /dev/null
     
-    pushd "working" > /dev/null
+    pushd "$WORKING_DIR" > /dev/null
     
     # Set up Git configuration for the commit
     git config user.email "test@ocuroot.com"
@@ -135,27 +141,27 @@ create_repo() {
     COMMIT_HASH=$(git rev-parse HEAD)
     
     popd > /dev/null
-    popd > /dev/null
 
-    echo $TEST_REPO_DIR
+    popd > /dev/null
+    
+    echo $(realpath "$test_data_dir/$TEST_REPO_DIR")
 }
 
 checkout_repo() {
-    local repo_uri=$1
-    
-    local repo_dir=$(mktemp -d)
-    pushd "$repo_dir" > /dev/null
-    git clone "$repo_uri" . >&2
-    popd > /dev/null
-    echo "$repo_dir"
+    local repo_uri=$(realpath "$1") 
+    local target_dir=$2
+
+    git clone "$repo_uri" "$target_dir" >&2
+    echo "$(realpath $target_dir)"
 }
 
 checkout_and_modify_repo() {
     local repo_uri=$1
-    local file_path=$2
-    local new_content=$3
+    local checkout_path=$2
+    local file_path=$3
+    local new_content=$4
     
-    local repo_dir=$(checkout_repo "$repo_uri")
+    local repo_dir=$(checkout_repo "$repo_uri" "$checkout_path")
     pushd "$repo_dir" > /dev/null
     
     echo "$new_content" > "$file_path"
@@ -193,14 +199,6 @@ job_logs() {
     echo $logs_response | jq -r '.logs[]'
 }
 
-all_job_logs() {
-    local jobs_response=$(curl -s "http://localhost:$CI_PORT/api/jobs")
-    for job_id in $(echo $jobs_response | jq -r '.jobs[]'); do
-        echo "Logs for job $job_id:"
-        job_logs "$job_id"
-    done
-}
-
 job_status() {
     local job_id=$1
     local job_response=$(curl -s "http://localhost:$CI_PORT/api/jobs/$job_id")
@@ -214,8 +212,23 @@ job_detail() {
 }
 
 wait_for_all_jobs() {
+    local log_dir="$1"
+    mkdir -p "$log_dir"
+
     curl -s "http://localhost:$CI_PORT/api/wait"
     assert_equal "0" "$?" "Failed to wait for all jobs with CURL"
+
+    for job_id in $(job_ids); do
+        echo "Job $job_id logs:" > "$log_dir/$job_id.log"
+        job_logs "$job_id" >> "$log_dir/$job_id.log"
+    done
+}
+
+assert_job_success() {
+    for job_id in $(job_ids); do
+        JOB_STATUS=$(job_status "$job_id")
+        assert_equal "success" "$JOB_STATUS" "Job $job_id did not succeed, status: $JOB_STATUS"
+    done
 }
 
 schedule_job() {
@@ -224,7 +237,7 @@ schedule_job() {
     local command=$3
 
     local job_request='{"repo_uri":"'"$repo_uri"'","commit":"'"$commit"'","command":"'"$command"'"}'
-    
+
     # Send job request to the server
     local response=$(curl -s -X POST -H "Content-Type: application/json" \
                        -d "$job_request" \

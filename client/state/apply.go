@@ -49,6 +49,18 @@ func ApplyIntent(ctx context.Context, ref refs.Ref, store refstore.Store) error 
 func applyEnvironmentIntent(ctx context.Context, ref refs.Ref, store refstore.Store) error {
 	log.Info("Applying environment intent", "ref", ref.String())
 
+	err := store.StartTransaction(ctx, "apply environment intent")
+	if err != nil {
+		return fmt.Errorf("failed to start transaction: %w", err)
+	}
+
+	defer func() {
+		commitErr := store.CommitTransaction(ctx)
+		if commitErr != nil {
+			log.Error("failed to commit transaction", "error", commitErr)
+		}
+	}()
+
 	var content sdk.Environment
 	if err := store.Get(ctx, ref.String(), &content); err != nil {
 		if err == refstore.ErrRefNotFound {
@@ -68,18 +80,6 @@ func applyEnvironmentIntent(ctx context.Context, ref refs.Ref, store refstore.St
 	if err := store.Set(ctx, stateRef.String(), content); err != nil {
 		return fmt.Errorf("failed to set state: %w", err)
 	}
-
-	err := store.StartTransaction(ctx, "scheduling recalculation of deployments")
-	if err != nil {
-		return fmt.Errorf("failed to start transaction: %w", err)
-	}
-
-	defer func() {
-		commitErr := store.CommitTransaction(ctx)
-		if commitErr != nil {
-			log.Error("failed to commit transaction", "error", commitErr)
-		}
-	}()
 
 	// Add a task to all deployed releases
 	deployments, err := store.Match(ctx, "**/@/deploy/*")

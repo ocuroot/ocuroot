@@ -197,9 +197,9 @@ func (g *GitRepoWrapper) checkStagedFiles() error {
 }
 
 func (g *GitRepoWrapper) getStagedFiles() ([]string, error) {
-	stdout, _, err := g.g.Client.Exec("diff", "--cached", "--name-only")
+	stdout, stderr, err := g.g.Client.Exec("diff", "--cached", "--name-only")
 	if err != nil {
-		return nil, fmt.Errorf("failed to get staged files: %w", err)
+		return nil, fmt.Errorf("failed to get staged files: %w\n%s", err, string(stderr))
 	}
 
 	var stagedFiles []string

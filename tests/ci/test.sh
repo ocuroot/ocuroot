@@ -14,17 +14,21 @@ test_ocuroot_release() {
     echo "Test: Ocuroot Release via CI"
     echo ""
 
+    rm -rf testdata
+    mkdir -p testdata
+    TESTDATA=$(realpath testdata)
+
     # Start the CI server in background
     start_ci_server
     trap cleanup_ci_server RETURN
     
-    TEST_REPO_DIR=$(create_repo)
+    TEST_REPO_DIR=$(create_repo "testdata")
     echo "Test repository created at $TEST_REPO_DIR"
 
-    JOB_ID=$(schedule_job "$TEST_REPO_DIR/repo.git" "$DEFAULT_BRANCH_NAME" "./release.sh")
+    JOB_ID=$(schedule_job "$TEST_REPO_DIR/repo.git" "$DEFAULT_BRANCH_NAME" "./release.sh $TESTDATA/ocuroot_home/1")
     assert_equal "0" "$?" "Failed to schedule job"
 
-    wait_for_all_jobs
+    wait_for_all_jobs "$TESTDATA/logs"
 
     assert_equal 1 $(job_count) "Expected one job, found $(job_count)"
 
@@ -32,7 +36,7 @@ test_ocuroot_release() {
     assert_equal "success" "$JOB_STATUS" "Job $JOB_ID did not succeed, status: $JOB_STATUS"
     job_logs "$JOB_ID"
 
-    REPO_DIR=$(checkout_repo "$TEST_REPO_DIR/repo.git")
+    REPO_DIR=$(checkout_repo "$TEST_REPO_DIR/repo.git" "testdata/working")
     assert_equal "0" "$?" "Failed to checkout repository"
 
     pushd "$REPO_DIR" > /dev/null
@@ -49,30 +53,26 @@ test_ocuroot_release_deps() {
     echo "Test: Ocuroot Release (with dependencies) via CI"
     echo ""
 
+    rm -rf testdata
+    mkdir -p testdata
+    TESTDATA=$(realpath testdata)
+
     # Start the CI server in background
     start_ci_server
     trap cleanup_ci_server RETURN
     
-    TEST_REPO_DIR=$(create_repo)
+    TEST_REPO_DIR=$(create_repo "testdata")
     echo "Test repository created at $TEST_REPO_DIR"
 
-    JOB_ID=$(schedule_job "$TEST_REPO_DIR/repo.git" "$DEFAULT_BRANCH_NAME" "./release-deps.sh")
+    JOB_ID=$(schedule_job "$TEST_REPO_DIR/repo.git" "$DEFAULT_BRANCH_NAME" "./release-deps.sh $TESTDATA/ocuroot_home/1")
     assert_equal "0" "$?" "Failed to schedule job"
 
-    wait_for_all_jobs
+    wait_for_all_jobs "$TESTDATA/logs"
 
     assert_equal 2 $(job_count) "Expected two jobs, found $(job_count)"
+    assert_job_success
 
-    echo "Printing logs for all jobs"
-    for job_id in $(job_ids); do
-        echo "Logs for job $job_id:"
-        job_logs "$job_id"
-
-        JOB_STATUS=$(job_status "$job_id")
-        assert_equal "success" "$JOB_STATUS" "Job $job_id did not succeed, status: $JOB_STATUS"
-    done
-
-    REPO_DIR=$(checkout_repo "$TEST_REPO_DIR/repo.git")
+    REPO_DIR=$(checkout_repo "$TEST_REPO_DIR/repo.git" "testdata/working")
     assert_equal "0" "$?" "Failed to checkout repository"
 
     pushd "$REPO_DIR" > /dev/null
@@ -96,40 +96,37 @@ test_ocuroot_release_deps_commits() {
     echo "Test: Ocuroot Release (with dependencies) via CI, multiple commits"
     echo ""
 
+    rm -rf testdata
+    mkdir -p testdata
+    TESTDATA=$(realpath testdata)
+
     # Start the CI server in background
     start_ci_server
     trap cleanup_ci_server RETURN
     
-    TEST_REPO_DIR=$(create_repo)
+    TEST_REPO_DIR=$(create_repo "testdata")
     echo "Test repository created at $TEST_REPO_DIR"
 
     # Only need to check out once to get state consistently
-    REPO_DIR=$(checkout_repo "$TEST_REPO_DIR/repo.git")
+    REPO_DIR=$(checkout_repo "$TEST_REPO_DIR/repo.git" "testdata/working")
     assert_equal "0" "$?" "Failed to checkout repository"
+
+    echo "Repository checked out to $REPO_DIR"
 
     j=1
     for i in $(seq 1 3); do
         echo "Test iteration $i"
 
-        checkout_and_modify_repo "$TEST_REPO_DIR/repo.git" "message-backend.txt" "$i"
+        checkout_and_modify_repo "$TEST_REPO_DIR/repo.git" "testdata/iteration-i$i" "message-backend.txt" "$i"
         if [ $((i % 2)) -eq 0 ]; then
             j=$((i / 2))
-            checkout_and_modify_repo "$TEST_REPO_DIR/repo.git" "message-frontend.txt" "$j"
+            checkout_and_modify_repo "$TEST_REPO_DIR/repo.git" "testdata/iteration-j$j" "message-frontend.txt" "$j"
         fi
 
         JOB_ID=$(schedule_job "$TEST_REPO_DIR/repo.git" $DEFAULT_BRANCH_NAME "./release-deps.sh")
         assert_equal "0" "$?" "Failed to schedule job"
 
-        wait_for_all_jobs
-
-        echo "Printing logs for all jobs"
-        for job_id in $(job_ids); do
-            echo "Logs for job $job_id:"
-            job_logs "$job_id"
-
-            JOB_STATUS=$(job_status "$job_id")
-            assert_equal "success" "$JOB_STATUS" "Job $job_id did not succeed, status: $JOB_STATUS"
-        done
+        wait_for_all_jobs "$TESTDATA/logs"
 
         pushd "$REPO_DIR" > /dev/null
         echo "i = $i, j = $j"
@@ -149,21 +146,25 @@ test_intent_change() {
     echo "Test: Intent change via CI"
     echo ""
 
+    rm -rf testdata
+    mkdir -p testdata
+    TESTDATA=$(realpath testdata)
+
     # Start the CI server in background
     start_ci_server
     trap cleanup_ci_server RETURN
 
-    TEST_REPO_DIR=$(create_repo)
+    TEST_REPO_DIR=$(create_repo "testdata")
     echo "Test repository created at $TEST_REPO_DIR"
 
     # Check out repo to make state available
-    REPO_DIR=$(checkout_repo "$TEST_REPO_DIR/repo.git")
+    REPO_DIR=$(checkout_repo "$TEST_REPO_DIR/repo.git" "testdata/working")
     pushd "$REPO_DIR" > /dev/null
 
-    JOB_ID=$(schedule_job "$TEST_REPO_DIR/repo.git" "$DEFAULT_BRANCH_NAME" "./release.sh")
+    JOB_ID=$(schedule_job "$TEST_REPO_DIR/repo.git" "$DEFAULT_BRANCH_NAME" "./release.sh $TESTDATA/ocuroot_home/1")
     assert_equal "0" "$?" "Failed to schedule job"
 
-    wait_for_all_jobs
+    wait_for_all_jobs "$TESTDATA/logs"
 
     assert_deployed "release.ocu.star" "staging"
     assert_ref_equals "./-/release.ocu.star/@/deploy/staging#output/foo" "bar"
@@ -171,10 +172,11 @@ test_intent_change() {
     ocuroot state set "+/custom/foo" "baz"
     assert_equal "0" "$?" "Failed to update state"
 
-    JOB_ID=$(schedule_job "$TEST_REPO_DIR/repo.git" "$DEFAULT_BRANCH_NAME" "./intent.sh")
+    JOB_ID=$(schedule_job "$TEST_REPO_DIR/repo.git" "$DEFAULT_BRANCH_NAME" "./intent.sh $TESTDATA/ocuroot_home/2")
     assert_equal "0" "$?" "Failed to schedule intent update"
 
-    wait_for_all_jobs
+    wait_for_all_jobs "$TESTDATA/logs"
+    assert_job_success
 
     assert_ref_equals "@/custom/foo" "baz"
     assert_deployed "release.ocu.star" "staging"
