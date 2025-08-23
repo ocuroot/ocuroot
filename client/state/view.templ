@@ -12,6 +12,7 @@ const (
     GlobReleases = "**/@*"
     GlobDeployments = "**/@*/deploy/*"
     GlobCustomState = "**/@*/custom/*"
+    GlobWork = "**/@*/*/*/*/status/{pending,running}"
 )
 
 templ InBody(components ...templ.Component) {
@@ -48,6 +49,10 @@ templ ViewBody(){
                 navbar.NavLink{
                     Name: "Custom State",
                     URL:  "/match/" + GlobCustomState,
+                },
+                navbar.NavLink{
+                    Name: "Pending Work",
+                    URL:  "/match/" + GlobWork,
                 },
             },
 			ShowThemeToggle: true,

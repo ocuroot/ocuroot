@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
+	"path"
 	"strings"
 
 	"github.com/a-h/templ"
@@ -13,7 +15,14 @@ import (
 )
 
 func (s *server) handleMatch(w http.ResponseWriter, r *http.Request) {
+	var err error
 	query := strings.TrimPrefix(r.URL.Path, "/match/")
+	query, err = url.QueryUnescape(query)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
 	matches, err := s.store.Match(r.Context(), query)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -30,6 +39,8 @@ func (s *server) handleMatch(w http.ResponseWriter, r *http.Request) {
 		content = s.buildDeploymentTable(r.Context(), matches)
 	case release.GlobRelease.Match(query):
 		content = s.buildReleaseTable(matches)
+	case release.GlobWork.Match(query) || query == GlobWork:
+		content = s.buildWorkTable(r.Context(), matches)
 	default:
 		content = Match(query, matches)
 	}
@@ -115,4 +126,45 @@ func (s *server) buildDeploymentTable(ctx context.Context, matches []string) tem
 		})
 	}
 	return ResultTable([]string{"Repo", "Filename", "Environment", "Release"}, tableContent)
+}
+
+func (s *server) buildWorkTable(ctx context.Context, matches []string) templ.Component {
+	var tableContent []ResultTableRow
+	for _, match := range matches {
+		resolved, err := s.store.ResolveLink(ctx, match)
+		if err != nil {
+			continue
+		}
+		resolvedParsed, err := refs.Parse(resolved)
+		if err != nil {
+			continue
+		}
+
+		var work string
+		subpathSegments := strings.Split(resolvedParsed.SubPath, "/")
+		switch resolvedParsed.SubPathType {
+		case refs.SubPathTypeCall:
+			work = fmt.Sprintf("Call '%s'", subpathSegments[0])
+		case refs.SubPathTypeDeploy:
+			work = fmt.Sprintf("Deploy to '%s'", subpathSegments[0])
+		default:
+			work = "Unknown"
+		}
+
+		var status string = path.Base(resolvedParsed.SubPath)
+		workRef := resolvedParsed.SetSubPath(path.Join(subpathSegments[0], subpathSegments[1]))
+
+		tableContent = append(tableContent, ResultTableRow{
+			URL: templ.URL(fmt.Sprintf("/ref/%s", workRef.String())),
+			Cells: []templ.Component{
+				textCell(resolvedParsed.Repo),
+				textCell(resolvedParsed.Filename),
+				textCell(resolvedParsed.ReleaseOrIntent.Value),
+				textCell(work),
+				textCell(status),
+			},
+		})
+	}
+	return ResultTable([]string{"Repo", "Filename", "Release", "Work", "Status"}, tableContent)
+
 }
