@@ -74,7 +74,7 @@ func (r Ref) SetFragment(fragment string) Ref {
 }
 
 func (r Ref) IsRelative() bool {
-	return r.Repo == "." || r.Filename == "." || r.ReleaseOrIntent.Value == "."
+	return r.Repo == "" || r.Repo == "." || r.Filename == "." || r.ReleaseOrIntent.Value == "."
 }
 
 func (r Ref) Valid() error {

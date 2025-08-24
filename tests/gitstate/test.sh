@@ -23,7 +23,7 @@ test_gitstate() {
     assert_deployed "basic.ocu.star" "production2"
 
     echo "== delete deployment intent =="
-    ocuroot state delete minimal/repo/-/basic.ocu.star/+/deploy/production
+    ocuroot state delete ./-/basic.ocu.star/+/deploy/production
     assert_equal "0" "$?" "Failed to delete deployment intent"
 
     echo "== check out intent store =="

@@ -44,42 +44,57 @@ func findRoot(path string, markerFile string) (string, error) {
 	}
 }
 
-// GetRepoInfo returns the repo URL and commit hash for the given repo root path.
-// If the environment variables OCU_REPO_URL_OVERRIDE and OCU_REPO_COMMIT_OVERRIDE are set, they will be used.
-func GetRepoInfo(repoRootPath string) (string, string, error) {
+func GetRepoURL(repoRootPath string) (string, error) {
+	var (
+		repo *gittools.Repo
+		err  error
+	)
+	repoURL := os.Getenv("OCU_REPO_URL_OVERRIDE")
+	if repoURL != "" {
+		return repoURL, nil
+	}
+
+	repo, err = gittools.Open(repoRootPath)
+	if err != nil {
+		return "", fmt.Errorf("failed to open repo: %w", err)
+	}
+	repoURL, err = repo.RemoteURL("origin", false)
+	if err != nil {
+		return "", fmt.Errorf("failed to get repo URL: %w", err)
+	}
+	repoURL = strings.TrimRight(repoURL, "\n")
+	repoURL = gitURLToRefPath(repoURL)
+	return repoURL, nil
+}
+
+func GetRepoCommit(repoRootPath string) (string, error) {
 	var (
 		repo *gittools.Repo
 		err  error
 	)
 
-	repoURL := os.Getenv("OCU_REPO_URL_OVERRIDE")
 	commit := os.Getenv("OCU_REPO_COMMIT_OVERRIDE")
-
-	if repoURL == "" || commit == "" {
-		repo, err = gittools.Open(repoRootPath)
-		if err != nil {
-			return "", "", fmt.Errorf("failed to open repo: %w", err)
-		}
+	if commit != "" {
+		return commit, nil
 	}
 
-	if repoURL == "" {
-		repoURL, err = repo.RemoteURL("origin", false)
-		if err != nil {
-			return "", "", fmt.Errorf("failed to get repo URL: %w", err)
-		}
-		repoURL = strings.TrimRight(repoURL, "\n")
-		repoURL = gitURLToRefPath(repoURL)
+	repo, err = gittools.Open(repoRootPath)
+	if err != nil {
+		return "", fmt.Errorf("failed to open repo: %w", err)
 	}
 
-	if commit == "" {
-		// TODO: This should be built into gittools
-		commitB, _, err := repo.Client.Exec("rev-parse", "HEAD")
-		if err != nil {
-			return "", "", fmt.Errorf("failed to get commit hash: %w", err)
+	// TODO: This should be built into gittools
+	commitB, stderr, err := repo.Client.Exec("rev-parse", "HEAD")
+	if err != nil {
+		// This implies that there are no commits on this branch
+		if strings.Contains(string(stderr), "unknown revision or path not in the working tree.") {
+			return "[none]", nil
 		}
-		commit = strings.TrimRight(string(commitB), "\n")
+
+		return "", fmt.Errorf("failed to get commit hash: %w\n%s", err, stderr)
 	}
-	return repoURL, commit, nil
+	commit = strings.TrimRight(string(commitB), "\n")
+	return commit, nil
 }
 
 func gitURLToRefPath(gitURL string) string {
