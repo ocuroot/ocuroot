@@ -88,7 +88,7 @@ func GetRepoCommit(repoRootPath string) (string, error) {
 	if err != nil {
 		// This implies that there are no commits on this branch
 		if strings.Contains(string(stderr), "unknown revision or path not in the working tree.") {
-			return "[none]", nil
+			return "null", nil
 		}
 
 		return "", fmt.Errorf("failed to get commit hash: %w\n%s", err, stderr)
