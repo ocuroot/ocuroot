@@ -29,7 +29,7 @@ Releases are entirely managed by Ocuroot based on the contents of your source re
 ### From Source
 
 ```bash
-go install github.com/ocuroot/ocuroot@latest
+go install github.com/ocuroot/ocuroot/cmd/ocuroot@latest
 ```
 
 ## Configuration
