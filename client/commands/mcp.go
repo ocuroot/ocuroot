@@ -83,7 +83,7 @@ var MCPCommand = &cobra.Command{
 }
 
 func previewHandler(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-	pkgFile, ok := request.Params.Arguments["package_file"].(string)
+	pkgFile, ok := request.GetArguments()["package_file"].(string)
 	if !ok {
 		return nil, errors.New("package_file must be a string")
 	}
@@ -133,7 +133,7 @@ func previewHandler(ctx context.Context, request mcp.CallToolRequest) (*mcp.Call
 }
 
 func sdkHandler(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-	version, ok := request.Params.Arguments["version"].(string)
+	version, ok := request.GetArguments()["version"].(string)
 	if !ok {
 		return nil, errors.New("version must be a string")
 	}
@@ -178,7 +178,7 @@ func exampleListHandler(ctx context.Context, request mcp.CallToolRequest) (*mcp.
 }
 
 func exampleGetHandler(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-	exampleName, ok := request.Params.Arguments["name"].(string)
+	exampleName, ok := request.GetArguments()["name"].(string)
 	if !ok {
 		return nil, errors.New("name must be a string")
 	}
