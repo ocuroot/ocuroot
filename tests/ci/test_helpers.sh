@@ -64,12 +64,6 @@ cleanup_ci_server() {
     
     # Give it a moment to clean up
     sleep 1
-    
-    # Clean up test repositories
-    if [ -d "$TEST_REPO_DIR" ]; then
-        echo "Cleaning up test repositories..."
-        rm -rf "$TEST_REPO_DIR"
-    fi
 }
 
 create_repo() {
