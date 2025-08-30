@@ -25,15 +25,29 @@ phase(
 def increment_version(ctx):
     prerelease = next_prerelease_version(ctx.inputs.prev_prerelease, ctx.inputs.prev_version)
 
-    commit_summaries = host.shell("git log {}..$(git rev-parse HEAD) --pretty=%s".format(ctx.inputs.prev_version)).stdout
+    create_draft_release(ctx.inputs.prev_version, prerelease)
 
     return done(
         outputs={
             "prerelease": prerelease,
-            "commit_summaries": commit_summaries,
         },
         tags=[prerelease],
     )
+
+def create_draft_release(previous_version, version):
+    # Generate release notes from the git log
+    commit_summaries = host.shell("git log {}..$(git rev-parse HEAD) --pretty='%h %s'".format(previous_version)).stdout
+    release_notes = "## Commit summaries\n\n{commit_summaries}".format(
+        commit_summaries=commit_summaries,
+    )
+
+    # Get the current commit to GH knows what to tag
+    target = host.shell("git rev-parse --abbrev-ref HEAD").stdout.strip()
+
+    host.shell("gh release create v{version} --target {target} --draft --title \"v{version}\" --notes \"$RELEASE_NOTES\"".format(
+        version=version,
+        target=target,
+    ), env={"RELEASE_NOTES": release_notes})
 
 phase(
     name="version",
@@ -72,6 +86,8 @@ def build(ctx):
         )
     )
 
+    add_binary_to_release(version, os, arch)
+
     # Output the URL for future use
     url = "https://downloads.ocuroot.com/ocuroot/{version}/{os}-{arch}/ocuroot".format(os=os, arch=arch, version=version)
     return done(
@@ -80,6 +96,12 @@ def build(ctx):
             "bucket_path": bucket_path,
         }
     )
+
+def add_binary_to_release(version, os, arch):
+    tar_name = "ocuroot_{os}-{arch}.tar.gz".format(os=os, arch=arch)
+    host.shell("tar -czvf .build/{tar_name} -C .build/{os}-{arch} ocuroot".format(os=os, arch=arch, tar_name=tar_name))
+    tar_path = "./.build/{tar_name}".format(tar_name=tar_name)
+    host.shell("gh release upload v{version} {file}".format(version=version, file=tar_path))
 
 phase(
     name="build",
@@ -142,23 +164,7 @@ def release(ctx):
             )
             download_links += "https://downloads.ocuroot.com/ocuroot/{version}/{os}-{arch}/ocuroot\n".format(os=os, arch=arch, version=version)
 
-    # Create a release
-    target = host.shell("git rev-parse --abbrev-ref HEAD").stdout.strip()
-
-    release_notes = """# Download links
-{download_links}
-
-# Commit summaries
-
-{commit_summaries}""".format(
-    download_links=download_links,
-    commit_summaries=ctx.inputs.commit_summaries,
-)
-
-    host.shell("gh release create {version} --target {target} --title \"v{version}\" --notes \"$RELEASE_NOTES\"".format(
-        version=version,
-        target=target,
-    ), env={"RELEASE_NOTES": release_notes})
+    copy_release(ctx.inputs.prev_version, version)
 
     return done(
         outputs={
@@ -167,10 +173,21 @@ def release(ctx):
         tags=[version],
     )
 
+def copy_release(source_tag, target_tag):
+    body = shell("gh release view v{source} --json body -q .body".format(source=source_tag)).stdout
+    target_hash = shell("git rev-parse --abbrev-ref HEAD").stdout.strip()   
+    shell("gh release create v{target} --target {target_hash} --title \"v{target}\" --notes \"$BODY\"".format(
+        target=target_tag,
+        target_hash=target_hash,
+    ), env={"BODY": body})
+
+    # Download assets from source and upload to target
+    shell("gh release download v{source} -p '*.tar.gz' -D ./.build/assets/".format(source=source_tag))
+    shell("gh release upload v{target} ./.build/assets/*.tar.gz".format(target=target_tag))
+
 def release_inputs():
     inputs = {
         "prerelease": input(ref="./@/call/increment_version#output/prerelease"),
-        "commit_summaries": input(ref="./call/increment_version#output/commit_summaries"),
     }
 
     for os in oses:

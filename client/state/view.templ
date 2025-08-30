@@ -24,7 +24,10 @@ templ InBody(components ...templ.Component) {
 }
 
 templ ViewBody(){
-    @components.Body(){
+    @components.BodyWithProps(components.BodyProps{
+		Title: "State",
+		Language: "en",
+	}) {
 		@navbar.Navbar(navbar.NavbarConfig{
 			BrandName:       "Ocuroot",
 			BrandURL:        "/",
