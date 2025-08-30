@@ -160,6 +160,13 @@ func MakeServePreview(tc release.TrackerConfig) func(w http.ResponseWriter, r *h
 			config.Package,
 		)
 		comp := PreviewPage(summary, tc.Ref.Filename, *config.Package)
-		comp.Render(r.Context(), w)
+		err = comp.Render(r.Context(), w)
+		if err != nil {
+			log.Error("Failed to render preview", "error", err)
+			w.WriteHeader(http.StatusInternalServerError)
+			errorComp := ErrorPage(err.Error())
+			errorComp.Render(r.Context(), w)
+			return
+		}
 	}
 }

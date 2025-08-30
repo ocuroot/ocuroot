@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/ocuroot/ui/components"
+	"github.com/ocuroot/ui/components/navbar"
 	"github.com/ocuroot/ocuroot/ui/components/pipeline"
 	"github.com/ocuroot/ocuroot/ui/components/watch"
 	"github.com/ocuroot/ocuroot/sdk"
@@ -17,8 +18,19 @@ templ Preview(summary *pipeline.ReleaseSummary, pkgPath string, pkg sdk.Package)
 }
 
 templ PreviewPage(summary *pipeline.ReleaseSummary, pkgPath string, pkg sdk.Package) {
-	@components.RootSimple("Release Preview") {
-		@Preview(summary, pkgPath, pkg)
+	@components.BodyWithProps(components.BodyProps{
+		Title: "Release Preview",
+		Language: "en",
+	}) {
+		@navbar.Navbar(navbar.NavbarConfig{
+			BrandName:       "Ocuroot",
+			BrandURL:        "/",
+			LogoURL:         "/static/logo.svg",
+			ShowThemeToggle: true,
+		})
+		@components.Container() {
+			@Preview(summary, pkgPath, pkg)
+		}
 		@watch.Watch("/watch")
 	}
 }
