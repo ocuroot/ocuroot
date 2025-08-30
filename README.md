@@ -27,6 +27,17 @@ Releases are entirely managed by Ocuroot based on the contents of your source re
 
 ## Installation
 
+### From Releases
+
+Binaries are available as assets on each [release](https://github.com/ocuroot/ocuroot/releases).
+
+You can use the excellent [bin](https://github.com/marcosnils/bin) tool to install direct from the
+latest release using:
+
+```bash
+bin install github.com/ocuroot/ocuroot
+```
+
 ### From Source
 
 ```bash
