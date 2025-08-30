@@ -1,8 +1,9 @@
-# ocuroot
+![Ocuroot](https://www.ocuroot.com/images/banner.png)
 
-The Ocuroot client. The client is a command line tool that manages state for
-releases and environments of your applications and cloud resources. It's provided
-as a standalone tool that runs on top of existing CI services.
+The Ocuroot client. Ocuroot is a command line tool that manages state for
+releases of your applications and cloud resources. It runs on top of your
+existing CI platform and keeps track of current state and your desired state
+(intent) for GitOps-like workflows, with or without Git.
 
 ## About Ocuroot
 
