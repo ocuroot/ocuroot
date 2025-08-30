@@ -164,7 +164,7 @@ def release(ctx):
             )
             download_links += "https://downloads.ocuroot.com/ocuroot/{version}/{os}-{arch}/ocuroot\n".format(os=os, arch=arch, version=version)
 
-    copy_release(ctx.inputs.prev_version, version)
+    copy_release(ctx.inputs.prerelease, version)
 
     return done(
         outputs={
@@ -182,7 +182,7 @@ def copy_release(source_tag, target_tag):
     ), env={"BODY": body})
 
     # Download assets from source and upload to target
-    shell("gh release download v{source} -p '*.tar.gz' -D ./.build/assets/".format(source=source_tag))
+    shell("gh release download v{source} --clobber -p '*.tar.gz' -D ./.build/assets/".format(source=source_tag))
     shell("gh release upload v{target} ./.build/assets/*.tar.gz".format(target=target_tag))
 
 def release_inputs():
