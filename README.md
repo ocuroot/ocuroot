@@ -27,6 +27,12 @@ Releases are entirely managed by Ocuroot based on the contents of your source re
 
 ## Installation
 
+### MacOS (Homebrew)
+
+```bash
+brew install ocuroot/tap/ocuroot
+```
+
 ### From Releases
 
 Binaries are available as assets on each [release](https://github.com/ocuroot/ocuroot/releases).
