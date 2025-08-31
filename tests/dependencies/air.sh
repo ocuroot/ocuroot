@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 OCU_REPO_COMMIT_OVERRIDE=commitid
 

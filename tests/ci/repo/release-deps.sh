@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 export OCUROOT_HOME="$1"
 if [ -z "$OCUROOT_HOME" ]; then

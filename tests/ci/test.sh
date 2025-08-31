@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 export ENABLE_OTEL=true
 export OCUROOT_CHECK_STAGED_FILES=true
