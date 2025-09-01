@@ -1,4 +1,5 @@
 load("environments.star", "environment_from_json")
+load("dowork.star", "check_params")
 
 def next(fn, annotation="", inputs={}):
     """
@@ -20,7 +21,7 @@ def next(fn, annotation="", inputs={}):
         "next": {
             "fn": fd,
             "annotation": annotation,
-            "inputs": _check_inputs(inputs),
+            "inputs": _check_inputs(fn, inputs),
         },
     }
 
@@ -43,34 +44,7 @@ def done(annotation="", outputs={}, tags=[]):
         },
     }
 
-def do_work(
-    f,
-    work_id,
-    inputs=None,
-):
-    args = {}
-    if work_id:
-        args["work_id"] = json.decode(work_id)
-    if inputs:
-        args["inputs"] = vars_from_json(json.decode(inputs))
-
-    ctx = struct(**args)
-    return json.encode(f(ctx))
-
-def vars_from_json(json):
-    vars = {}
-    for k, v in json.items():
-        # TODO: handle known types using a "$type" field
-        # Example below
-        if type(v) == "dict" and "$type" in v:
-            if v["$type"] == "ref":
-                vars[k] = v["ref"]
-
-        vars[k] = v
-
-    return struct(**vars)
-
-def _check_inputs(inputs):
+def _check_inputs(fn, inputs):
     checked_inputs = {}
     # environment is allowed as an input name here, since
     # you may want to "forward" the value from the previous function
@@ -81,4 +55,8 @@ def _check_inputs(inputs):
             checked_inputs[key] = {
                 "value": value,
             }
+
+    fParams = json.decode(backend.functions.get_args(fn))
+    check_params(fn, fParams["args"], fParams["kwargs"], checked_inputs.keys())
+
     return checked_inputs

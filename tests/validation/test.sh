@@ -33,6 +33,9 @@ bad_inputs() {
 
     check_ref_does_not_exist "@/environment/shouldmatch"
 
+    ocuroot release new functionargs.ocu.star
+    assert_not_equal "0" "$?" "Expected a failure"
+    
     echo "Test passed"
 }
 
