@@ -17,7 +17,7 @@ import (
 const (
 	GlobEnvironments = "@/environment/*"
 	GlobRepositories = "**/-/repo.ocu.star/@"
-	GlobReleases     = "**/@*"
+	GlobReleases     = "**/@r*"
 	GlobDeployments  = "**/@*/deploy/*"
 	GlobCustomState  = "**/@*/custom/*"
 	GlobWork         = "**/@*/*/*/*/status/{pending,running}"

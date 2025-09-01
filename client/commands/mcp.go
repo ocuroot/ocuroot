@@ -121,7 +121,7 @@ func previewHandler(ctx context.Context, request mcp.CallToolRequest) (*mcp.Call
 
 	config, err := local.ExecutePackage(ctx, repoRootPath, ref, backend)
 	if err != nil {
-		return nil, fmt.Errorf("failed to execute package at ref %s in repo %s: %v", ref, repoRootPath, starlarkerrors.Render(err))
+		return nil, fmt.Errorf("failed to load config at ref %s in repo %s: %v", ref, repoRootPath, starlarkerrors.Render(err))
 	}
 
 	packageJSON, err := json.Marshal(config.Package)

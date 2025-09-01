@@ -34,7 +34,7 @@ func TrackerForNewRelease(ctx context.Context, tc TrackerConfig) (*release.Relea
 	backend, outputs := NewBackend(tc)
 	config, err := local.ExecutePackage(ctx, tc.RepoPath, tc.Ref, backend)
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to execute package: %w", err)
+		return nil, nil, fmt.Errorf("failed to load config: %w", err)
 	}
 
 	if len(outputs.Environments) > 0 && config.Package != nil {
@@ -65,7 +65,7 @@ func TrackerForExistingRelease(ctx context.Context, tc TrackerConfig) (*release.
 	backend, _ := NewBackend(tc)
 	config, err := local.ExecutePackage(ctx, tc.RepoPath, tc.Ref, backend)
 	if err != nil {
-		return nil, fmt.Errorf("failed to execute package: %w", err)
+		return nil, fmt.Errorf("failed to load config %w", err)
 	}
 
 	if tc.Ref.ReleaseOrIntent.Type != refs.Release {

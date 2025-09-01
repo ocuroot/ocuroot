@@ -24,6 +24,6 @@ func TestPackageExec(t *testing.T) {
 		be,
 	)
 	if err != nil {
-		t.Fatalf("failed to execute package: %v", starlarkerrors.Render(err))
+		t.Fatalf("failed to load config: %v", starlarkerrors.Render(err))
 	}
 }
