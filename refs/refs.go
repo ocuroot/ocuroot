@@ -167,7 +167,10 @@ func (r Ref) RelativeTo(ref Ref) (Ref, error) {
 	}
 	if r.Filename == "." || r.Filename == "" {
 		out.Filename = ref.Filename
+	} else if r.Repo == "" {
+		out.Filename = path.Join(ref.Filename, r.Filename)
 	}
+
 	if r.ReleaseOrIntent.Type == Unknown {
 		out.ReleaseOrIntent = ref.ReleaseOrIntent
 	}

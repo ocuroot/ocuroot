@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"path/filepath"
 
 	"github.com/charmbracelet/log"
 	"github.com/ocuroot/ocuroot/client"
@@ -25,13 +26,19 @@ func GetRef(cmd *cobra.Command, args []string) (refs.Ref, error) {
 	}
 
 	out := refs.Ref{}
-	out.Filename, _ = cmd.Flags().GetString("package")
-	releaseName, _ := cmd.Flags().GetString("release")
-	if releaseName != "" {
-		out.ReleaseOrIntent = refs.ReleaseOrIntent{
-			Type:  refs.Release,
-			Value: releaseName,
+	if cmd != nil {
+		out.Filename, _ = cmd.Flags().GetString("package")
+		releaseName, _ := cmd.Flags().GetString("release")
+		if releaseName != "" {
+			out.ReleaseOrIntent = refs.ReleaseOrIntent{
+				Type:  refs.Release,
+				Value: releaseName,
+			}
 		}
+	}
+
+	if out.Filename == "" {
+		out.Filename = "."
 	}
 
 	return out, nil
@@ -46,74 +53,6 @@ func AddRefFlags(cmd *cobra.Command, persistent bool) {
 	}
 	flags.String("package", ".", "Path to the working package in the current repository. Can also be specified via a full ref in the first parameter.")
 	flags.String("release", "", "ID or tag of the release. Can also be specified via a full ref in the first parameter.")
-}
-
-func getTrackerConfigNoRef(ctx context.Context) (release.TrackerConfig, error) {
-	wd, err := os.Getwd()
-	if err != nil {
-		return release.TrackerConfig{}, err
-	}
-
-	repoRootPath, err := client.FindRepoRoot(wd)
-	if err != nil {
-		return release.TrackerConfig{}, err
-	}
-
-	// Create a backend that is just enough for loading repo config
-	backend, be := local.BackendForRepo()
-
-	data, err := sdk.LoadRepo(
-		ctx,
-		sdk.NewFSResolver(os.DirFS(repoRootPath)),
-		"repo.ocu.star",
-		backend,
-		func(thread *starlark.Thread, msg string) {
-			log.Info(msg)
-		},
-	)
-	if err != nil {
-		return release.TrackerConfig{}, fmt.Errorf("failed to load repo: %w", err)
-	}
-
-	ref := refs.Ref{
-		Repo: be.RepoAlias,
-	}
-
-	if be.RepoAlias == "" {
-		ref.Repo, err = client.GetRepoURL(repoRootPath)
-		if err != nil {
-			return release.TrackerConfig{}, err
-		}
-	}
-
-	s, err := release.NewRefStore(
-		be.Store,
-		ref.Repo,
-		repoRootPath,
-	)
-	if err != nil {
-		return release.TrackerConfig{}, fmt.Errorf("failed to create ref store: %w", err)
-	}
-
-	commit, err := client.GetRepoCommit(repoRootPath)
-	if err != nil {
-		return release.TrackerConfig{}, err
-	}
-
-	tc := release.TrackerConfig{
-		Commit:      commit,
-		RepoPath:    repoRootPath,
-		Ref:         ref,
-		Store:       s,
-		StoreConfig: be.Store,
-	}
-
-	err = saveRepoConfig(ctx, tc, data)
-	if err != nil {
-		return release.TrackerConfig{}, fmt.Errorf("failed to save repo config: %w", err)
-	}
-
-	return tc, nil
 }
 
 func storeFromRepoOrStateRoot(ctx context.Context) (store refstore.Store, isRepo bool, err error) {
@@ -206,11 +145,6 @@ func getTrackerConfig(ctx context.Context, cmd *cobra.Command, args []string) (r
 		return release.TrackerConfig{}, err
 	}
 
-	ref, err := GetRef(cmd, args)
-	if err != nil {
-		return release.TrackerConfig{}, err
-	}
-
 	// Create a backend that is just enough for loading repo config
 	backend, be := local.BackendForRepo()
 
@@ -227,12 +161,21 @@ func getTrackerConfig(ctx context.Context, cmd *cobra.Command, args []string) (r
 		return release.TrackerConfig{}, fmt.Errorf("failed to load repo: %w", err)
 	}
 
+	ref, err := GetRef(cmd, args)
+	if err != nil {
+		return release.TrackerConfig{}, err
+	}
+
 	if ref.IsRelative() {
-		baseRef := refs.Ref{
-			Repo: be.RepoAlias,
+		wdRel, err := filepath.Rel(repoRootPath, wd)
+		if err != nil {
+			return release.TrackerConfig{}, err
 		}
-		// TODO: If this is not the root directory of the repo, should we include the
-		// current dir?
+
+		baseRef := refs.Ref{
+			Repo:     be.RepoAlias,
+			Filename: wdRel,
+		}
 
 		if be.RepoAlias == "" {
 			repoURL, err := client.GetRepoURL(repoRootPath)

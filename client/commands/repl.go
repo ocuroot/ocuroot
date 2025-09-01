@@ -53,7 +53,7 @@ Examples:
 // runSingleCommand executes a single Starlark command and exits
 func runSingleCommand(ctx context.Context, filePath string, command string) error {
 	// Get tracker config to load repo.ocu.star and set up state store
-	tc, err := getTrackerConfigNoRef(ctx)
+	tc, err := getTrackerConfig(ctx, nil, nil)
 	if err != nil {
 		return fmt.Errorf("failed to get tracker config: %w", err)
 	}
@@ -143,7 +143,7 @@ func runSingleCommand(ctx context.Context, filePath string, command string) erro
 
 func runStarlarkReplWithFile(ctx context.Context, filePath string) error {
 	// Get tracker config to load repo.ocu.star and set up state store
-	tc, err := getTrackerConfigNoRef(ctx)
+	tc, err := getTrackerConfig(ctx, nil, nil)
 	if err != nil {
 		return fmt.Errorf("failed to get tracker config: %w", err)
 	}

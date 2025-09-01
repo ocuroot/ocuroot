@@ -58,7 +58,7 @@ var StateMatchCmd = &cobra.Command{
 	Args:  cobra.RangeArgs(0, 1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx := cmd.Context()
-		tc, err := getTrackerConfigNoRef(ctx)
+		tc, err := getTrackerConfig(ctx, cmd, args)
 		if err != nil {
 			return fmt.Errorf("failed to get tracker config: %w", err)
 		}
@@ -97,7 +97,7 @@ var StateDiffCmd = &cobra.Command{
 	Long:  `Diff intent with current state.`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx := cmd.Context()
-		tc, err := getTrackerConfigNoRef(ctx)
+		tc, err := getTrackerConfig(ctx, cmd, args)
 		if err != nil {
 			return fmt.Errorf("failed to get tracker config: %w", err)
 		}
@@ -243,7 +243,7 @@ var StateViewCmd = &cobra.Command{
 	Args:  cobra.ExactArgs(0),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx := cmd.Context()
-		tc, err := getTrackerConfigNoRef(ctx)
+		tc, err := getTrackerConfig(ctx, cmd, args)
 		if err != nil {
 			return fmt.Errorf("failed to get tracker config: %w", err)
 		}

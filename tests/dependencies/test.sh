@@ -9,7 +9,7 @@ test_releases_with_continue() {
     echo ""
     setup_test
     
-    # Release the frontend
+    # Release the frontend from repo root
     echo "ocuroot release new ./-/frontend/package.ocu.star"
     ocuroot release new ./-/frontend/package.ocu.star
     assert_equal "0" "$?" "Failed to release frontend"
@@ -19,10 +19,12 @@ test_releases_with_continue() {
     assert_not_deployed "frontend/package.ocu.star" "production"
     assert_not_deployed "frontend/package.ocu.star" "production2"
 
-    # Release the backend
-    echo "ocuroot release new backend/package.ocu.star"
-    ocuroot release new backend/package.ocu.star
+    # Release the backend, from backend dir
+    pushd backend
+    echo "ocuroot release new package.ocu.star"
+    ocuroot release new package.ocu.star
     assert_equal "0" "$?" "Failed to release backend"
+    popd
 
     # Should have deployed, no dependencies
     assert_deployed "backend/package.ocu.star" "staging"
