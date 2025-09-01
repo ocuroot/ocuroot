@@ -10,12 +10,12 @@ retry_explicit_ref() {
 
     check_ref_does_not_exist "release.ocu.star/@/deploy/production"
 
-    ocuroot release retry release.ocu.star/@1
+    ocuroot release retry release.ocu.star/@r1
     assert_equal "0" "$?" "Expected retry to succeed"
 
     check_ref_exists "release.ocu.star/@/deploy/production"
     # Ensure that the release was completed after the retry
-    check_ref_exists "release.ocu.star/@1/call/postrelease/1/status/complete"
+    check_ref_exists "release.ocu.star/@r1/call/postrelease/1/status/complete"
 
     echo "Test passed"
 }

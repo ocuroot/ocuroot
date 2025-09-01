@@ -57,18 +57,19 @@ func LoadConfig(
 
 	builtinsByVersion, err := c.LoadBuiltinsForAllVersion(ctx)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("LoadBuiltinsForAllVersion: %w", err)
 	}
 
+	oldFN := filename
 	filename, data, err := resolver.Resolve(filename)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("Resolve %q: %w", oldFN, err)
 	}
 
 	// First pass to check for the SDK version function
 	sdkVersion, err := IdentifySDKVersion(filename, data)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("IdentifySDKVersion: %w", err)
 	}
 
 	var builtins starlark.StringDict

@@ -25,10 +25,10 @@ test_two_releases() {
     assert_equal "0" "$?" "Failed to apply approval intent and continue work"
 
     # Check that the work was applied
-    check_ref_exists "minimal/repo/-/approvals.ocu.star/@1/custom/approval"
+    check_ref_exists "minimal/repo/-/approvals.ocu.star/@r1/custom/approval"
 
     echo "== create approval2 intent =="
-    ocuroot state set "minimal/repo/-/approvals.ocu.star/+1/custom/approval2" 1
+    ocuroot state set "minimal/repo/-/approvals.ocu.star/+r1/custom/approval2" 1
     assert_equal "0" "$?" "Failed to create approval2 intent"
     echo "== apply approval intent and continue work =="
     ocuroot work any
@@ -139,25 +139,25 @@ test_force_deploy() {
     ocuroot release new basic.ocu.star
     assert_equal "0" "$?" "Failed to release v1"
 
-    check_ref_exists "basic.ocu.star/@1"
+    check_ref_exists "basic.ocu.star/@r1"
 
     echo "== block release to same commit =="
     ocuroot release new basic.ocu.star
     assert_not_equal "0" "$?" "Should not allow release to same commit"
 
-    check_ref_does_not_exist "basic.ocu.star/@2"
+    check_ref_does_not_exist "basic.ocu.star/@r2"
 
     echo "== force release to same commit =="
     ocuroot release new basic.ocu.star --force
     assert_equal "0" "$?" "Failed to force release to same commit"
 
-    check_ref_exists "basic.ocu.star/@2"
+    check_ref_exists "basic.ocu.star/@r2"
 
     echo "== deploy to different commit =="
     OCU_REPO_COMMIT_OVERRIDE=commit2 ocuroot release new basic.ocu.star
     assert_equal "0" "$?" "Failed to deploy to different commit"
 
-    check_ref_exists "basic.ocu.star/@3"
+    check_ref_exists "basic.ocu.star/@r3"
 
     echo "Test succeeded"
     echo ""

@@ -356,6 +356,19 @@ func TestRefStructure(t *testing.T) {
 				SubPath:     "approval",
 			},
 		},
+		{
+			ref: "//package.ocu.star/+r5/custom/approval",
+			expected: Ref{
+				Repo:     ".",
+				Filename: "package.ocu.star",
+				ReleaseOrIntent: ReleaseOrIntent{
+					Type:  Intent,
+					Value: "r5",
+				},
+				SubPathType: "custom",
+				SubPath:     "approval",
+			},
+		},
 	}
 	for _, ref := range refs {
 		t.Run(ref.ref, func(t *testing.T) {

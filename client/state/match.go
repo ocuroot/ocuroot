@@ -69,7 +69,7 @@ func (s *server) buildRepositoryTable(matches []string) templ.Component {
 			continue
 		}
 		tableContent = append(tableContent, ResultTableRow{
-			URL: templ.URL(fmt.Sprintf("/match/%s/-/**/@*", pr.Repo)),
+			URL: templ.URL(fmt.Sprintf("/match/%s/-/**/@r*", pr.Repo)),
 			Cells: []templ.Component{
 				textCell(pr.Repo),
 			},

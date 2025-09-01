@@ -4,12 +4,27 @@ export OCU_REPO_COMMIT_OVERRIDE=${OCU_REPO_COMMIT_OVERRIDE:-commitid}
 
 source $(dirname "$0")/../test_helpers.sh
 
+test_releases_with_rootpath() {
+    echo "Test: releases with root path"
+    echo ""
+    setup_test
+    
+    # Release the backend from the frontend dir
+    pushd frontend
+    echo "ocuroot release new //backend/package.ocu.star"
+    ocuroot release new //backend/package.ocu.star
+    assert_equal "0" "$?" "Failed to release backend"
+    popd
+
+    assert_deployed "backend/package.ocu.star" "staging"
+}
+
 test_releases_with_continue() {
     echo "Test: releases with continue"
     echo ""
     setup_test
     
-    # Release the frontend
+    # Release the frontend from repo root
     echo "ocuroot release new ./-/frontend/package.ocu.star"
     ocuroot release new ./-/frontend/package.ocu.star
     assert_equal "0" "$?" "Failed to release frontend"
@@ -19,10 +34,12 @@ test_releases_with_continue() {
     assert_not_deployed "frontend/package.ocu.star" "production"
     assert_not_deployed "frontend/package.ocu.star" "production2"
 
-    # Release the backend
-    echo "ocuroot release new backend/package.ocu.star"
-    ocuroot release new backend/package.ocu.star
+    # Release the backend, from backend dir
+    pushd backend
+    echo "ocuroot release new package.ocu.star"
+    ocuroot release new package.ocu.star
     assert_equal "0" "$?" "Failed to release backend"
+    popd
 
     # Should have deployed, no dependencies
     assert_deployed "backend/package.ocu.star" "staging"
@@ -161,6 +178,7 @@ build_ocuroot
 
 pushd "$(dirname "$0")" > /dev/null
 
+test_releases_with_rootpath
 test_releases_with_continue
 test_releases_with_intent_update
 test_releases_across_commits

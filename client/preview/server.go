@@ -147,7 +147,7 @@ func MakeServePreview(tc release.TrackerConfig) func(w http.ResponseWriter, r *h
 		}
 		config, err := local.ExecutePackage(r.Context(), tc.RepoPath, tc.Ref, backend)
 		if err != nil {
-			errorMsg := fmt.Sprintf("Failed to execute package: %v", err)
+			errorMsg := fmt.Sprintf("Failed to load config %v", err)
 			w.WriteHeader(http.StatusInternalServerError)
 			errorComp := ErrorPage(errorMsg)
 			errorComp.Render(r.Context(), w)

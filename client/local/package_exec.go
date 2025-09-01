@@ -26,7 +26,7 @@ func ExecutePackage(ctx context.Context, root string, ref refs.Ref, backend sdk.
 		},
 	)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("LoadConfig: %w", err)
 	}
 
 	if config.Package == nil {
@@ -40,7 +40,7 @@ func ExecutePackage(ctx context.Context, root string, ref refs.Ref, backend sdk.
 		for _, err := range validationErrors {
 			errorMsg += fmt.Sprintf("  - %s\n", err.Error())
 		}
-		return nil, fmt.Errorf("validation failed: %s", errorMsg)
+		return nil, fmt.Errorf("Validation: %s", errorMsg)
 	}
 
 	return config, nil
