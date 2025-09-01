@@ -108,8 +108,10 @@ func LoadConfig(
 		return nil, starlarkerrors.Wrap(err)
 	}
 
+	// Retrieve helper functions for work wrapping
 	if dw, exists := builtins["do_work"]; exists {
 		out.doWorkFunc = dw.(*starlark.Function)
+		builtins["do_work"] = nil
 	}
 
 	// Add global functions to available globals
@@ -196,11 +198,18 @@ func (c *Config) Run(
 		params = append(params, starlark.Tuple{starlark.String(key), starlark.String(string(valueJSON))})
 	}
 
+	fArgs := starlark.Tuple{}
+	for i := range gf.NumParams() {
+		p, _ := gf.Param(i)
+		fArgs = append(fArgs, starlark.String(p))
+	}
+
 	resultValue, err := starlark.Call(
 		thread,
 		c.doWorkFunc,
 		starlark.Tuple{
 			gf,
+			fArgs,
 		},
 		params,
 	)

@@ -1,3 +1,5 @@
+load("dowork.star", "check_params")
+
 def phase(name, work=[]):
     """
     phase defines a single phase within a release.
@@ -72,7 +74,9 @@ def deploy(environment=None, up=_default_up, down=_default_down, inputs={}):
         A dictionary representing the deploy action
     """
 
-    checked_inputs = _check_inputs(inputs)
+    checked_inputs = _check_inputs(up, inputs)
+    _check_inputs(down, inputs) # Check without keeping the results
+
     # Make the environment an implicit input to this deployment
     checked_inputs["environment"] = {
         "ref": "@/environment/{}".format(environment.name),
@@ -121,7 +125,7 @@ def call(fn, name, annotation="", inputs={}):
         A dictionary representing the call work item
     """
 
-    checked_inputs = _check_inputs(inputs)
+    checked_inputs = _check_inputs(fn, inputs)
     fn = render_function(fn)["function"]
     _add_func(fn)
 
@@ -165,7 +169,7 @@ def _add_func(func):
     package["functions"] = functions
     backend.thread.set("package", package)
 
-def _check_inputs(inputs):
+def _check_inputs(fn, inputs):
     checked_inputs = {}
     for key, value in inputs.items():
         if key == "environment":
@@ -176,4 +180,8 @@ def _check_inputs(inputs):
             checked_inputs[key] = {
                 "value": value,
             }
+
+    fParams = json.decode(backend.functions.get_args(fn))
+    check_params(fn, fParams["args"], fParams["kwargs"], checked_inputs.keys())
+
     return checked_inputs

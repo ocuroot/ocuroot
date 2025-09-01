@@ -1,8 +1,7 @@
 ocuroot("0.3.0")
 
-def build(ctx):
+def build():
     print("Building minimal package")
-    print(ctx)
 
     # Read source file and write to output file
     src = read("src.txt")
@@ -36,14 +35,13 @@ def build(ctx):
         },
     )
 
-def up(ctx):
+def up(environment={"name": ""}, staging_name="", previous_count=0, input1=None):
     print("Deploying minimal package")    
-    print("ctx: ", ctx)
-    print("Environment: ", ctx.inputs.environment["name"])
+    print("Environment: ", environment["name"])
     outputs = {}
-    outputs["count"] = ctx.inputs.previous_count + 1
-    outputs["environment"] = ctx.inputs.environment
-    outputs["input1"] = ctx.inputs.input1
+    outputs["count"] = previous_count + 1
+    outputs["environment"] = environment
+    outputs["input1"] = input1
 
     # Output some log lines and force a pause
     for i in range(1,5):
@@ -52,13 +50,13 @@ def up(ctx):
 
     return next(up_stage2, inputs=outputs)
 
-def up_stage2(ctx):
-    print("Continuing deploy to ", ctx.inputs.environment["name"])
-    print(ctx.inputs.input1)
-    return done(outputs={"env_name": ctx.inputs.environment["name"], "count": ctx.inputs.count}, tags=["v"+str(ctx.inputs.count)])
+def up_stage2(count, environment, input1):
+    print("Continuing deploy to ", environment["name"])
+    print(input1)
+    return done(outputs={"env_name": environment["name"], "count": count}, tags=["v"+str(count)])
 
-def down(ctx):
+def down(environment={"name": ""}, staging_name="", previous_count=0, input1=None):
     print("Destroying minimal package")
-    print(ctx)
-    print("Environment: " + ctx.inputs.environment["name"])
+    print("Environment: ", environment["name"])
+    print("Input1: ", input1)
     return done()

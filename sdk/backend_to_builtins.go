@@ -37,7 +37,48 @@ func (c *configLoader) backendToBuiltins(ctx context.Context, backend Backend) s
 		return id.String(), nil
 	})
 
+	out["functions"] = starlarkstruct.FromStringDict(starlark.String("functions"), starlark.StringDict{
+		"get_args": starlark.NewBuiltin("functions.get_args", getArgs),
+	})
+
 	return out
+}
+
+type getArgsOut struct {
+	Args   []string `json:"args"`
+	KWArgs []string `json:"kwargs"`
+}
+
+func getArgs(thread *starlark.Thread, fn *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
+	if len(args) != 1 {
+		return nil, fmt.Errorf("expected exactly one argument")
+	}
+	fnVal := args[0]
+	fnToCheck, ok := fnVal.(*starlark.Function)
+	if !ok {
+		return nil, fmt.Errorf("expected a function as the first argument")
+	}
+
+	outArgs := []string{}
+	outKWArgs := []string{}
+
+	for i := range fnToCheck.NumParams() {
+		n, _ := fnToCheck.Param(i)
+		if fnToCheck.ParamDefault(i) != nil {
+			outKWArgs = append(outKWArgs, n)
+		} else {
+			outArgs = append(outArgs, n)
+		}
+	}
+
+	jsonOut, err := json.Marshal(getArgsOut{
+		Args:   outArgs,
+		KWArgs: outKWArgs,
+	})
+	if err != nil {
+		return nil, err
+	}
+	return starlark.String(string(jsonOut)), nil
 }
 
 func (c *configLoader) threadBuiltins() starlark.Value {
