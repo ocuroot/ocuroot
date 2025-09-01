@@ -139,6 +139,14 @@ func (l *lexer) run() {
 }
 
 func lexStart(l *lexer) stateFn {
+	// Support // as an indicator for the root of the current repo
+	if strings.HasPrefix(l.input[l.pos:], "//") {
+		l.pos += len("//")
+		l.ignore()
+		l.items <- item{itemRepo, "."}
+		return lexPath
+	}
+
 	if strings.HasPrefix(l.input[l.pos:], "./") {
 		if strings.HasPrefix(l.input[l.pos:], "./+") || strings.HasPrefix(l.input[l.pos:], "./@") {
 			l.pos += len(".")
