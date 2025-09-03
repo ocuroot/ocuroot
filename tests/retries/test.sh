@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
 
+export OCUROOT_HOME=$(pwd)/$(dirname "$0")/.ocuroot
+
 source $(dirname "$0")/../test_helpers.sh
 
 retry_explicit_ref() {
@@ -42,6 +44,7 @@ retry_package_only() {
 setup_test() {
     rm -rf .store
     rm -rf .data
+    rm -rf .ocuroot
 
     ocuroot release new environments.ocu.star
 }

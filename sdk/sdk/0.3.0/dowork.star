@@ -2,13 +2,12 @@
 def do_work(
     f,
     fArgs,
-    work_id,
     inputs=None,
 ):
     if len(fArgs) == 1 and fArgs[0] == "ctx":
-        return _do_work_ctx(f, work_id, inputs)
+        return _do_work_ctx(f, inputs)
 
-    return _do_work(f, fArgs, work_id, inputs)
+    return _do_work(f, fArgs, inputs)
 
 def check_params(
     fn,
@@ -37,7 +36,6 @@ def check_params(
 def _do_work(
     f,
     fArgs,
-    work_id,
     inputs=None,
 ):
     args = {}
@@ -47,12 +45,9 @@ def _do_work(
 
 def _do_work_ctx(
     f,
-    work_id,
     inputs=None,
 ):
     args = {}
-    if work_id:
-        args["work_id"] = json.decode(work_id)
     if inputs:
         args["inputs"] = vars_from_json(json.decode(inputs))
 

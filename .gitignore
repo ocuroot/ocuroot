@@ -32,6 +32,5 @@ store/**/testdata/rapid/**/*.fail
 # Ignore air temp directory
 tmp
 
-# Ignore ocuroot state and build
-.store
+# Ignore ocuroot build
 .build

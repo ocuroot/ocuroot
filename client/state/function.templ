@@ -33,15 +33,15 @@ templ FunctionStateContent(fs release.FunctionState, children []string) {
         }
     </ul>
     <div class="divider"></div>
-    <h3>Outputs</h3>
-    <ul>
-        for key, output := range fs.Current.Outputs {
-            <div class="output">
-                @Output(key, output)
-            </div>
-        }
-    </ul>
-    <div class="divider"></div>
+    // <h3>Outputs</h3>
+    // <ul>
+    //     for key, output := range fs.Current.Outputs {
+    //         <div class="output">
+    //             @Output(key, output)
+    //         </div>
+    //     }
+    // </ul>
+    // <div class="divider"></div>
 
     <h3>History</h3>
     <ul>

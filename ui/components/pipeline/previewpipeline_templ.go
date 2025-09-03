@@ -81,7 +81,7 @@ func PreviewPipeline(props PreviewPipelineProps) templ.Component {
 
 // ternary is a helper function to simulate a ternary operator
 // modalsForChain renders the modals for a chain's functions
-func previewModalsForChain(chain []*FunctionChainSummary) templ.Component {
+func previewModalsForChain(work *WorkSummary) templ.Component {
 	return templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
 		templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
 		if templ_7745c5c3_CtxErr := ctx.Err(); templ_7745c5c3_CtxErr != nil {
@@ -102,7 +102,7 @@ func previewModalsForChain(chain []*FunctionChainSummary) templ.Component {
 			templ_7745c5c3_Var2 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		for _, c := range chain {
+		for index, c := range work.Jobs {
 			if len(c.Functions) > 0 {
 				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 7, " ")
 				if templ_7745c5c3_Err != nil {
@@ -133,7 +133,7 @@ func previewModalsForChain(chain []*FunctionChainSummary) templ.Component {
 					}
 					return nil
 				})
-				templ_7745c5c3_Err = components.Modal(fmt.Sprintf("chain-inputs-%s", c.ID), "Chain Inputs").Render(templ.WithChildren(ctx, templ_7745c5c3_Var3), templ_7745c5c3_Buffer)
+				templ_7745c5c3_Err = components.Modal(fmt.Sprintf("chain-inputs-%s", work.Name), "Chain Inputs").Render(templ.WithChildren(ctx, templ_7745c5c3_Var3), templ_7745c5c3_Buffer)
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
@@ -141,7 +141,7 @@ func previewModalsForChain(chain []*FunctionChainSummary) templ.Component {
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
-				if c.Status() == models.StatusComplete {
+				if work.JobStatuses[index] == models.StatusComplete {
 					templ_7745c5c3_Var4 := templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
 						templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
 						templ_7745c5c3_Buffer, templ_7745c5c3_IsBuffer := templruntime.GetBuffer(templ_7745c5c3_W)
@@ -154,8 +154,8 @@ func previewModalsForChain(chain []*FunctionChainSummary) templ.Component {
 							}()
 						}
 						ctx = templ.InitializeContext(ctx)
-						if len(c.Functions[len(c.Functions)-1].Outputs) > 0 {
-							templ_7745c5c3_Err = keyvalue.FromVarMap(c.Functions[len(c.Functions)-1].Outputs).Render(ctx, templ_7745c5c3_Buffer)
+						if len(c.Outputs) > 0 {
+							templ_7745c5c3_Err = keyvalue.FromVarMap(c.Outputs).Render(ctx, templ_7745c5c3_Buffer)
 							if templ_7745c5c3_Err != nil {
 								return templ_7745c5c3_Err
 							}
@@ -167,7 +167,7 @@ func previewModalsForChain(chain []*FunctionChainSummary) templ.Component {
 						}
 						return nil
 					})
-					templ_7745c5c3_Err = components.Modal(fmt.Sprintf("chain-outputs-%s", c.ID), "Chain Outputs").Render(templ.WithChildren(ctx, templ_7745c5c3_Var4), templ_7745c5c3_Buffer)
+					templ_7745c5c3_Err = components.Modal(fmt.Sprintf("chain-outputs-%s", work.Name), "Chain Outputs").Render(templ.WithChildren(ctx, templ_7745c5c3_Var4), templ_7745c5c3_Buffer)
 					if templ_7745c5c3_Err != nil {
 						return templ_7745c5c3_Err
 					}
@@ -200,7 +200,7 @@ func PreviewWorkHeader(work *WorkSummary) templ.Component {
 			templ_7745c5c3_Var5 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = previewModalsForChain(work.Chains).Render(ctx, templ_7745c5c3_Buffer)
+		templ_7745c5c3_Err = previewModalsForChain(work).Render(ctx, templ_7745c5c3_Buffer)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -237,9 +237,9 @@ func PreviewWorkHeader(work *WorkSummary) templ.Component {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var7 string
-		templ_7745c5c3_Var7, templ_7745c5c3_Err = templ.JoinStringErrs(work.Chains[0].Name)
+		templ_7745c5c3_Var7, templ_7745c5c3_Err = templ.JoinStringErrs(work.Name)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `ui/components/pipeline/previewpipeline.templ`, Line: 135, Col: 62}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `ui/components/pipeline/previewpipeline.templ`, Line: 135, Col: 52}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var7))
 		if templ_7745c5c3_Err != nil {
@@ -249,7 +249,7 @@ func PreviewWorkHeader(work *WorkSummary) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = PreviewChainActionIcons(work.Chains).Render(ctx, templ_7745c5c3_Buffer)
+		templ_7745c5c3_Err = PreviewChainActionIcons(work).Render(ctx, templ_7745c5c3_Buffer)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -262,7 +262,7 @@ func PreviewWorkHeader(work *WorkSummary) templ.Component {
 }
 
 // PreviewChainActionIcons renders the action icons for a chain
-func PreviewChainActionIcons(chain []*FunctionChainSummary) templ.Component {
+func PreviewChainActionIcons(work *WorkSummary) templ.Component {
 	return templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
 		templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
 		if templ_7745c5c3_CtxErr := ctx.Err(); templ_7745c5c3_CtxErr != nil {
@@ -283,9 +283,9 @@ func PreviewChainActionIcons(chain []*FunctionChainSummary) templ.Component {
 			templ_7745c5c3_Var8 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		for _, c := range chain {
+		for _, c := range work.Jobs {
 			if len(c.Functions) > 0 {
-				templ_7745c5c3_Err = templ.RenderScriptItems(ctx, templ_7745c5c3_Buffer, components.OpenModal(fmt.Sprintf("chain-inputs-%s", c.ID)))
+				templ_7745c5c3_Err = templ.RenderScriptItems(ctx, templ_7745c5c3_Buffer, components.OpenModal(fmt.Sprintf("chain-inputs-%s", work.Name)))
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
@@ -293,7 +293,7 @@ func PreviewChainActionIcons(chain []*FunctionChainSummary) templ.Component {
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
-				var templ_7745c5c3_Var9 templ.ComponentScript = components.OpenModal(fmt.Sprintf("chain-inputs-%s", c.ID))
+				var templ_7745c5c3_Var9 templ.ComponentScript = components.OpenModal(fmt.Sprintf("chain-inputs-%s", work.Name))
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var9.Call)
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err

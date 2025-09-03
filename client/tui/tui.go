@@ -2,11 +2,9 @@ package tui
 
 import (
 	"fmt"
-	"io"
 	"os"
 
 	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/log"
 	"github.com/mattn/go-isatty"
 )
 
@@ -34,14 +32,12 @@ func (w *WorkTui) Cleanup() error {
 	// Only run this process once
 	select {
 	case <-w.tuiDone:
-		log.SetOutput(os.Stderr)
 		return w.program.ReleaseTerminal()
 	default:
 	}
 
 	w.program.Send(DoneEvent{})
 	<-w.tuiDone
-	log.SetOutput(os.Stderr)
 	return w.program.ReleaseTerminal()
 }
 
@@ -81,20 +77,12 @@ func (n *NullTui) Cleanup() error {
 	return nil
 }
 
-func StartWorkTui(startInLogMode bool) Tui {
+func StartWorkTui() Tui {
 	if !isatty.IsTerminal(os.Stdout.Fd()) {
-		if startInLogMode {
-			return &NullTui{}
-		}
-		log.SetOutput(io.Discard)
 		return &NonTTYTui{tasks: make(map[string]Task)}
 	}
 
 	model := NewWorkModel()
-	model.logMode = startInLogMode
-
-	log.SetOutput(model.logBuf)
-	log.SetReportCaller(true)
 
 	p := tea.NewProgram(model)
 

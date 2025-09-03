@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
 
+export OCUROOT_HOME=$(pwd)/$(dirname "$0")/.ocuroot
+
 source $(dirname "$0")/../test_helpers.sh
 
 create_environment() {
@@ -98,6 +100,7 @@ create_environment_omnibus() {
 
 setup_test() {
     rm -rf .store
+    rm -rf .ocuroot
 }
 
 build_ocuroot

@@ -5,6 +5,7 @@ import (
 	"path"
 	"sort"
 
+	"github.com/charmbracelet/log"
 	libglob "github.com/gobwas/glob"
 	"github.com/ocuroot/ocuroot/sdk"
 	"github.com/ocuroot/ocuroot/store/models"
@@ -57,16 +58,13 @@ func SDKPackageToReleaseSummary(
 				workRuns = globFilter(childRefs, fmt.Sprintf("**/-/**/@*/call/%s/*", chainName))
 			}
 
+			ws.Name = chainName
 			if len(workRuns) == 0 {
-				ws.Chains = append(ws.Chains, &FunctionChainSummary{
-					ID:   models.NewID[models.FunctionChainID](),
-					Name: chainName,
+				ws.Jobs = append(ws.Jobs, models.Work{
 					Functions: []*models.Function{
 						{
-							ID:     models.NewID[models.FunctionID](),
 							Fn:     function,
 							Inputs: inputs,
-							Status: models.StatusPending,
 						},
 					},
 				})
@@ -75,35 +73,20 @@ func SDKPackageToReleaseSummary(
 			}
 
 			for _, run := range workRuns {
-				chain := &FunctionChainSummary{
-					ID:   models.FunctionChainID(run),
-					Name: chainName,
+				ws.Jobs = append(ws.Jobs, models.Work{
 					Functions: []*models.Function{
 						{
-							ID:     models.NewID[models.FunctionID](),
 							Fn:     function,
 							Inputs: inputs,
-							Status: models.StatusPending,
 						},
 					},
+				})
+				statusRefs := globFilter(childRefs, fmt.Sprintf("%s/status/*", run))
+				if len(statusRefs) > 0 {
+					log.Error("Multiple status refs", "run", run, "refs", statusRefs)
 				}
-				functions := globFilter(childRefs, fmt.Sprintf("%s/functions/*", run))
-				functions = earliestFirst(functions)
-				for index, fn := range functions {
-					var status models.Status = models.StatusPending
-					statusRefs := globFilter(childRefs, fmt.Sprintf("%s/status/*", fn))
-					if len(statusRefs) > 0 {
-						status = models.Status(path.Base(statusRefs[0]))
-					}
-					var fn *models.Function
-					if index == 0 {
-						fn = chain.Functions[0]
-						chain.Functions = nil
-					}
-					fn.Status = status
-					chain.Functions = append(chain.Functions, fn)
-				}
-				ws.Chains = append(ws.Chains, chain)
+				status := models.Status(path.Base(statusRefs[0]))
+				ws.JobStatuses = append(ws.JobStatuses, status)
 			}
 
 			p.Work = append(p.Work, ws)

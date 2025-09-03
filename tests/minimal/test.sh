@@ -6,7 +6,26 @@ export OCUROOT_CHECK_STAGED_FILES=true
 
 export OCU_REPO_COMMIT_OVERRIDE=${OCU_REPO_COMMIT_OVERRIDE:-commitid}
 
+export OCUROOT_HOME=$(pwd)/$(dirname "$0")/.ocuroot
+
 source $(dirname "$0")/../test_helpers.sh
+
+test_basic() {
+    echo "Test: basic"
+    echo ""
+    setup_test
+
+    echo "== release v1 =="
+    ocuroot release new basic.ocu.star
+    assert_equal "0" "$?" "Failed to release v1"
+
+    assert_deployed "basic.ocu.star" "staging"
+    assert_deployed "basic.ocu.star" "production"
+    assert_deployed "basic.ocu.star" "production2"
+
+    echo "Test succeeded"
+    echo ""
+}
 
 test_two_releases() {
     echo "Test: two releases"
@@ -167,6 +186,7 @@ setup_test() {
     # Clean up any previous runs
     rm -rf .store
     rm -rf .build
+    rm -rf $OCUROOT_HOME
 
     # Set up environments
     echo "ocuroot release new environments/package.ocu.star"
@@ -178,6 +198,7 @@ build_ocuroot
 
 pushd "$(dirname "$0")" > /dev/null
 
+test_basic
 test_two_releases
 test_down
 test_deploy_intent

@@ -22,7 +22,7 @@ func initEvent(ref refs.Ref, t tui.Tui, store refstore.Store) *TaskEvent {
 		log.Error("failed to get work ref", "error", err)
 		return nil
 	}
-	chainRef := librelease.ChainRefFromFunctionRef(ref)
+	chainRef := librelease.ReduceToJobRef(ref)
 
 	var out *TaskEvent = &TaskEvent{}
 
@@ -52,8 +52,8 @@ func initEvent(ref refs.Ref, t tui.Tui, store refstore.Store) *TaskEvent {
 			Status:       WorkStatusPending,
 			CreationTime: time.Now(),
 
-			Store:    store,
-			ChainRef: chainRef,
+			Store:  store,
+			JobRef: chainRef,
 		}
 	}
 
@@ -61,10 +61,10 @@ func initEvent(ref refs.Ref, t tui.Tui, store refstore.Store) *TaskEvent {
 }
 
 func updateStatus(ctx context.Context, store refstore.Store, ref refs.Ref, ev *TaskEvent) {
-	chainRef := librelease.ChainRefFromFunctionRef(ref)
-	chainStatus, err := librelease.GetFunctionChainStatusFromFunctions(ctx, store, chainRef)
+	chainRef := librelease.ReduceToJobRef(ref)
+	chainStatus, err := librelease.GetWorkStatus(ctx, store, chainRef)
 	if err != nil {
-		log.Error("failed to get function chain status", "chainRef", ref.String(), "error", err)
+		log.Error("failed to get work status", "chainRef", ref.String(), "error", err)
 		return
 	}
 
@@ -127,7 +127,7 @@ func WatchForChainUpdates(ctx context.Context, store refstore.Store, tuiWork tui
 
 func tuiStateChange(ctx context.Context, store refstore.Store, tuiWork tui.Tui) func(ref refs.Ref) {
 	return func(ref refs.Ref) {
-		chainRef := librelease.ChainRefFromFunctionRef(ref)
+		chainRef := librelease.ReduceToJobRef(ref)
 
 		out := initEvent(chainRef, tuiWork, store)
 		updateStatus(ctx, store, chainRef, out)

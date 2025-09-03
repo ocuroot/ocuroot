@@ -201,7 +201,7 @@ func RefHeader(props RefPageProps) templ.Component {
 				if len(strings.Split(rp.SubPath, "/")) > 1 {
 					templ_7745c5c3_Err = HeaderLink(
 						props.Ref,
-						release.GlobChain,
+						release.GlobJob,
 						fmt.Sprintf("#%s", strings.Split(rp.SubPath, "/")[1]),
 						fmt.Sprintf("/ref/%s/-/%s/@%s/call/%s/%s", rp.Repo, rp.Filename, rp.ReleaseOrIntent.Value, strings.Split(rp.SubPath, "/")[0], strings.Split(rp.SubPath, "/")[1]),
 					).Render(ctx, templ_7745c5c3_Buffer)
@@ -231,7 +231,7 @@ func RefHeader(props RefPageProps) templ.Component {
 				if len(strings.Split(rp.SubPath, "/")) > 1 {
 					templ_7745c5c3_Err = HeaderLink(
 						props.Ref,
-						release.GlobChain,
+						release.GlobJob,
 						fmt.Sprintf("#%s", strings.Split(rp.SubPath, "/")[1]),
 						fmt.Sprintf("/ref/%s/-/%s/@%s/deploy/%s/%s", rp.Repo, rp.Filename, rp.ReleaseOrIntent.Value, strings.Split(rp.SubPath, "/")[0], strings.Split(rp.SubPath, "/")[1]),
 					).Render(ctx, templ_7745c5c3_Buffer)

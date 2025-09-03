@@ -46,8 +46,6 @@ type WorkModel struct {
 	Done bool
 
 	logBuf *bytes.Buffer
-
-	logMode bool
 }
 
 func (w *WorkModel) GetTaskByID(id string) (Task, bool) {
@@ -71,10 +69,6 @@ func (m *WorkModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.KeyMsg:
 		// Cool, what was the actual key pressed?
 		switch msg.String() {
-
-		case "l":
-			m.logMode = !m.logMode
-			return m, nil
 
 		// These keys should exit the program.
 		case "ctrl+c":
@@ -115,10 +109,6 @@ func (m *WorkModel) View() string {
 func (m *WorkModel) view(finished bool) string {
 	if m.Done {
 		return ""
-	}
-
-	if m.logMode {
-		return m.logBuf.String()
 	}
 
 	// Sort tasks by sort key

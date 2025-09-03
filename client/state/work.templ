@@ -6,7 +6,6 @@ import (
     "path"
 
     "github.com/ocuroot/ocuroot/store/models"
-    "github.com/ocuroot/ocuroot/lib/release"
     "github.com/ocuroot/ui/components/badges"
     "github.com/ocuroot/ui/components/layout"
 
@@ -25,10 +24,8 @@ templ WorkContent(work models.Work, children []string) {
     </div>
     @layout.Row() {
         @Column40(){
-            for _, child := range children {
-                if release.GlobFunction.Match(child) {
-                    <div hx-trigger="load" hx-get={ fmt.Sprintf("/ref/%s?partial=true", child) } hx-swap="innerHTML">{ fmt.Sprint(child) }</div>
-                }
+            for _, fn := range work.Functions {
+                <div hx-trigger="load" hx-get={ fmt.Sprintf("/ref/%s?partial=true", fn.Fn.String()) } hx-swap="innerHTML">{ fmt.Sprint(fn.Fn.String()) }</div>
             }
         }
         @Column60() {

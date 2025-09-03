@@ -20,8 +20,7 @@ var (
 	GlobDeploymentIntent        = libglob.MustCompile("**/+*/deploy/*", '/')
 	GlobDeploymentStateOrIntent = libglob.MustCompile("**/{@,+}*/deploy/*", '/')
 	GlobCall                    = libglob.MustCompile("**/{@,+}*/call/*", '/')
-	GlobChain                   = libglob.MustCompile("**/{@,+}*/{call,deploy}/*/*", '/')
-	GlobFunction                = libglob.MustCompile("**/{@,+}*/{call,deploy}/*/*/functions/*", '/')
+	GlobJob                     = libglob.MustCompile("**/{@,+}*/{call,deploy}/*/*", '/')
 	GlobLog                     = libglob.MustCompile("**/{@,+}*/{call,deploy}/*/*/logs", '/')
 	GlobCustomState             = libglob.MustCompile("**/@*/custom/*", '/')
 	GlobCustomIntent            = libglob.MustCompile("**/+*/custom/*", '/')
@@ -41,8 +40,8 @@ func WorkRefFromChainRef(ref refs.Ref) (refs.Ref, error) {
 	return out, nil
 }
 
-func ChainRefFromFunctionRef(ref refs.Ref) refs.Ref {
-	wr, err := refs.Reduce(ref.String(), GlobChain)
+func ReduceToJobRef(ref refs.Ref) refs.Ref {
+	wr, err := refs.Reduce(ref.String(), GlobJob)
 	if err != nil {
 		return ref
 	}
@@ -51,10 +50,6 @@ func ChainRefFromFunctionRef(ref refs.Ref) refs.Ref {
 		return ref
 	}
 	return out
-}
-
-func FunctionRefFromChainRef(ref refs.Ref, fn *models.Function) refs.Ref {
-	return ref.JoinSubPath("functions", string(fn.ID))
 }
 
 type Custom any
@@ -68,14 +63,12 @@ func LoadRef(ctx context.Context, store refstore.Store, ref refs.Ref) (any, erro
 		return LoadRefOfType[ReleaseInfo](ctx, store, ref)
 	case GlobWork.Match(ref.String()):
 		return LoadRefOfType[models.Work](ctx, store, ref)
-	case GlobChain.Match(ref.String()):
+	case GlobJob.Match(ref.String()):
 		return LoadRefOfType[models.Work](ctx, store, ref)
 	case GlobDeploymentIntent.Match(ref.String()):
 		return LoadRefOfType[models.Intent](ctx, store, ref)
 	case GlobLog.Match(ref.String()):
 		return LoadRefOfType[[]sdk.Log](ctx, store, ref)
-	case GlobFunction.Match(ref.String()):
-		return LoadRefOfType[FunctionState](ctx, store, ref)
 	case GlobEnvironment.Match(ref.String()):
 		return LoadRefOfType[models.Environment](ctx, store, ref)
 	default:

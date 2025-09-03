@@ -108,10 +108,7 @@ func (w *releaseStore) InitDeploymentDown(ctx context.Context, env string) error
 		return fmt.Errorf("failed to get current deployment: %w", err)
 	}
 
-	entrypoint := FunctionState{}
-	if err := w.Store.Get(ctx, currentDeployment.Entrypoint.String(), &entrypoint); err != nil {
-		return fmt.Errorf("failed to get entrypoint: %w", err)
-	}
+	entrypoint := currentDeployment.Functions[0]
 
 	ri, err := w.GetReleaseInfo(ctx)
 	if err != nil {
@@ -158,18 +155,21 @@ func (w *releaseStore) InitDeploymentDown(ctx context.Context, env string) error
 	return nil
 }
 
-func FunctionIsReady(ctx context.Context, store refstore.Store, ref string) (bool, error) {
-	functionRef, err := refs.Reduce(ref, GlobFunction)
+func JobIsReady(ctx context.Context, store refstore.Store, ref string) (bool, error) {
+	jobRef, err := refs.Reduce(ref, GlobJob)
 	if err != nil {
 		return false, fmt.Errorf("failed to reduce ref: %w", err)
 	}
 
-	var functionState FunctionState
-	if err := store.Get(ctx, functionRef, &functionState); err != nil {
-		return false, fmt.Errorf("failed to get function state at %s: %w", functionRef, err)
+	var work models.Work
+	if err := store.Get(ctx, jobRef, &work); err != nil {
+		return false, fmt.Errorf("failed to get function state at %s: %w", jobRef, err)
 	}
-
-	dependenciesSatisfied, err := CheckDependencies(ctx, store, functionState)
+	if len(work.Functions) == 0 {
+		return false, fmt.Errorf("no functions in work")
+	}
+	lastFunction := work.Functions[len(work.Functions)-1]
+	dependenciesSatisfied, err := CheckDependencies(ctx, store, lastFunction)
 	if err != nil {
 		return false, fmt.Errorf("failed to check dependencies: %w", err)
 	}
@@ -178,7 +178,7 @@ func FunctionIsReady(ctx context.Context, store refstore.Store, ref string) (boo
 		return false, nil
 	}
 
-	inputs, err := PopulateInputs(ctx, store, functionState.Current.Inputs)
+	inputs, err := PopulateInputs(ctx, store, lastFunction.Inputs)
 	if err != nil {
 		return false, fmt.Errorf("failed to populate inputs: %w", err)
 	}
@@ -192,75 +192,80 @@ func FunctionIsReady(ctx context.Context, store refstore.Store, ref string) (boo
 	return true, nil
 }
 
-func CheckDependencies(ctx context.Context, store refstore.Store, fs FunctionState) (bool, error) {
-	if len(fs.Current.Dependencies) == 0 {
+func CheckDependencies(ctx context.Context, store refstore.Store, fn *models.Function) (bool, error) {
+	if len(fn.Dependencies) == 0 {
 		return true, nil
 	}
 
 	var deps []string
-	for _, dep := range fs.Current.Dependencies {
+	for _, dep := range fn.Dependencies {
 		deps = append(deps, dep.String())
 	}
 	matchedDeps, err := store.Match(ctx, deps...)
 	if err != nil {
 		return false, err
 	}
-	if len(matchedDeps) != len(fs.Current.Dependencies) {
+	if len(matchedDeps) != len(fn.Dependencies) {
 		return false, nil
 	}
 
 	return true, nil
 }
 
-func (w *releaseStore) FailedFunctions(ctx context.Context) (map[refs.Ref]*models.Function, error) {
-	matchRef := w.ReleaseRef.String() + "/**/functions/*/status/failed"
-	failedFunctions, err := w.Store.Match(ctx, matchRef)
+func (w *releaseStore) FailedJobs(ctx context.Context) (map[refs.Ref]*models.Work, error) {
+	matchRef := w.ReleaseRef.String() + "/{call,deploy}/*/*/status/failed"
+	failedJobs, err := w.Store.Match(ctx, matchRef)
 	if err != nil {
 		return nil, err
 	}
 
-	out := make(map[refs.Ref]*models.Function)
-	for _, fn := range failedFunctions {
-		functionRef := strings.TrimSuffix(fn, "/status/failed")
+	out := make(map[refs.Ref]*models.Work)
+	for _, fn := range failedJobs {
+		jobRef := strings.TrimSuffix(fn, "/status/failed")
 
-		var function FunctionState
-		err := w.Store.Get(ctx, functionRef, &function)
+		var work models.Work
+		err := w.Store.Get(ctx, jobRef, &work)
 		if err != nil {
 			return nil, err
 		}
-		// TODO: There should be a clearer indicator
-		if function.Current.Fn.Name == "" {
-			return nil, fmt.Errorf("function %s not found", functionRef)
-		}
 
-		fr, err := refs.Parse(functionRef)
+		fr, err := refs.Parse(jobRef)
 		if err != nil {
 			return nil, err
 		}
-		out[fr] = &function.Current
+		out[fr] = &work
 	}
 	return out, nil
 }
 
-func (w *releaseStore) PendingFunctions(ctx context.Context) (map[refs.Ref]*models.Function, error) {
-	matchRef := w.ReleaseRef.String() + "/**/functions/*/status/pending"
-	pendingFunctions, err := w.Store.Match(ctx, matchRef)
+func (w *releaseStore) PendingJobs(ctx context.Context) (map[refs.Ref]*models.Work, error) {
+	matchRefPending := w.ReleaseRef.String() + "/{call,deploy}/*/*/status/pending"
+	matchRefPaused := w.ReleaseRef.String() + "/{call,deploy}/*/*/status/paused"
+
+	log.Info("PendingJobs globs", "pending", matchRefPending, "paused", matchRefPaused)
+
+	pendingJobs, err := w.Store.Match(ctx, matchRefPending, matchRefPaused)
 	if err != nil {
 		return nil, err
 	}
 
-	out := make(map[refs.Ref]*models.Function)
-	for _, fn := range pendingFunctions {
-		functionRef := strings.TrimSuffix(fn, "/status/pending")
-
-		var function FunctionState
-		err := w.Store.Get(ctx, functionRef, &function)
+	out := make(map[refs.Ref]*models.Work)
+	for _, fn := range pendingJobs {
+		workRef, err := refs.Reduce(fn, GlobJob)
 		if err != nil {
 			return nil, err
 		}
+
+		var work models.Work
+		err = w.Store.Get(ctx, workRef, &work)
+		if err != nil {
+			return nil, err
+		}
+		function := work.Functions[len(work.Functions)-1]
+
 		// TODO: There should be a clearer indicator
-		if function.Current.Fn.Name == "" {
-			return nil, fmt.Errorf("function %s not found", functionRef)
+		if function.Fn.Name == "" {
+			return nil, fmt.Errorf("function %s not found", workRef)
 		}
 
 		// Check that all dependencies are satisfied
@@ -269,15 +274,16 @@ func (w *releaseStore) PendingFunctions(ctx context.Context) (map[refs.Ref]*mode
 			return nil, err
 		}
 		if !satisfied {
-			log.Info("function dependencies not satisfied", "function", functionRef, "dependencies", function.Current.Dependencies)
+			log.Info("function dependencies not satisfied", "function", workRef, "dependencies", function.Dependencies)
 			continue
 		}
 
-		fr, err := refs.Parse(functionRef)
+		workRefParsed, err := refs.Parse(workRef)
 		if err != nil {
 			return nil, err
 		}
-		out[fr] = &function.Current
+
+		out[workRefParsed] = &work
 	}
 	return out, nil
 }
@@ -318,48 +324,8 @@ func (w *releaseStore) GetReleaseState(ctx context.Context) (*pipeline.ReleaseSu
 	return &release, nil
 }
 
-func GetFunctionChainStatusFromFunctions(ctx context.Context, store refstore.Store, chainRef refs.Ref) (models.Status, error) {
-	resultMatches, err := store.Match(ctx, chainRef.String()+"/functions/*/status/*")
-	if err != nil {
-		return "", err
-	}
-
-	var statusCounts map[string]int
-	for _, match := range resultMatches {
-		status := path.Base(match)
-		if statusCounts == nil {
-			statusCounts = make(map[string]int)
-		}
-		statusCounts[status]++
-	}
-
-	if statusCounts[string(models.StatusPending)] == len(resultMatches) {
-		return models.StatusPending, nil
-	}
-	if statusCounts[string(models.StatusComplete)] == len(resultMatches) {
-		return models.StatusComplete, nil
-	}
-
-	if statusCounts[string(models.StatusRunning)] > 0 {
-		return models.StatusRunning, nil
-	}
-	if statusCounts[string(models.StatusFailed)] > 0 {
-		return models.StatusFailed, nil
-	}
-	if statusCounts[string(models.StatusCancelled)] > 0 {
-		return models.StatusCancelled, nil
-	}
-
-	if statusCounts[string(models.StatusPending)] > 0 && statusCounts[string(models.StatusComplete)] > 0 {
-		return models.StatusRunning, nil
-	}
-
-	// Default to pending
-	return models.StatusPending, nil
-}
-
-func GetFunctionChainStatus(ctx context.Context, store refstore.Store, chainRef refs.Ref) (models.Status, error) {
-	resultMatches, err := store.Match(ctx, chainRef.String()+"/status/*")
+func GetWorkStatus(ctx context.Context, store refstore.Store, workRef refs.Ref) (models.Status, error) {
+	resultMatches, err := store.Match(ctx, workRef.String()+"/status/*")
 	if err != nil {
 		return "", err
 	}
@@ -374,11 +340,20 @@ func GetFunctionChainStatus(ctx context.Context, store refstore.Store, chainRef 
 	return models.Status(path.Base(resultMatches[0])), nil
 }
 
-func (w *releaseStore) GetFunctionChainStatus(ctx context.Context, chainRef refs.Ref) (models.Status, error) {
-	return GetFunctionChainStatus(ctx, w.Store, chainRef)
+func (w *releaseStore) GetWorkStatus(ctx context.Context, workRef refs.Ref) (models.Status, error) {
+	return GetWorkStatus(ctx, w.Store, workRef)
 }
 
 var validInputNameRegex = regexp.MustCompile(`^[a-zA-Z_][a-zA-Z0-9_]*$`)
+
+func validateFunction(fn *models.Function) error {
+	for inputName := range fn.Inputs {
+		if !validInputNameRegex.MatchString(inputName) {
+			return fmt.Errorf("invalid input name %q", inputName)
+		}
+	}
+	return nil
+}
 
 func (w *releaseStore) InitializeFunction(
 	ctx context.Context,
@@ -386,23 +361,14 @@ func (w *releaseStore) InitializeFunction(
 	functionChainRef refs.Ref,
 	fn *models.Function,
 ) error {
+	log.Info("Initializing function", "ref", functionChainRef.String())
+
 	// Validate contents of function
-	for inputName := range fn.Inputs {
-		if !validInputNameRegex.MatchString(inputName) {
-			return fmt.Errorf("invalid input name %q", inputName)
-		}
+	if err := validateFunction(fn); err != nil {
+		return err
 	}
 
-	// Set the initial (pending) state for the function
-	functionRef := FunctionRefFromChainRef(functionChainRef, fn)
-	err := UpdateFunctionStateUnderRef(ctx, w.Store, functionRef, fn)
-	if err != nil {
-		return fmt.Errorf("failed to update function state: %w", err)
-	}
-
-	if workState.Entrypoint.String() == "" {
-		workState.Entrypoint = functionRef
-	}
+	workState.Functions = append(workState.Functions, fn)
 
 	if err := w.Store.Set(ctx, functionChainRef.String(), workState); err != nil {
 		return fmt.Errorf("failed to set work state: %w", err)
@@ -421,57 +387,30 @@ func InitializeFunctionChain(
 	functionChainRef refs.Ref,
 	fn *models.Function,
 ) error {
-	// Set the initial (pending) state for the function
-	functionRef := FunctionRefFromChainRef(functionChainRef, fn)
-	err := UpdateFunctionStateUnderRef(ctx, store, functionRef, fn)
-	if err != nil {
-		return fmt.Errorf("failed to update function state: %w", err)
-	}
-
 	releaseRef := functionChainRef.SetFragment("").SetSubPath("").SetSubPathType(refs.SubPathTypeNone)
 
 	workState := models.Work{
-		Release:    releaseRef,
-		Entrypoint: functionRef,
+		Release: releaseRef,
+		Functions: []*models.Function{
+			fn,
+		},
 	}
+	if functionChainRef.SubPathType == refs.SubPathTypeCall {
+		workState.Type = models.WorkTypeCall
+	}
+	if functionChainRef.SubPathType == refs.SubPathTypeDeploy {
+		workState.Type = models.WorkTypeUp
+	}
+
+	log.Info("Initializing function chain", "ref", functionChainRef.String(), "workState", workState)
 	if err := store.Set(ctx, functionChainRef.String(), workState); err != nil {
 		return fmt.Errorf("failed to set work state: %w", err)
 	}
 
+	log.Info("Saving status", "ref", functionChainRef.String(), "status", models.StatusPending)
 	if err := saveStatus(ctx, store, functionChainRef, models.StatusPending); err != nil {
 		return fmt.Errorf("failed to save status: %w", err)
 	}
-	return nil
-}
-
-func UpdateFunctionStateUnderRef(ctx context.Context, store refstore.Store, functionRef refs.Ref, function *models.Function) error {
-	for inputName := range function.Inputs {
-		if !validInputNameRegex.MatchString(inputName) {
-			return fmt.Errorf("invalid input name %q", inputName)
-		}
-	}
-
-	functionStatusRef := functionRef.JoinSubPath(statusPathSegment)
-
-	var s FunctionState
-	if err := store.Get(ctx, functionStatusRef.String(), &s); err != nil && !errors.Is(err, refstore.ErrRefNotFound) {
-		return fmt.Errorf("failed to get function state: %w", err)
-	}
-
-	s.Current = *function
-	s.History = append(s.History, StatusEvent{
-		Time:   time.Now(),
-		Status: function.Status,
-	})
-
-	if err := store.Set(ctx, functionRef.String(), s); err != nil {
-		return fmt.Errorf("failed to set function state: %w", err)
-	}
-
-	if err := saveStatus(ctx, store, functionRef, function.Status); err != nil {
-		return err
-	}
-
 	return nil
 }
 
@@ -491,6 +430,8 @@ func saveStatus(ctx context.Context, store refstore.Store, ref refs.Ref, status 
 	if err := store.Set(ctx, functionStateRef.String(), models.NewMarker()); err != nil {
 		return fmt.Errorf("failed to set function state: %w", err)
 	}
+
+	log.Info("saved status", "status", status, "ref", ref.String(), "fsr", functionStateRef.String())
 
 	return nil
 }
@@ -515,10 +456,7 @@ func (r *releaseStore) sdkWorkToFunctionChain(ctx context.Context, work sdk.Work
 	mWork := models.Work{
 		Release: r.ReleaseRef,
 	}
-	fs := &models.Function{
-		ID:     "1",
-		Status: models.StatusPending,
-	}
+	fs := &models.Function{}
 
 	if work.Deployment != nil {
 		workRef = workRef.
@@ -554,7 +492,7 @@ func (r *releaseStore) sdkWorkToFunctionChain(ctx context.Context, work sdk.Work
 func (r *releaseStore) sdkWorkToFunctionChainDown(
 	ctx context.Context,
 	environment string,
-	fn FunctionState,
+	fn *models.Function,
 	downFunc sdk.FunctionDef,
 ) (refs.Ref, models.Work, *models.Function, error) {
 	workRef := r.ReleaseRef
@@ -567,13 +505,11 @@ func (r *releaseStore) sdkWorkToFunctionChainDown(
 		Release: r.ReleaseRef,
 	}
 	fs := &models.Function{
-		ID:     "1",
-		Status: models.StatusPending,
 		Fn:     downFunc,
 		Inputs: make(map[string]sdk.InputDescriptor),
 	}
 
-	for name, input := range fn.Current.Inputs {
+	for name, input := range fn.Inputs {
 		i := sdk.InputDescriptor{
 			Value: input.Value,
 		}
@@ -595,9 +531,9 @@ func (r *releaseStore) sdkWorkToFunctionChainDown(
 	return workRef, mWork, fs, nil
 }
 
-// SDKPackageToFunctionChains converts a SDK package to a map of function chain refs to
+// SDKPackageToFunctions converts a SDK package to a map of function chain refs to
 // function summaries representing the first function in each chain
-func (r *releaseStore) SDKPackageToFunctionChains(ctx context.Context, pkg *sdk.Package) (map[refs.Ref]*models.Function, error) {
+func (r *releaseStore) SDKPackageToFunctions(ctx context.Context, pkg *sdk.Package) (map[refs.Ref]*models.Function, error) {
 	functionChains := make(map[refs.Ref]*models.Function)
 	var previousPhaseRefs []refs.Ref
 	for _, phase := range pkg.Phases {

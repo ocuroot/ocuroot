@@ -30,7 +30,6 @@ func (c *Config) GlobalFuncs() map[string]*starlark.Function {
 }
 
 type FunctionContext struct {
-	WorkID  WorkID         `json:"work_id"`
 	Package *Package       `json:"package,omitempty"`
 	Inputs  map[string]any `json:"inputs,omitempty"`
 }

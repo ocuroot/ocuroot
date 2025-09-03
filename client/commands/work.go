@@ -37,14 +37,12 @@ var WorkContinueCmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx := cmd.Context()
 
-		logMode := cmd.Flag("logmode").Changed
-
 		tc, err := getTrackerConfig(ctx, cmd, args)
 		if err != nil {
 			return fmt.Errorf("failed to get tracker config: %w", err)
 		}
 
-		if err := doReleaseWorkForCommit(ctx, tc, logMode); err != nil {
+		if err := doReleaseWorkForCommit(ctx, tc); err != nil {
 			return err
 		}
 
@@ -65,8 +63,6 @@ finally it will trigger work for other commits ('ocuroot work trigger').
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx := cmd.Context()
 
-		logMode := cmd.Flag("logmode").Changed
-
 		tc, err := getTrackerConfig(ctx, cmd, args)
 		if err != nil {
 			return fmt.Errorf("failed to get tracker config: %w", err)
@@ -85,7 +81,7 @@ finally it will trigger work for other commits ('ocuroot work trigger').
 		}
 
 		log.Info("Starting release work")
-		if err := doReleaseWorkForCommit(ctx, tc, logMode); err != nil {
+		if err := doReleaseWorkForCommit(ctx, tc); err != nil {
 			return err
 		}
 
@@ -98,22 +94,28 @@ finally it will trigger work for other commits ('ocuroot work trigger').
 	},
 }
 
-func doReleaseWorkForCommit(ctx context.Context, tc release.TrackerConfig, logMode bool) error {
+func doReleaseWorkForCommit(ctx context.Context, tc release.TrackerConfig) error {
 	// Update inputs for existing deployments
 	if err := reconcileAllDeploymentsAtCommit(ctx, tc.Store, tc.Ref.Repo, tc.Commit); err != nil {
 		return fmt.Errorf("failed to reconcile deployments: %w", err)
 	}
 
-	// Match any outstanding functions for this repo/commit
-	// This uses the old pattern of including the commit id in the version
-	mr := fmt.Sprintf(
-		"%v/-/**/@%v*/{deploy,call}/**/functions/*/status/pending",
+	// Match any outstanding work for this repo/commit
+	mrPending := fmt.Sprintf(
+		"%v/-/**/@%v*/{deploy,call}/*/*/status/pending",
+		tc.Ref.Repo,
+		tc.Commit,
+	)
+	mrPaused := fmt.Sprintf(
+		"%v/-/**/@%v*/{deploy,call}/*/*/status/paused",
 		tc.Ref.Repo,
 		tc.Commit,
 	)
 	outstanding, err := tc.Store.Match(
 		ctx,
-		mr)
+		mrPending,
+		mrPaused,
+	)
 	if err != nil {
 		return fmt.Errorf("failed to match refs: %w", err)
 	}
@@ -126,7 +128,8 @@ func doReleaseWorkForCommit(ctx context.Context, tc release.TrackerConfig, logMo
 		log.Info("Found release for commit", "ref", ref)
 		outstandingWork, err := tc.Store.Match(
 			ctx,
-			fmt.Sprintf("%v/{deploy,call}/**/functions/*/status/pending", ref.String()))
+			fmt.Sprintf("%v/{deploy,call}/*/*/status/pending", ref.String()),
+			fmt.Sprintf("%v/{deploy,call}/*/*/status/paused", ref.String()))
 		if err != nil {
 			return fmt.Errorf("failed to match refs: %w", err)
 		}
@@ -154,7 +157,7 @@ func doReleaseWorkForCommit(ctx context.Context, tc release.TrackerConfig, logMo
 	for releaseRef := range releases {
 		tc.Ref = releaseRef
 
-		if err := continueRelease(ctx, tc, logMode); err != nil {
+		if err := continueRelease(ctx, tc); err != nil {
 			return err
 		}
 	}
@@ -213,14 +216,15 @@ func doTriggerWork(ctx context.Context, store refstore.Store, dryRun bool) error
 	// Match any outstanding functions in the state repo
 	outstanding, err := store.Match(
 		ctx,
-		"**/@*/{deploy,call}/**/functions/*/status/pending",
+		"**/@*/{deploy,call}/*/*/status/pending",
+		"**/@*/{deploy,call}/*/*/status/paused",
 	)
 	if err != nil {
 		return fmt.Errorf("failed to match refs: %w", err)
 	}
 
 	for _, ref := range outstanding {
-		funcReady, err := librelease.FunctionIsReady(ctx, store, ref)
+		funcReady, err := librelease.JobIsReady(ctx, store, ref)
 		if err != nil {
 			return fmt.Errorf("failed to check function: %w", err)
 		}
@@ -361,8 +365,8 @@ func runTask(ctx context.Context, tc release.TrackerConfig, ref string) error {
 	return nil
 }
 
-func continueRelease(ctx context.Context, tc release.TrackerConfig, logMode bool) error {
-	workTui := tui.StartWorkTui(logMode)
+func continueRelease(ctx context.Context, tc release.TrackerConfig) error {
+	workTui := tui.StartWorkTui()
 	defer workTui.Cleanup()
 
 	tc.Store = tuiwork.WatchForChainUpdates(ctx, tc.Store, workTui)
@@ -485,13 +489,8 @@ func reconcileDeployment(ctx context.Context, store refstore.Store, ref string) 
 		return nil, fmt.Errorf("failed to get release: %w", err)
 	}
 
-	entryFunction := deployment.Entrypoint
-	var entryFunctionState librelease.FunctionState
-	if err := store.Get(ctx, entryFunction.String(), &entryFunctionState); err != nil {
-		return nil, fmt.Errorf("failed to get entry function at %s: %w", entryFunction.String(), err)
-	}
-
-	dependenciesSatisfied, err := librelease.CheckDependencies(ctx, store, entryFunctionState)
+	entryFunction := deployment.Functions[0]
+	dependenciesSatisfied, err := librelease.CheckDependencies(ctx, store, entryFunction)
 	if err != nil {
 		return nil, fmt.Errorf("failed to check dependencies: %w", err)
 	}
@@ -500,8 +499,7 @@ func reconcileDeployment(ctx context.Context, store refstore.Store, ref string) 
 		return nil, nil
 	}
 
-	entryFunctionInputs := entryFunctionState.Current.Inputs
-
+	entryFunctionInputs := entryFunction.Inputs
 	inputs, err := librelease.PopulateInputs(ctx, store, entryFunctionInputs)
 	if err != nil {
 		return nil, fmt.Errorf("failed to populate inputs: %w", err)
@@ -579,13 +577,8 @@ func reconcileAllDeploymentsAtCommit(ctx context.Context, store refstore.Store, 
 			continue
 		}
 
-		entryFunction := deployment.Entrypoint
-		var entryFunctionState librelease.FunctionState
-		if err := store.Get(ctx, entryFunction.String(), &entryFunctionState); err != nil {
-			log.Error("Failed to get entry function", "ref", ref, "error", err)
-			continue
-		}
-		entryFunctionInputs := entryFunctionState.Current.Inputs
+		entryFunction := deployment.Functions[0]
+		entryFunctionInputs := entryFunction.Inputs
 
 		inputs, err := librelease.PopulateInputs(ctx, store, entryFunctionInputs)
 		if err != nil {
@@ -616,21 +609,20 @@ func reconcileAllDeploymentsAtCommit(ctx context.Context, store refstore.Store, 
 			log.Error("Failed to parse resolved deployment", "ref", ref, "error", err)
 			continue
 		}
-		newFunctionChainRef := parsedResolvedDeployment.SetSubPath(path.Join(path.Dir(parsedResolvedDeployment.SubPath)))
+		newFunctionChainRef := parsedResolvedDeployment.SetSubPath(path.Dir(parsedResolvedDeployment.SubPath))
 		newFunctionChainRefString, err := refstore.IncrementPath(ctx, store, fmt.Sprintf("%s/", newFunctionChainRef.String()))
 		if err != nil {
 			log.Error("Failed to increment path", "ref", ref, "error", err)
 			continue
 		}
+		log.Info("Incremented path", "ref", ref, "newRef", newFunctionChainRefString)
 		newFunctionChainRef, err = refs.Parse(newFunctionChainRefString)
 		if err != nil {
 			log.Error("Failed to parse path", "ref", ref, "error", err)
 			continue
 		}
 		err = librelease.InitializeFunctionChain(ctx, store, newFunctionChainRef, &models.Function{
-			ID:     "1",
-			Fn:     entryFunctionState.Current.Fn,
-			Status: models.StatusPending,
+			Fn:     entryFunction.Fn,
 			Inputs: inputs,
 		})
 		if err != nil {
@@ -647,7 +639,6 @@ func reconcileAllDeploymentsAtCommit(ctx context.Context, store refstore.Store, 
 func init() {
 	RootCmd.AddCommand(WorkCmd)
 
-	WorkContinueCmd.Flags().BoolP("logmode", "l", false, "Enable log mode when initializing the TUI")
 	WorkCmd.AddCommand(WorkContinueCmd)
 
 	WorkTriggerCommand.Flags().BoolP("dryrun", "d", false, "List refs for work that would be triggered")
@@ -656,5 +647,4 @@ func init() {
 
 	WorkCmd.AddCommand(WorkTasksCmd)
 	WorkCmd.AddCommand(WorkAnyCommand)
-	WorkAnyCommand.Flags().BoolP("logmode", "l", false, "Enable log mode when initializing the TUI")
 }

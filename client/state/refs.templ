@@ -69,7 +69,7 @@ templ RefHeader(props RefPageProps) {
             if len(strings.Split(rp.SubPath, "/")) > 1 {
                 @HeaderLink(
                     props.Ref, 
-                    release.GlobChain, 
+                    release.GlobJob, 
                     fmt.Sprintf("#%s", strings.Split(rp.SubPath, "/")[1]), 
                     fmt.Sprintf("/ref/%s/-/%s/@%s/call/%s/%s", rp.Repo, rp.Filename, rp.ReleaseOrIntent.Value, strings.Split(rp.SubPath, "/")[0], strings.Split(rp.SubPath, "/")[1]),
                 )
@@ -85,7 +85,7 @@ templ RefHeader(props RefPageProps) {
             if len(strings.Split(rp.SubPath, "/")) > 1 {
                 @HeaderLink(
                     props.Ref, 
-                    release.GlobChain, 
+                    release.GlobJob, 
                     fmt.Sprintf("#%s", strings.Split(rp.SubPath, "/")[1]), 
                     fmt.Sprintf("/ref/%s/-/%s/@%s/deploy/%s/%s", rp.Repo, rp.Filename, rp.ReleaseOrIntent.Value, strings.Split(rp.SubPath, "/")[0], strings.Split(rp.SubPath, "/")[1]),
                 )

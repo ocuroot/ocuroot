@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 
 export OCU_REPO_COMMIT_OVERRIDE=${OCU_REPO_COMMIT_OVERRIDE:-commitid}
+export OCUROOT_HOME=$(pwd)/$(dirname "$0")/.ocuroot
 
 source $(dirname "$0")/../test_helpers.sh
 source $(dirname "$0")/test_helpers.sh
@@ -65,6 +66,8 @@ test_gitstate() {
 setup_test() {
     echo "State remote: $STATE_REMOTE"
     echo "Intent remote: $INTENT_REMOTE"
+
+    rm -rf .ocuroot
 
     # Set up environments
     echo "ocuroot release new environments.ocu.star"
