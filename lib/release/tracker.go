@@ -604,6 +604,12 @@ func (r *ReleaseTracker) Run(
 			return sdk.WorkResult{}, fmt.Errorf("failed to run function %s: %w", fn.Fn, err)
 		}
 
+		// If we completed but no result was provided, assume success.
+		// This handles when someone forgot an empty done().
+		if result.Err == nil && result.Done == nil && result.Next == nil {
+			result.Done = &sdk.WorkDone{}
+		}
+
 		// Record the result of this function to the state store
 		if err := r.saveWorkState(ctx, workRef, work, result, logs); err != nil {
 			return result, fmt.Errorf("failed to save work state: %w", err)
@@ -666,7 +672,10 @@ func ResultToStatus(result sdk.WorkResult) models.Status {
 	if result.Err != nil {
 		return models.StatusFailed
 	}
-	return models.StatusComplete
+	if result.Done != nil {
+		return models.StatusComplete
+	}
+	return models.StatusRunning
 }
 
 func (r *ReleaseTracker) updateLogs(ctx context.Context, chainRef refs.Ref, logs []sdk.Log) error {

@@ -27,6 +27,19 @@ test_basic() {
     echo ""
 }
 
+test_basic() {
+    echo "Test: missing done"
+    echo ""
+    setup_test
+
+    echo "== release v1 =="
+    ocuroot release new missing_done.star
+    assert_equal "0" "$?" "Failed to release v1"
+
+    echo "Test succeeded"
+    echo ""
+}
+
 test_two_releases() {
     echo "Test: two releases"
     echo ""
