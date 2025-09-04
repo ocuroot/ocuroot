@@ -14,6 +14,8 @@ def setup_deploy(environment):
     )
 
 def up(ctx):
+    print("up")
+    print(ctx)
     return done(
         outputs={
             "host": "{}.frontend.example.com".format(ctx.inputs.environment["name"]),

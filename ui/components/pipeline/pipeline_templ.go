@@ -469,15 +469,16 @@ func WorkHeader(work *WorkSummary, logURL LogURLFunction) templ.Component {
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
+			jobRefs := work.JobRefs[len(work.JobRefs)-3:]
 			for index, jobStatus := range work.JobStatuses[len(work.JobStatuses)-3:] {
 				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 23, "<a style=\"margin-right: 4px;\" href=\"")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
 				var templ_7745c5c3_Var11 templ.SafeURL
-				templ_7745c5c3_Var11, templ_7745c5c3_Err = templ.JoinURLErrs(fmt.Sprintf("/ref/%s", fmt.Sprint(index)))
+				templ_7745c5c3_Var11, templ_7745c5c3_Err = templ.JoinURLErrs(fmt.Sprintf("/ref/%s", jobRefs[index]))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `ui/components/pipeline/pipeline.templ`, Line: 249, Col: 86}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `ui/components/pipeline/pipeline.templ`, Line: 250, Col: 83}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var11))
 				if templ_7745c5c3_Err != nil {
@@ -503,9 +504,9 @@ func WorkHeader(work *WorkSummary, logURL LogURLFunction) templ.Component {
 					return templ_7745c5c3_Err
 				}
 				var templ_7745c5c3_Var12 templ.SafeURL
-				templ_7745c5c3_Var12, templ_7745c5c3_Err = templ.JoinURLErrs(fmt.Sprintf("/ref/%s", fmt.Sprint(index)))
+				templ_7745c5c3_Var12, templ_7745c5c3_Err = templ.JoinURLErrs(fmt.Sprintf("/ref/%s", work.JobRefs[index]))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `ui/components/pipeline/pipeline.templ`, Line: 255, Col: 59}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `ui/components/pipeline/pipeline.templ`, Line: 256, Col: 61}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var12))
 				if templ_7745c5c3_Err != nil {
@@ -562,7 +563,7 @@ func RenderPhaseSummary(phase *PhaseSummary, logURL LogURLFunction) templ.Compon
 		var templ_7745c5c3_Var14 string
 		templ_7745c5c3_Var14, templ_7745c5c3_Err = templ.JoinStringErrs(phase.Name)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `ui/components/pipeline/pipeline.templ`, Line: 277, Col: 67}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `ui/components/pipeline/pipeline.templ`, Line: 278, Col: 67}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var14))
 		if templ_7745c5c3_Err != nil {
@@ -575,7 +576,7 @@ func RenderPhaseSummary(phase *PhaseSummary, logURL LogURLFunction) templ.Compon
 		var templ_7745c5c3_Var15 string
 		templ_7745c5c3_Var15, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("%d/%d", phase.StatusCounts()[models.StatusComplete], phase.StatusCounts().Total()))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `ui/components/pipeline/pipeline.templ`, Line: 279, Col: 142}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `ui/components/pipeline/pipeline.templ`, Line: 280, Col: 142}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var15))
 		if templ_7745c5c3_Err != nil {

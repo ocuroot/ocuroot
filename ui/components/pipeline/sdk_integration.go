@@ -86,6 +86,7 @@ func SDKPackageToReleaseSummary(
 					log.Error("Multiple status refs", "run", run, "refs", statusRefs)
 				}
 				status := models.Status(path.Base(statusRefs[0]))
+				ws.JobRefs = append(ws.JobRefs, run)
 				ws.JobStatuses = append(ws.JobStatuses, status)
 			}
 

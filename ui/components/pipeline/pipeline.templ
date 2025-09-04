@@ -245,14 +245,15 @@ templ WorkHeader(work *WorkSummary, logURL LogURLFunction) {
 					<div class="flex items-center gap-2">
 						if len(work.Jobs) > 3 {
 							<div style="margin-right: 4px;">...</div>
+							{{ jobRefs := work.JobRefs[len(work.JobRefs)-3:] }}
 							for index, jobStatus := range work.JobStatuses[len(work.JobStatuses)-3:] {
-								<a style="margin-right: 4px;" href={ fmt.Sprintf("/ref/%s", fmt.Sprint(index)) }>
+								<a style="margin-right: 4px;" href={ fmt.Sprintf("/ref/%s", jobRefs[index]) }>
 									@MapStatusToProgress(jobStatus)
 								</a>
 							}
 						} else {
 							for index, jobStatus := range work.JobStatuses {
-								<a href={ fmt.Sprintf("/ref/%s", fmt.Sprint(index)) }>
+								<a href={ fmt.Sprintf("/ref/%s", work.JobRefs[index]) }>
 									@MapStatusToProgress(jobStatus)
 								</a>
 							}

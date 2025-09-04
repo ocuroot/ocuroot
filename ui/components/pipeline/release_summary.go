@@ -100,5 +100,6 @@ type WorkSummary struct {
 	Name        string
 	Environment *EnvironmentSummary `json:"environment"`
 	Jobs        []models.Work
+	JobRefs     []string
 	JobStatuses []models.Status
 }

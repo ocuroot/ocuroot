@@ -86,7 +86,7 @@ templ RefHeader(props RefPageProps) {
                 @HeaderLink(
                     props.Ref, 
                     release.GlobJob, 
-                    fmt.Sprintf("#%s", strings.Split(rp.SubPath, "/")[1]), 
+                    fmt.Sprintf("Job %s", strings.Split(rp.SubPath, "/")[1]), 
                     fmt.Sprintf("/ref/%s/-/%s/@%s/deploy/%s/%s", rp.Repo, rp.Filename, rp.ReleaseOrIntent.Value, strings.Split(rp.SubPath, "/")[0], strings.Split(rp.SubPath, "/")[1]),
                 )
             }
@@ -142,8 +142,6 @@ templ StateContent(props RefPageProps) {
             }
         case []sdk.Log:
             @Logs(c)
-        case release.FunctionState:
-            @FunctionState(props)
         case models.Environment:
             @Environment(props)
         default:

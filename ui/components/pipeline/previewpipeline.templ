@@ -93,8 +93,8 @@ templ previewModalsForChain(work *WorkSummary) {
 					<p>No inputs</p>
 				}
 			}
-			// Last function's outputs
-			if work.JobStatuses[index] == models.StatusComplete {
+			// Outputs if complete
+			if len(work.JobStatuses) > index && work.JobStatuses[index] == models.StatusComplete {
 				@components.Modal(fmt.Sprintf("chain-outputs-%s", work.Name), "Chain Outputs") {
 					if len(c.Outputs) > 0 {
 						@keyvalue.FromVarMap(c.Outputs)
