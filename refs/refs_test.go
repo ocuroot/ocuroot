@@ -19,7 +19,7 @@ func TestValidNormalizedRefs(t *testing.T) {
 		"github.com/org/repo/-/path/to/package",
 		"./-/path/to/package",
 		"./-/path/to/package/@/deploy/prod#output/host",
-		"./@/call/build#output/output1",
+		"./@/task/build#output/output1",
 
 		"github.com/ocu-project/ocu/-/package.ocu.star/+/deploy/staging", // Intent
 		"github.com/ocu-project/ocu/-/package.ocu.star/@ABC123/deploy/staging/ABC123/logs",
@@ -54,19 +54,19 @@ func TestRelativeTo(t *testing.T) {
 		expected   string
 	}{
 		{
-			ref:        "./call/build#output/output1",
+			ref:        "./task/build#output/output1",
 			relativeTo: "github.com/org/repo/-/path/to/package/@abc123",
-			expected:   "github.com/org/repo/-/path/to/package/@abc123/call/build#output/output1",
+			expected:   "github.com/org/repo/-/path/to/package/@abc123/task/build#output/output1",
 		},
 		{
-			ref:        "./@/call/build#output/output1",
+			ref:        "./@/task/build#output/output1",
 			relativeTo: "github.com/org/repo/-/path/to/package/@abc123",
-			expected:   "github.com/org/repo/-/path/to/package/@/call/build#output/output1",
+			expected:   "github.com/org/repo/-/path/to/package/@/task/build#output/output1",
 		},
 		{
-			ref:        "./-/path/to/package/@/call/build#output/output1",
+			ref:        "./-/path/to/package/@/task/build#output/output1",
 			relativeTo: "github.com/org/repo/-/path/to/package/@abc123",
-			expected:   "github.com/org/repo/-/path/to/package/@/call/build#output/output1",
+			expected:   "github.com/org/repo/-/path/to/package/@/task/build#output/output1",
 		},
 		{
 			ref:        "github.com/org/repo2/-/path/to/package2/@/deploy/prod#output/host",
@@ -183,11 +183,11 @@ func TestRefStructure(t *testing.T) {
 			},
 		},
 		{
-			ref: "./-/path/to/package/@/call/build#output/output1",
+			ref: "./-/path/to/package/@/task/build#output/output1",
 			expected: Ref{
 				Repo:            ".",
 				Filename:        "path/to/package",
-				SubPathType:     "call",
+				SubPathType:     "task",
 				SubPath:         "build",
 				Fragment:        "output/output1",
 				ReleaseOrIntent: CurrentRelease,
@@ -281,11 +281,11 @@ func TestRefStructure(t *testing.T) {
 			},
 		},
 		{
-			ref: "./@/call/build#output/output1",
+			ref: "./@/task/build#output/output1",
 			expected: Ref{
 				Repo:            "",
 				Filename:        ".",
-				SubPathType:     "call",
+				SubPathType:     "task",
 				SubPath:         "build",
 				Fragment:        "output/output1",
 				ReleaseOrIntent: CurrentRelease,
@@ -330,11 +330,11 @@ func TestRefStructure(t *testing.T) {
 			},
 		},
 		{
-			ref: "./call/build#output/output1",
+			ref: "./task/build#output/output1",
 			expected: Ref{
 				Repo:        "",
 				Filename:    ".",
-				SubPathType: "call",
+				SubPathType: "task",
 				SubPath:     "build",
 				Fragment:    "output/output1",
 				ReleaseOrIntent: ReleaseOrIntent{
@@ -449,9 +449,9 @@ func TestInvalidRefs(t *testing.T) {
 func TestRefNormalization(t *testing.T) {
 	// Normalization should remove trailing slashes
 	var refsToNormalized = map[string]string{
-		"./call/build/": "./call/build",
-		"github.com/example/example/-/path/to/package/@/call/build#output/output1/": "github.com/example/example/-/path/to/package/@/call/build#output/output1",
-		"github.com/example/example/-/path/to/package/@/call/build/":                "github.com/example/example/-/path/to/package/@/call/build",
+		"./task/build/": "./task/build",
+		"github.com/example/example/-/path/to/package/@/task/build#output/output1/": "github.com/example/example/-/path/to/package/@/task/build#output/output1",
+		"github.com/example/example/-/path/to/package/@/task/build/":                "github.com/example/example/-/path/to/package/@/task/build",
 	}
 	for ref, expected := range refsToNormalized {
 		t.Run(ref, func(t *testing.T) {

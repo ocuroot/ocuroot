@@ -16,7 +16,7 @@ phase(
             down=down,
             environment=environment,
             inputs={
-                "input1": ref("./call/build#output/output1"),
+                "input1": ref("./task/build#output/output1"),
                 "previous_count": input(
                     ref="./@/deploy/{}#output/count".format(environment.name),
                     default=0,
@@ -34,7 +34,7 @@ phase(
             down=down,
             environment=environment,
             inputs={
-                "input1": ref("./call/build#output/output1"),
+                "input1": ref("./task/build#output/output1"),
                 "staging_name": ref("./@/deploy/staging#output/env_name"),
                 "previous_count": input(
                     ref=ref("./@/deploy/{}#output/count".format(environment.name)),

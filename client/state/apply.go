@@ -80,7 +80,7 @@ func applyEnvironmentIntent(ctx context.Context, ref refs.Ref, store refstore.St
 		return fmt.Errorf("failed to set state: %w", err)
 	}
 
-	// Add a task to all deployed releases
+	// Add an operation to all deployed releases
 	deployments, err := store.Match(ctx, "**/@/deploy/*")
 	if err != nil {
 		return fmt.Errorf("failed to match deployments: %w", err)
@@ -94,10 +94,10 @@ func applyEnvironmentIntent(ctx context.Context, ref refs.Ref, store refstore.St
 		if err != nil {
 			return fmt.Errorf("failed to parse deployment: %w", err)
 		}
-		parsedDeployment = parsedDeployment.SetSubPathType(refs.SubPathTypeTask).SetSubPath("check_envs")
+		parsedDeployment = parsedDeployment.SetSubPathType(refs.SubPathTypeOp).SetSubPath("check_envs")
 
 		if err := store.Set(ctx, parsedDeployment.String(), models.NewMarker()); err != nil {
-			return fmt.Errorf("failed to set task: %w", err)
+			return fmt.Errorf("failed to set operation: %w", err)
 		}
 	}
 

@@ -55,7 +55,7 @@ var WorkAnyCommand = &cobra.Command{
 	Long: `Pick up any outstanding work based on the contents of the state store.
 
 Will start by running any release work (equivalent to 'ocuroot work continue'), then
-any tasks ('ocuroot work tasks'), then sync any intent ('ocuroot state diff | xargs -r -n1 ocuroot state apply'),
+any ops ('ocuroot work ops'), then sync any intent ('ocuroot state diff | xargs -r -n1 ocuroot state apply'),
 finally it will trigger work for other commits ('ocuroot work trigger').
 	`,
 	Args: cobra.RangeArgs(0, 1),
@@ -74,8 +74,8 @@ finally it will trigger work for other commits ('ocuroot work trigger').
 			return err
 		}
 
-		log.Info("Starting task work")
-		if err := doTasks(ctx, tc); err != nil {
+		log.Info("Starting op work")
+		if err := doOps(ctx, tc); err != nil {
 			return err
 		}
 
@@ -101,12 +101,12 @@ func doReleaseWorkForCommit(ctx context.Context, tc release.TrackerConfig) error
 
 	// Match any outstanding work for this repo/commit
 	mrPending := fmt.Sprintf(
-		"%v/-/**/@%v*/{deploy,call}/*/*/status/pending",
+		"%v/-/**/@%v*/{deploy,task}/*/*/status/pending",
 		tc.Ref.Repo,
 		tc.Commit,
 	)
 	mrPaused := fmt.Sprintf(
-		"%v/-/**/@%v*/{deploy,call}/*/*/status/paused",
+		"%v/-/**/@%v*/{deploy,task}/*/*/status/paused",
 		tc.Ref.Repo,
 		tc.Commit,
 	)
@@ -127,8 +127,8 @@ func doReleaseWorkForCommit(ctx context.Context, tc release.TrackerConfig) error
 		log.Info("Found release for commit", "ref", ref)
 		outstandingWork, err := tc.Store.Match(
 			ctx,
-			fmt.Sprintf("%v/{deploy,call}/*/*/status/pending", ref.String()),
-			fmt.Sprintf("%v/{deploy,call}/*/*/status/paused", ref.String()))
+			fmt.Sprintf("%v/{deploy,task}/*/*/status/pending", ref.String()),
+			fmt.Sprintf("%v/{deploy,task}/*/*/status/paused", ref.String()))
 		if err != nil {
 			return fmt.Errorf("failed to match refs: %w", err)
 		}
@@ -215,8 +215,8 @@ func doTriggerWork(ctx context.Context, store refstore.Store, dryRun bool) error
 	// Match any outstanding functions in the state repo
 	outstanding, err := store.Match(
 		ctx,
-		"**/@*/{deploy,call}/*/*/status/pending",
-		"**/@*/{deploy,call}/*/*/status/paused",
+		"**/@*/{deploy,task}/*/*/status/pending",
+		"**/@*/{deploy,task}/*/*/status/paused",
 	)
 	if err != nil {
 		return fmt.Errorf("failed to match refs: %w", err)
@@ -259,17 +259,17 @@ func doTriggerWork(ctx context.Context, store refstore.Store, dryRun bool) error
 		repos[repoCommit] = struct{}{}
 	}
 
-	// Identify any tasks
+	// Identify any ops
 	outstanding, err = store.Match(
 		ctx,
-		"**/@*/task/*",
+		"**/@*/op/*",
 	)
 	if err != nil {
 		return fmt.Errorf("failed to match refs: %w", err)
 	}
 
 	for _, ref := range outstanding {
-		log.Info("Found outstanding task", "ref", ref)
+		log.Info("Found outstanding op", "ref", ref)
 		if dryRun {
 			fmt.Println("Outstanding ref: " + ref)
 		}
@@ -290,10 +290,10 @@ func doTriggerWork(ctx context.Context, store refstore.Store, dryRun bool) error
 	return nil
 }
 
-var WorkTasksCmd = &cobra.Command{
-	Use:   "tasks",
-	Short: "Run scheduled tasks",
-	Long:  `Run scheduled tasks against this commit.`,
+var WorkOpsCmd = &cobra.Command{
+	Use:   "ops",
+	Short: "Run scheduled ops",
+	Long:  `Run scheduled operations against this commit.`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx := cmd.Context()
 
@@ -302,7 +302,7 @@ var WorkTasksCmd = &cobra.Command{
 			return fmt.Errorf("failed to get tracker config: %w", err)
 		}
 
-		if err := doTasks(ctx, tc); err != nil {
+		if err := doOps(ctx, tc); err != nil {
 			return err
 		}
 
@@ -310,33 +310,33 @@ var WorkTasksCmd = &cobra.Command{
 	},
 }
 
-func doTasks(ctx context.Context, tc release.TrackerConfig) error {
+func doOps(ctx context.Context, tc release.TrackerConfig) error {
 	releasesForCommit, err := releasesForCommit(ctx, tc.Store, tc.Ref.Repo, tc.Commit)
 	if err != nil {
 		return fmt.Errorf("failed to get releases for commit: %w", err)
 	}
 
-	var tasks []string
+	var ops []string
 	for _, ref := range releasesForCommit {
-		mr := fmt.Sprintf("%v/task/*", ref.String())
-		log.Info("Checking for tasks", "glob", mr)
-		matchedTasks, err := tc.Store.Match(ctx, mr)
+		mr := fmt.Sprintf("%v/op/*", ref.String())
+		log.Info("Checking for ops", "glob", mr)
+		matchedOps, err := tc.Store.Match(ctx, mr)
 		if err != nil {
 			return fmt.Errorf("failed to match refs: %w", err)
 		}
-		tasks = append(tasks, matchedTasks...)
+		ops = append(ops, matchedOps...)
 	}
 
-	for _, ref := range tasks {
-		log.Info("Found outstanding task", "ref", ref)
-		if err := runTask(ctx, tc, ref); err != nil {
-			return fmt.Errorf("failed to run task: %w", err)
+	for _, ref := range ops {
+		log.Info("Found outstanding op", "ref", ref)
+		if err := runOp(ctx, tc, ref); err != nil {
+			return fmt.Errorf("failed to run op: %w", err)
 		}
 	}
 	return nil
 }
 
-func runTask(ctx context.Context, tc release.TrackerConfig, ref string) error {
+func runOp(ctx context.Context, tc release.TrackerConfig, ref string) error {
 	var err error
 
 	tc.Ref, err = refs.Parse(ref)
@@ -650,6 +650,6 @@ func init() {
 	WorkTriggerCommand.Flags().BoolP("intent", "i", false, "Trigger intents instead of deployments")
 	WorkCmd.AddCommand(WorkTriggerCommand)
 
-	WorkCmd.AddCommand(WorkTasksCmd)
+	WorkCmd.AddCommand(WorkOpsCmd)
 	WorkCmd.AddCommand(WorkAnyCommand)
 }

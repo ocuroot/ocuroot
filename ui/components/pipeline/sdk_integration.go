@@ -55,7 +55,7 @@ func SDKPackageToReleaseSummary(
 				inputs = work.Call.Inputs
 
 				// Identify any runs of this call
-				workRuns = globFilter(childRefs, fmt.Sprintf("**/-/**/@*/call/%s/*", chainName))
+				workRuns = globFilter(childRefs, fmt.Sprintf("**/-/**/@*/task/%s/*", chainName))
 			}
 
 			ws.Name = chainName

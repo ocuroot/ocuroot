@@ -13,7 +13,7 @@ func TestReduce(t *testing.T) {
 		result string
 	}{
 		{
-			ref:    "github.com/example/myrepo/-/path/to/release.ocu.star/@commitid/call/build",
+			ref:    "github.com/example/myrepo/-/path/to/release.ocu.star/@commitid/task/build",
 			glob:   "**/{@,+}*",
 			result: "github.com/example/myrepo/-/path/to/release.ocu.star/@commitid",
 		},
@@ -23,14 +23,14 @@ func TestReduce(t *testing.T) {
 			result: "github.com/example/myrepo/-/path/to/release.ocu.star/@commitid",
 		},
 		{
-			ref:    "github.com/example/myrepo/-/path/to/release.ocu.star/@commitid/call/build",
+			ref:    "github.com/example/myrepo/-/path/to/release.ocu.star/@commitid/task/build",
 			glob:   "**/{@,+}",
 			result: "github.com/example/myrepo/-/path/to/release.ocu.star/@",
 		},
 		{
-			ref:    "github.com/example/myrepo/-/path/to/release.ocu.star/@commitid/call/build",
-			glob:   "**/{@,+}/call/*",
-			result: "github.com/example/myrepo/-/path/to/release.ocu.star/@/call/build",
+			ref:    "github.com/example/myrepo/-/path/to/release.ocu.star/@commitid/task/build",
+			glob:   "**/{@,+}/task/*",
+			result: "github.com/example/myrepo/-/path/to/release.ocu.star/@/task/build",
 		},
 	}
 
@@ -57,13 +57,13 @@ func TestReduceNoMatch(t *testing.T) {
 		error string
 	}{
 		{
-			ref:   "github.com/example/myrepo/-/path/to/release.ocu.star/@commitid/call/build",
+			ref:   "github.com/example/myrepo/-/path/to/release.ocu.star/@commitid/task/build",
 			glob:  "**/{@,+}/deploy/*",
 			error: "no match",
 		},
 		{
 			ref:   "github.com/example/myrepo/-/path/to/release.ocu.star/@commitid",
-			glob:  "**/{@,+}/call/*",
+			glob:  "**/{@,+}/task/*",
 			error: "no match",
 		},
 	}

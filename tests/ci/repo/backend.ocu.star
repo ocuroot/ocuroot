@@ -41,7 +41,7 @@ phase(
             down=down,
             environment=environment,
             inputs={
-                "message": input(ref="./call/build/#output/message"),
+                "message": input(ref="./task/build/#output/message"),
             },
         ) for environment in staging
     ],
@@ -55,7 +55,7 @@ phase(
             down=down,
             environment=environment,
             inputs={
-                "message": input(ref="./call/build/#output/message"),
+                "message": input(ref="./task/build/#output/message"),
             },
         ) for environment in prod
     ],

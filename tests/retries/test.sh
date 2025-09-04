@@ -17,7 +17,7 @@ retry_explicit_ref() {
 
     check_ref_exists "release.ocu.star/@/deploy/production"
     # Ensure that the release was completed after the retry
-    check_ref_exists "release.ocu.star/@r1/call/postrelease/1/status/complete"
+    check_ref_exists "release.ocu.star/@r1/task/postrelease/1/status/complete"
 
     echo "Test passed"
 }

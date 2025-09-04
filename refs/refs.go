@@ -98,21 +98,22 @@ type SubPathType string
 const (
 	SubPathTypeNone        SubPathType = ""
 	SubPathTypeDeploy      SubPathType = "deploy"
-	SubPathTypeCall        SubPathType = "call"
+	SubPathTypeTask        SubPathType = "task"
 	SubPathTypeCustom      SubPathType = "custom"
 	SubPathTypeEnvironment SubPathType = "environment"
-	SubPathTypeTask        SubPathType = "task"
 	SubPathTypeCommit      SubPathType = "commit"
+
+	SubPathTypeOp SubPathType = "op"
 )
 
 func (s SubPathType) Valid() error {
 	switch s {
 	case SubPathTypeDeploy,
-		SubPathTypeCall,
+		SubPathTypeTask,
 		SubPathTypeCustom,
 		SubPathTypeEnvironment,
-		SubPathTypeTask,
-		SubPathTypeCommit:
+		SubPathTypeCommit,
+		SubPathTypeOp:
 		return nil
 	default:
 		return fmt.Errorf("invalid subpath type: %s", s)
@@ -236,10 +237,3 @@ func (r Ref) String() string {
 	}
 	return out
 }
-
-type WorkType string
-
-const (
-	WorkTypeCall   WorkType = "call"
-	WorkTypeDeploy WorkType = "deploy"
-)

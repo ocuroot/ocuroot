@@ -14,22 +14,21 @@ var (
 	GlobPackage                 = libglob.MustCompile(`**/[^@+]+/**`, '/')
 	GlobRepoConfig              = libglob.MustCompile("**/-/repo.ocu.star/@*", '/')
 	GlobRelease                 = libglob.MustCompile("**/{@,+}*", '/')
-	GlobWork                    = libglob.MustCompile("**/@*/{call,deploy}/*", '/')
-	GlobTask                    = libglob.MustCompile("**/@*/task/*", '/')
+	GlobTask                    = libglob.MustCompile("**/@*/{task,deploy}/*", '/')
+	GlobOp                      = libglob.MustCompile("**/@*/op/*", '/')
 	GlobDeploymentState         = libglob.MustCompile("**/@*/deploy/*", '/')
 	GlobDeploymentIntent        = libglob.MustCompile("**/+*/deploy/*", '/')
 	GlobDeploymentStateOrIntent = libglob.MustCompile("**/{@,+}*/deploy/*", '/')
-	GlobCall                    = libglob.MustCompile("**/{@,+}*/call/*", '/')
-	GlobRun                     = libglob.MustCompile("**/{@,+}*/{call,deploy}/*/*", '/')
-	GlobLog                     = libglob.MustCompile("**/{@,+}*/{call,deploy}/*/*/logs", '/')
+	GlobRun                     = libglob.MustCompile("**/{@,+}*/{task,deploy}/*/*", '/')
+	GlobLog                     = libglob.MustCompile("**/{@,+}*/{task,deploy}/*/*/logs", '/')
 	GlobCustomState             = libglob.MustCompile("**/@*/custom/*", '/')
 	GlobCustomIntent            = libglob.MustCompile("**/+*/custom/*", '/')
 	GlobCustomStateOrIntent     = libglob.MustCompile("**/{@,+}*/custom/*", '/')
 	GlobEnvironment             = libglob.MustCompile("{@,+}*/environment/*", '/')
 )
 
-func WorkRefFromChainRef(ref refs.Ref) (refs.Ref, error) {
-	wr, err := refs.Reduce(ref.String(), GlobWork)
+func ReduceToTaskRef(ref refs.Ref) (refs.Ref, error) {
+	wr, err := refs.Reduce(ref.String(), GlobTask)
 	if err != nil {
 		return ref, err
 	}
@@ -61,7 +60,7 @@ func LoadRef(ctx context.Context, store refstore.Store, ref refs.Ref) (any, erro
 		return LoadRefOfType[models.RepoConfig](ctx, store, ref)
 	case GlobRelease.Match(ref.String()):
 		return LoadRefOfType[ReleaseInfo](ctx, store, ref)
-	case GlobWork.Match(ref.String()):
+	case GlobTask.Match(ref.String()):
 		return LoadRefOfType[models.Run](ctx, store, ref)
 	case GlobRun.Match(ref.String()):
 		return LoadRefOfType[models.Run](ctx, store, ref)

@@ -184,12 +184,12 @@ func RefHeader(props RefPageProps) templ.Component {
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			if rp.SubPathType == refs.SubPathTypeCall {
+			if rp.SubPathType == refs.SubPathTypeTask {
 				templ_7745c5c3_Err = HeaderLink(
 					props.Ref,
-					release.GlobCall,
-					fmt.Sprintf("Call '%s'", strings.Split(rp.SubPath, "/")[0]),
-					fmt.Sprintf("/ref/%s/-/%s/@%s/call/%s", rp.Repo, rp.Filename, rp.ReleaseOrIntent.Value, strings.Split(rp.SubPath, "/")[0]),
+					release.GlobTask,
+					fmt.Sprintf("Task '%s'", strings.Split(rp.SubPath, "/")[0]),
+					fmt.Sprintf("/ref/%s/-/%s/@%s/task/%s", rp.Repo, rp.Filename, rp.ReleaseOrIntent.Value, strings.Split(rp.SubPath, "/")[0]),
 				).Render(ctx, templ_7745c5c3_Buffer)
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
@@ -203,7 +203,7 @@ func RefHeader(props RefPageProps) templ.Component {
 						props.Ref,
 						release.GlobRun,
 						fmt.Sprintf("Run %s", strings.Split(rp.SubPath, "/")[1]),
-						fmt.Sprintf("/ref/%s/-/%s/@%s/call/%s/%s", rp.Repo, rp.Filename, rp.ReleaseOrIntent.Value, strings.Split(rp.SubPath, "/")[0], strings.Split(rp.SubPath, "/")[1]),
+						fmt.Sprintf("/ref/%s/-/%s/@%s/task/%s/%s", rp.Repo, rp.Filename, rp.ReleaseOrIntent.Value, strings.Split(rp.SubPath, "/")[0], strings.Split(rp.SubPath, "/")[1]),
 					).Render(ctx, templ_7745c5c3_Buffer)
 					if templ_7745c5c3_Err != nil {
 						return templ_7745c5c3_Err

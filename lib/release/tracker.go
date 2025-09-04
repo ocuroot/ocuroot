@@ -122,7 +122,7 @@ func (r *ReleaseTracker) InitRelease(ctx context.Context, commit string) error {
 	}
 	for jobRef, fn := range jobs {
 		var t models.JobType
-		if jobRef.SubPathType == refs.SubPathTypeCall {
+		if jobRef.SubPathType == refs.SubPathTypeTask {
 			t = models.JobTypeTask
 		} else {
 			t = models.JobTypeUp
@@ -726,7 +726,7 @@ func (r *ReleaseTracker) saveWorkState(ctx context.Context, runRef refs.Ref, run
 	if err := r.stateStore.Store.Set(ctx, runRef.String(), run); err != nil {
 		return fmt.Errorf("failed to set work: %w", err)
 	}
-	taskRef, err := refs.Reduce(runRef.String(), GlobWork)
+	taskRef, err := refs.Reduce(runRef.String(), GlobTask)
 	if err != nil {
 		return fmt.Errorf("failed to reduce work ref: %w", err)
 	}

@@ -39,7 +39,7 @@ func (s *server) handleMatch(w http.ResponseWriter, r *http.Request) {
 		content = s.buildDeploymentTable(r.Context(), matches)
 	case release.GlobRelease.Match(query):
 		content = s.buildReleaseTable(matches)
-	case release.GlobWork.Match(query) || query == GlobWork:
+	case release.GlobTask.Match(query) || query == GlobTask:
 		content = s.buildWorkTable(r.Context(), matches)
 	default:
 		content = Match(query, matches)
@@ -143,8 +143,8 @@ func (s *server) buildWorkTable(ctx context.Context, matches []string) templ.Com
 		var work string
 		subpathSegments := strings.Split(resolvedParsed.SubPath, "/")
 		switch resolvedParsed.SubPathType {
-		case refs.SubPathTypeCall:
-			work = fmt.Sprintf("Call '%s'", subpathSegments[0])
+		case refs.SubPathTypeTask:
+			work = fmt.Sprintf("Task '%s'", subpathSegments[0])
 		case refs.SubPathTypeDeploy:
 			work = fmt.Sprintf("Deploy to '%s'", subpathSegments[0])
 		default:

@@ -17,7 +17,7 @@ import (
 )
 
 func initEvent(ref refs.Ref, t tui.Tui, store refstore.Store) *TaskEvent {
-	wr, err := librelease.WorkRefFromChainRef(ref)
+	wr, err := librelease.ReduceToTaskRef(ref)
 	if err != nil {
 		log.Error("failed to get work ref", "error", err)
 		return nil
@@ -87,7 +87,7 @@ func updateStatus(ctx context.Context, store refstore.Store, ref refs.Ref, ev *T
 
 func TuiLogger(tuiWork tui.Tui) func(fnRef refs.Ref, msg sdk.Log) {
 	return func(fnRef refs.Ref, msg sdk.Log) {
-		wr, err := librelease.WorkRefFromChainRef(fnRef)
+		wr, err := librelease.ReduceToTaskRef(fnRef)
 		if err != nil {
 			log.Error("failed to get work ref", "error", err)
 			return
@@ -115,7 +115,7 @@ func WatchForChainUpdates(ctx context.Context, store refstore.Store, tuiWork tui
 			updater(r)
 		},
 		store,
-		"**/{call,deploy}/*/*/status/*",
+		"**/{task,deploy}/*/*/status/*",
 	)
 	if err != nil {
 		log.Error("failed to listen to state changes", "error", err)

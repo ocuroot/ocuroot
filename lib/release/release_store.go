@@ -217,7 +217,7 @@ func CheckDependencies(ctx context.Context, store refstore.Store, fn *models.Fun
 }
 
 func (w *releaseStore) FailedJobs(ctx context.Context) (map[refs.Ref]*models.Run, error) {
-	matchRef := w.ReleaseRef.String() + "/{call,deploy}/*/*/status/failed"
+	matchRef := w.ReleaseRef.String() + "/{task,deploy}/*/*/status/failed"
 	failedJobs, err := w.Store.Match(ctx, matchRef)
 	if err != nil {
 		return nil, err
@@ -243,8 +243,8 @@ func (w *releaseStore) FailedJobs(ctx context.Context) (map[refs.Ref]*models.Run
 }
 
 func (w *releaseStore) PendingJobs(ctx context.Context) (map[refs.Ref]*models.Run, error) {
-	matchRefPending := w.ReleaseRef.String() + "/{call,deploy}/*/*/status/pending"
-	matchRefPaused := w.ReleaseRef.String() + "/{call,deploy}/*/*/status/paused"
+	matchRefPending := w.ReleaseRef.String() + "/{task,deploy}/*/*/status/pending"
+	matchRefPaused := w.ReleaseRef.String() + "/{task,deploy}/*/*/status/paused"
 
 	log.Info("PendingJobs globs", "pending", matchRefPending, "paused", matchRefPaused)
 
@@ -399,7 +399,7 @@ func InitializeRun(
 			fn,
 		},
 	}
-	if runRef.SubPathType == refs.SubPathTypeCall {
+	if runRef.SubPathType == refs.SubPathTypeTask {
 		workState.Type = models.JobTypeTask
 	}
 	if runRef.SubPathType == refs.SubPathTypeDeploy {
@@ -473,7 +473,7 @@ func (r *releaseStore) sdkWorkToFunctionChain(ctx context.Context, work sdk.Work
 
 	if work.Call != nil {
 		workRef = workRef.
-			SetSubPathType(refs.SubPathTypeCall).
+			SetSubPathType(refs.SubPathTypeTask).
 			SetSubPath(work.Call.Name)
 		mWork.Type = models.JobTypeTask
 		fs.Fn = work.Call.Fn

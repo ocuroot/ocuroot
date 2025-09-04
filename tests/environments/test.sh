@@ -26,13 +26,13 @@ create_environment() {
     ocuroot state apply "+/environment/production3"
     assert_equal "0" "$?" "Failed to apply environment"
 
-    check_ref_exists "package1.ocu.star/@r1/task/check_envs"
+    check_ref_exists "package1.ocu.star/@r1/op/check_envs"
 
-    ocuroot work tasks
-    assert_equal "0" "$?" "Failed to run tasks"
+    ocuroot work ops
+    assert_equal "0" "$?" "Failed to run ops"
 
     # The task must have been removed once fulfilled
-    check_ref_does_not_exist "package1.ocu.star/@r1/task/check_envs"
+    check_ref_does_not_exist "package1.ocu.star/@r1/op/check_envs"
 
     ocuroot work continue
     assert_equal "0" "$?" "Failed to continue work"
@@ -92,7 +92,7 @@ create_environment_omnibus() {
 
     # The task must have been removed once fulfilled
     check_ref_exists "package1.ocu.star/@/deploy/production3"
-    check_ref_does_not_exist "package1.ocu.star/@1/task/check_envs"
+    check_ref_does_not_exist "package1.ocu.star/@1/op/check_envs"
 
     echo "Test passed"
 }
