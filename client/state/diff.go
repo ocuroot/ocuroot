@@ -133,7 +133,7 @@ func compareDeployIntent(
 ) (bool, error) {
 	var (
 		intentContent models.Intent
-		stateContent  models.Work
+		stateContent  models.Intent
 	)
 	if err := store.Get(ctx, intentRef.String(), &intentContent); err != nil {
 		if err == refstore.ErrRefNotFound {
@@ -148,12 +148,7 @@ func compareDeployIntent(
 		return false, fmt.Errorf("failed to get state content: %w", err)
 	}
 
-	if intentContent.Release.String() != stateContent.Release.String() {
-		return false, nil
-	}
-
-	fn := stateContent.Functions[0]
-	if !reflect.DeepEqual(intentContent.Inputs, fn.Inputs) {
+	if !reflect.DeepEqual(intentContent, stateContent) {
 		return false, nil
 	}
 

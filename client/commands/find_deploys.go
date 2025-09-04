@@ -53,7 +53,7 @@ Example:
 			return fmt.Errorf("failed to search for commit %s: %w", startCommit, err)
 		}
 
-		refsToDeployment := make(map[string]models.Work)
+		refsToDeployment := make(map[string]models.Run)
 		releaseToDeployment := make(map[string]librelease.ReleaseInfo)
 		commitToRef := make(map[string]string)
 		// Find all deploys from this repo
@@ -67,7 +67,7 @@ Example:
 				return fmt.Errorf("failed to resolve ref: %w", err)
 			}
 
-			var work models.Work
+			var work models.Run
 			if err := tc.Store.Get(ctx, resolvedRef, &work); err != nil {
 				return fmt.Errorf("failed to get work: %w", err)
 			}

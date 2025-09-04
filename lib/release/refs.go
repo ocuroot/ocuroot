@@ -20,7 +20,7 @@ var (
 	GlobDeploymentIntent        = libglob.MustCompile("**/+*/deploy/*", '/')
 	GlobDeploymentStateOrIntent = libglob.MustCompile("**/{@,+}*/deploy/*", '/')
 	GlobCall                    = libglob.MustCompile("**/{@,+}*/call/*", '/')
-	GlobJob                     = libglob.MustCompile("**/{@,+}*/{call,deploy}/*/*", '/')
+	GlobRun                     = libglob.MustCompile("**/{@,+}*/{call,deploy}/*/*", '/')
 	GlobLog                     = libglob.MustCompile("**/{@,+}*/{call,deploy}/*/*/logs", '/')
 	GlobCustomState             = libglob.MustCompile("**/@*/custom/*", '/')
 	GlobCustomIntent            = libglob.MustCompile("**/+*/custom/*", '/')
@@ -41,7 +41,7 @@ func WorkRefFromChainRef(ref refs.Ref) (refs.Ref, error) {
 }
 
 func ReduceToJobRef(ref refs.Ref) refs.Ref {
-	wr, err := refs.Reduce(ref.String(), GlobJob)
+	wr, err := refs.Reduce(ref.String(), GlobRun)
 	if err != nil {
 		return ref
 	}
@@ -62,9 +62,9 @@ func LoadRef(ctx context.Context, store refstore.Store, ref refs.Ref) (any, erro
 	case GlobRelease.Match(ref.String()):
 		return LoadRefOfType[ReleaseInfo](ctx, store, ref)
 	case GlobWork.Match(ref.String()):
-		return LoadRefOfType[models.Work](ctx, store, ref)
-	case GlobJob.Match(ref.String()):
-		return LoadRefOfType[models.Work](ctx, store, ref)
+		return LoadRefOfType[models.Run](ctx, store, ref)
+	case GlobRun.Match(ref.String()):
+		return LoadRefOfType[models.Run](ctx, store, ref)
 	case GlobDeploymentIntent.Match(ref.String()):
 		return LoadRefOfType[models.Intent](ctx, store, ref)
 	case GlobLog.Match(ref.String()):

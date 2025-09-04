@@ -99,7 +99,7 @@ func (ps *PhaseSummary) StatusCounts() StatusCountMap {
 type WorkSummary struct {
 	Name        string
 	Environment *EnvironmentSummary `json:"environment"`
-	Jobs        []models.Work
+	Jobs        []models.Run
 	JobRefs     []string
 	JobStatuses []models.Status
 }

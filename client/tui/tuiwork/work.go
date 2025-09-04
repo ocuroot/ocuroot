@@ -155,7 +155,7 @@ func (t *Task) message() string {
 	}
 
 	// Get job outputs and render as a message
-	var jobWork *models.Work
+	var jobWork *models.Run
 	if err := t.Store.Get(ctx, t.JobRef.String(), &jobWork); err != nil {
 		log.Error("failed to get job", "ref", t.JobRef.String(), "error", err)
 		return "failed to get job: " + t.JobRef.String() + "\n" + err.Error()

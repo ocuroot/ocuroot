@@ -302,7 +302,7 @@ func createWorkSummary(status models.Status) WorkSummary {
 			ID:   models.EnvironmentID(newID()),
 			Name: "Test Environment",
 		},
-		Jobs: []models.Work{
+		Jobs: []models.Run{
 			{
 				Functions: []*models.Function{
 					createFunctionSummary(),
@@ -343,7 +343,7 @@ func createRelease(phaseStatuses [][]models.Status) *ReleaseSummary {
 			functions = append(functions, createFunctionSummary())
 
 			// Create the chain
-			chain := models.Work{
+			chain := models.Run{
 				Functions: functions,
 			}
 
@@ -353,7 +353,7 @@ func createRelease(phaseStatuses [][]models.Status) *ReleaseSummary {
 					ID:   models.EnvironmentID(newID()),
 					Name: fmt.Sprintf("Environment %d-%d", i, j),
 				},
-				Jobs:        []models.Work{chain},
+				Jobs:        []models.Run{chain},
 				JobStatuses: []models.Status{status},
 			})
 		}

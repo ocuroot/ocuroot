@@ -243,7 +243,7 @@ func applyDeployIntent(ctx context.Context, ref refs.Ref, store refstore.Store) 
 	}
 	err = rs.InitializeFunction(
 		ctx,
-		models.Work{
+		models.Run{
 			Release: intentContent.Release,
 		},
 		chainRef,

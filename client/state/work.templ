@@ -12,10 +12,10 @@ import (
 )
 
 templ WorkView(props RefPageProps) {
-	@WorkContent(props.Content.(models.Work), props.ChildRefs)
+	@WorkContent(props.Content.(models.Run), props.ChildRefs)
 }
 
-templ WorkContent(work models.Work, children []string) {
+templ WorkContent(work models.Run, children []string) {
 	<div class="functionheader">
 		<div>&nbsp;</div>
 		<div class="functionstatus">

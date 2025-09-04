@@ -60,7 +60,7 @@ func SDKPackageToReleaseSummary(
 
 			ws.Name = chainName
 			if len(workRuns) == 0 {
-				ws.Jobs = append(ws.Jobs, models.Work{
+				ws.Jobs = append(ws.Jobs, models.Run{
 					Functions: []*models.Function{
 						{
 							Fn:     function,
@@ -73,7 +73,7 @@ func SDKPackageToReleaseSummary(
 			}
 
 			for _, run := range workRuns {
-				ws.Jobs = append(ws.Jobs, models.Work{
+				ws.Jobs = append(ws.Jobs, models.Run{
 					Functions: []*models.Function{
 						{
 							Fn:     function,

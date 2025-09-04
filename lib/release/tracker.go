@@ -121,14 +121,14 @@ func (r *ReleaseTracker) InitRelease(ctx context.Context, commit string) error {
 		return fmt.Errorf("failed to create function chains: %w", err)
 	}
 	for jobRef, fn := range jobs {
-		var t models.WorkType
+		var t models.JobType
 		if jobRef.SubPathType == refs.SubPathTypeCall {
-			t = models.WorkTypeCall
+			t = models.JobTypeTask
 		} else {
-			t = models.WorkTypeUp
+			t = models.JobTypeUp
 		}
 
-		err = r.stateStore.InitializeFunction(ctx, models.Work{
+		err = r.stateStore.InitializeFunction(ctx, models.Run{
 			Type:    t,
 			Release: r.stateStore.ReleaseRef,
 		}, jobRef, fn)
@@ -168,7 +168,7 @@ func (r *ReleaseTracker) GetReleaseSummary(ctx context.Context) (*pipeline.Relea
 
 // UnfilteredNextWork returns all work that is pending execution,
 // regardless of whether or not their inputs are available.
-func (r *ReleaseTracker) UnfilteredNextWork(ctx context.Context) (map[refs.Ref]*models.Work, error) {
+func (r *ReleaseTracker) UnfilteredNextWork(ctx context.Context) (map[refs.Ref]*models.Run, error) {
 	nf, err := r.stateStore.PendingJobs(ctx)
 	if err != nil {
 		return nil, err
@@ -179,7 +179,7 @@ func (r *ReleaseTracker) UnfilteredNextWork(ctx context.Context) (map[refs.Ref]*
 
 // FilteredNextWork returns all work that is pending execution,
 // but only those that have all their inputs available.
-func (r *ReleaseTracker) FilteredNextWork(ctx context.Context) (map[refs.Ref]*models.Work, error) {
+func (r *ReleaseTracker) FilteredNextWork(ctx context.Context) (map[refs.Ref]*models.Run, error) {
 	if err := r.stateStore.Store.StartTransaction(ctx, "populating inputs"); err != nil {
 		return nil, err
 	}
@@ -196,7 +196,7 @@ func (r *ReleaseTracker) FilteredNextWork(ctx context.Context) (map[refs.Ref]*mo
 
 	log.Info("Filtering pending work", "work", nw)
 
-	out := make(map[refs.Ref]*models.Work)
+	out := make(map[refs.Ref]*models.Run)
 
 	for wr, work := range nw {
 		missing, err := r.PopulateInputs(ctx, wr, work.Functions[len(work.Functions)-1])
@@ -238,7 +238,7 @@ func (r *ReleaseTracker) RunToPause(ctx context.Context, logger Logger) error {
 	)
 
 	var (
-		nw  map[refs.Ref]*models.Work
+		nw  map[refs.Ref]*models.Run
 		err error
 	)
 	for nw, err = r.FilteredNextWork(ctx); len(nw) > 0; nw, err = r.FilteredNextWork(ctx) {
@@ -346,7 +346,7 @@ func (r *ReleaseTracker) Retry(ctx context.Context, logger Logger) error {
 		}
 
 		// Initialize the work state for the new chain using the standalone function
-		if err := InitializeFunctionChain(ctx, r.stateStore.Store, incrementedChainRef, &retryFn); err != nil {
+		if err := InitializeRun(ctx, r.stateStore.Store, incrementedChainRef, &retryFn); err != nil {
 			return fmt.Errorf("failed to initialize retry chain: %w", err)
 		}
 
@@ -408,8 +408,8 @@ func (r *ReleaseTracker) checkEnvs(ctx context.Context, logger Logger) error {
 
 		log.Info("Creating chain", "ref", functionChainRef.String())
 
-		err = r.stateStore.InitializeFunction(ctx, models.Work{
-			Type:    models.WorkTypeUp,
+		err = r.stateStore.InitializeFunction(ctx, models.Run{
+			Type:    models.JobTypeUp,
 			Release: r.stateStore.ReleaseRef,
 		}, functionChainRef, fn)
 		if err != nil {
@@ -501,7 +501,7 @@ func PopulateInputs(ctx context.Context, store refstore.Store, inputs map[string
 	return out, nil
 }
 
-func (r *ReleaseTracker) updateIntent(ctx context.Context, workRef refs.Ref, work *models.Work) error {
+func (r *ReleaseTracker) updateIntent(ctx context.Context, workRef refs.Ref, work *models.Run) error {
 	// We only want intents for deployments
 	if workRef.SubPathType != refs.SubPathTypeDeploy {
 		return nil
@@ -531,7 +531,7 @@ func (r *ReleaseTracker) Run(
 	ctx context.Context,
 	logger sdk.Logger,
 	workRef refs.Ref,
-	work *models.Work,
+	work *models.Run,
 ) (sdk.WorkResult, error) {
 	log.Info("Run", "work", workRef.String())
 	action := fmt.Sprintf("WORK %s", workRef.String())
@@ -693,23 +693,23 @@ func (r *ReleaseTracker) updateLogs(ctx context.Context, chainRef refs.Ref, logs
 	return nil
 }
 
-func (r *ReleaseTracker) saveWorkState(ctx context.Context, workRef refs.Ref, work *models.Work, result sdk.WorkResult, logs []sdk.Log) error {
+func (r *ReleaseTracker) saveWorkState(ctx context.Context, runRef refs.Ref, run *models.Run, result sdk.WorkResult, logs []sdk.Log) error {
 	// Append logs
-	if err := r.updateLogs(ctx, workRef, logs); err != nil {
+	if err := r.updateLogs(ctx, runRef, logs); err != nil {
 		return err
 	}
 
 	status := ResultToStatus(result)
-	log.Info("Setting status", "ref", workRef.String(), "status", status)
-	if err := saveStatus(ctx, r.stateStore.Store, workRef, status); err != nil {
+	log.Info("Setting status", "ref", runRef.String(), "status", status)
+	if err := saveStatus(ctx, r.stateStore.Store, runRef, status); err != nil {
 		return fmt.Errorf("failed to save work status: %w", err)
 	}
 
 	if result.Done != nil {
-		work.Outputs = result.Done.Outputs
+		run.Outputs = result.Done.Outputs
 	}
 
-	if err := r.stateStore.Store.Set(ctx, workRef.String(), work); err != nil {
+	if err := r.stateStore.Store.Set(ctx, runRef.String(), run); err != nil {
 		return fmt.Errorf("failed to set work: %w", err)
 	}
 
@@ -722,28 +722,41 @@ func (r *ReleaseTracker) saveWorkState(ctx context.Context, workRef refs.Ref, wo
 		return fmt.Errorf("failed to add tags: %w", err)
 	}
 
-	if err := r.stateStore.Store.Set(ctx, workRef.String(), work); err != nil {
+	log.Info("Setting run", "ref", runRef.String())
+	if err := r.stateStore.Store.Set(ctx, runRef.String(), run); err != nil {
 		return fmt.Errorf("failed to set work: %w", err)
 	}
-	currentWorkRef, err := refs.Reduce(workRef.String(), GlobWork)
+	taskRef, err := refs.Reduce(runRef.String(), GlobWork)
 	if err != nil {
 		return fmt.Errorf("failed to reduce work ref: %w", err)
 	}
-	if err := r.stateStore.Store.Set(ctx, currentWorkRef, work); err != nil {
+	log.Info("Setting task", "ref", taskRef)
+	task := models.Task{
+		RunRef: runRef,
+		Intent: models.Intent{
+			Type:    run.Type,
+			Release: run.Release,
+		},
+		Outputs: run.Outputs,
+	}
+	if len(run.Functions) > 0 {
+		task.Inputs = run.Functions[0].Inputs
+	}
+	if err := r.stateStore.Store.Set(ctx, taskRef, task); err != nil {
 		return fmt.Errorf("failed to link work: %w", err)
 	}
 
-	currentWorkRefParsed, err := refs.Parse(currentWorkRef)
+	taskRefParsed, err := refs.Parse(taskRef)
 	if err != nil {
-		return fmt.Errorf("failed to parse current work ref: %w", err)
+		return fmt.Errorf("failed to parse task ref: %w", err)
 	}
-	globalCurrentWorkRef := currentWorkRefParsed.MakeRelease().SetVersion("")
-	if work.Type == models.WorkTypeDown {
-		if err := r.stateStore.Store.Unlink(ctx, globalCurrentWorkRef.String()); err != nil {
+	latestReleaseTaskRef := taskRefParsed.MakeRelease().SetVersion("")
+	if run.Type == models.JobTypeDown {
+		if err := r.stateStore.Store.Unlink(ctx, latestReleaseTaskRef.String()); err != nil {
 			return fmt.Errorf("failed to unlink work: %w", err)
 		}
 	} else {
-		if err := r.stateStore.Store.Link(ctx, globalCurrentWorkRef.String(), workRef.String()); err != nil {
+		if err := r.stateStore.Store.Link(ctx, latestReleaseTaskRef.String(), taskRef); err != nil {
 			return fmt.Errorf("failed to link work: %w", err)
 		}
 	}

@@ -4,6 +4,8 @@ export OCUROOT_HOME=$(pwd)/$(dirname "$0")/.ocuroot
 
 export OCU_REPO_COMMIT_OVERRIDE=${OCU_REPO_COMMIT_OVERRIDE:-commitid}
 
+export OCUROOT_DEBUG=1
+
 source $(dirname "$0")/../test_helpers.sh
 
 test_releases_with_rootpath() {

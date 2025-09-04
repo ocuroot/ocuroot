@@ -18,7 +18,7 @@ import (
 	"github.com/ocuroot/ui/components/progress"
 )
 
-type LogURLFunction func(fc models.Work) string
+type LogURLFunction func(fc models.Run) string
 
 type PipelineProps struct {
 	Summary *ReleaseSummary

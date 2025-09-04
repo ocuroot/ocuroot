@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"path"
 	"reflect"
 	"strings"
 
@@ -470,9 +469,13 @@ func getReconcilableDeployments(ctx context.Context, store refstore.Store) ([]re
 }
 
 func reconcileDeployment(ctx context.Context, store refstore.Store, ref string) (*refs.Ref, error) {
-	var deployment models.Work
+	var deployment models.Task
 	if err := store.Get(ctx, ref, &deployment); err != nil {
 		return nil, fmt.Errorf("failed to get deployment at %s: %w", ref, err)
+	}
+	var run models.Run
+	if err := store.Get(ctx, deployment.RunRef.String(), &run); err != nil {
+		return nil, fmt.Errorf("failed to get run at %s: %w", deployment.RunRef.String(), err)
 	}
 
 	resolvedDeployment, err := store.ResolveLink(ctx, ref)
@@ -489,7 +492,7 @@ func reconcileDeployment(ctx context.Context, store refstore.Store, ref string) 
 		return nil, fmt.Errorf("failed to get release: %w", err)
 	}
 
-	entryFunction := deployment.Functions[0]
+	entryFunction := run.Functions[0]
 	dependenciesSatisfied, err := librelease.CheckDependencies(ctx, store, entryFunction)
 	if err != nil {
 		return nil, fmt.Errorf("failed to check dependencies: %w", err)
@@ -549,9 +552,14 @@ func reconcileAllDeploymentsAtCommit(ctx context.Context, store refstore.Store, 
 	}
 
 	for _, ref := range allDeployments {
-		var deployment models.Work
+		var deployment models.Task
 		if err := store.Get(ctx, ref, &deployment); err != nil {
 			log.Error("Failed to get deployment", "ref", ref, "error", err)
+			continue
+		}
+		var run models.Run
+		if err := store.Get(ctx, deployment.RunRef.String(), &run); err != nil {
+			log.Error("Failed to get run", "ref", deployment.RunRef.String(), "error", err)
 			continue
 		}
 
@@ -560,14 +568,14 @@ func reconcileAllDeploymentsAtCommit(ctx context.Context, store refstore.Store, 
 			log.Error("Failed to resolve inputs", "ref", ref, "error", err)
 			continue
 		}
-		parsedResolvedDeployment, err := refs.Parse(resolvedDeployment)
+		parsedResolvedTask, err := refs.Parse(resolvedDeployment)
 		if err != nil {
 			log.Error("Failed to parse resolved deployment", "ref", ref, "error", err)
 			continue
 		}
 
 		var release librelease.ReleaseInfo
-		if err := store.Get(ctx, parsedResolvedDeployment.SetSubPathType(refs.SubPathTypeNone).SetSubPath("").SetFragment("").String(), &release); err != nil {
+		if err := store.Get(ctx, parsedResolvedTask.SetSubPathType(refs.SubPathTypeNone).SetSubPath("").SetFragment("").String(), &release); err != nil {
 			log.Error("Failed to get release", "ref", ref, "error", err)
 			continue
 		}
@@ -577,9 +585,7 @@ func reconcileAllDeploymentsAtCommit(ctx context.Context, store refstore.Store, 
 			continue
 		}
 
-		entryFunction := deployment.Functions[0]
-		entryFunctionInputs := entryFunction.Inputs
-
+		entryFunctionInputs := deployment.Inputs
 		inputs, err := librelease.PopulateInputs(ctx, store, entryFunctionInputs)
 		if err != nil {
 			continue
@@ -589,11 +595,11 @@ func reconcileAllDeploymentsAtCommit(ctx context.Context, store refstore.Store, 
 		for k, v := range inputs {
 			if !reflect.DeepEqual(entryFunctionInputs[k].Value, v.Value) {
 				// Ensure we don't create loops with the outputs of this chain
-				if isForSameWork(*v.Ref, parsedResolvedDeployment) {
+				if isForSameWork(*v.Ref, parsedResolvedTask) {
 					continue
 				}
 
-				log.Info("input changed", "key", k, "oldValue", toJSON(entryFunctionInputs[k].Value), "newValue", v.Value, "vRef", v.Ref.String(), "parsedResolvedDeployment", parsedResolvedDeployment.String())
+				log.Info("input changed", "key", k, "oldValue", toJSON(entryFunctionInputs[k].Value), "newValue", v.Value, "vRef", v.Ref.String(), "parsedResolvedDeployment", parsedResolvedTask.String())
 				changed = true
 			}
 		}
@@ -604,25 +610,24 @@ func reconcileAllDeploymentsAtCommit(ctx context.Context, store refstore.Store, 
 		}
 
 		log.Info("Duplicating deployment", "ref", resolvedDeployment)
-		parsedResolvedDeployment, err = refs.Parse(resolvedDeployment)
+		parsedResolvedTask, err = refs.Parse(resolvedDeployment)
 		if err != nil {
 			log.Error("Failed to parse resolved deployment", "ref", ref, "error", err)
 			continue
 		}
-		newFunctionChainRef := parsedResolvedDeployment.SetSubPath(path.Dir(parsedResolvedDeployment.SubPath))
-		newFunctionChainRefString, err := refstore.IncrementPath(ctx, store, fmt.Sprintf("%s/", newFunctionChainRef.String()))
+		newRunRefString, err := refstore.IncrementPath(ctx, store, fmt.Sprintf("%s/", parsedResolvedTask.String()))
 		if err != nil {
 			log.Error("Failed to increment path", "ref", ref, "error", err)
 			continue
 		}
-		log.Info("Incremented path", "ref", ref, "newRef", newFunctionChainRefString)
-		newFunctionChainRef, err = refs.Parse(newFunctionChainRefString)
+		log.Info("Incremented path", "ref", ref, "newRef", newRunRefString)
+		newRunRef, err := refs.Parse(newRunRefString)
 		if err != nil {
 			log.Error("Failed to parse path", "ref", ref, "error", err)
 			continue
 		}
-		err = librelease.InitializeFunctionChain(ctx, store, newFunctionChainRef, &models.Function{
-			Fn:     entryFunction.Fn,
+		err = librelease.InitializeRun(ctx, store, newRunRef, &models.Function{
+			Fn:     run.Functions[0].Fn,
 			Inputs: inputs,
 		})
 		if err != nil {
@@ -630,7 +635,7 @@ func reconcileAllDeploymentsAtCommit(ctx context.Context, store refstore.Store, 
 			continue
 		}
 
-		log.Info("Duplicated deployment", "oldRef", resolvedDeployment, "newRef", newFunctionChainRef)
+		log.Info("Duplicated deployment", "oldRef", resolvedDeployment, "newRef", newRunRef)
 	}
 
 	return nil

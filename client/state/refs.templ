@@ -69,8 +69,8 @@ templ RefHeader(props RefPageProps) {
             if len(strings.Split(rp.SubPath, "/")) > 1 {
                 @HeaderLink(
                     props.Ref, 
-                    release.GlobJob, 
-                    fmt.Sprintf("#%s", strings.Split(rp.SubPath, "/")[1]), 
+                    release.GlobRun, 
+                    fmt.Sprintf("Run %s", strings.Split(rp.SubPath, "/")[1]), 
                     fmt.Sprintf("/ref/%s/-/%s/@%s/call/%s/%s", rp.Repo, rp.Filename, rp.ReleaseOrIntent.Value, strings.Split(rp.SubPath, "/")[0], strings.Split(rp.SubPath, "/")[1]),
                 )
             }
@@ -85,8 +85,8 @@ templ RefHeader(props RefPageProps) {
             if len(strings.Split(rp.SubPath, "/")) > 1 {
                 @HeaderLink(
                     props.Ref, 
-                    release.GlobJob, 
-                    fmt.Sprintf("Job %s", strings.Split(rp.SubPath, "/")[1]), 
+                    release.GlobRun, 
+                    fmt.Sprintf("Run %s", strings.Split(rp.SubPath, "/")[1]), 
                     fmt.Sprintf("/ref/%s/-/%s/@%s/deploy/%s/%s", rp.Repo, rp.Filename, rp.ReleaseOrIntent.Value, strings.Split(rp.SubPath, "/")[0], strings.Split(rp.SubPath, "/")[1]),
                 )
             }
@@ -134,7 +134,7 @@ templ StateContent(props RefPageProps) {
     switch c := props.Content.(type) {
         case release.ReleaseInfo:
             @ReleaseCard(props)
-        case models.Work:
+        case models.Run:
             @WorkView(props)
         case models.Intent:
             @components.Card() {
