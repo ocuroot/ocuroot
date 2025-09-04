@@ -28,9 +28,9 @@ func (p *Package) Validate() []error {
 
 	// Count environment usage across all phases
 	for _, phase := range p.Phases {
-		for _, work := range phase.Work {
-			if work.Deployment != nil {
-				envUsage[work.Deployment.Environment]++
+		for _, task := range phase.Tasks {
+			if task.Deployment != nil {
+				envUsage[task.Deployment.Environment]++
 			}
 		}
 	}
@@ -47,9 +47,9 @@ func (p *Package) Validate() []error {
 	// Check for duplicate names in work items
 	workNames := make(map[string]int)
 	for _, phase := range p.Phases {
-		for _, work := range phase.Work {
-			if work.Call != nil {
-				workNames[work.Call.Name]++
+		for _, task := range phase.Tasks {
+			if task.Task != nil {
+				workNames[task.Task.Name]++
 			}
 		}
 	}

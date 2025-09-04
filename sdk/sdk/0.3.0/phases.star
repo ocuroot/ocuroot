@@ -1,54 +1,56 @@
 load("dowork.star", "check_params")
 
-def phase(name, work=[]):
+def phase(name, work=[], tasks=[]):
     """
     phase defines a single phase within a release.
     A release function should return a list of phases.
     Phases are executed in the order they are returned.
 
-    Work items may be defined using the following functions:
+    Tasks may be defined using the following functions:
     - deploy: A deployment to a specific environment
-    - call: A call to a function, for builds or tests
+    - task: A standalone task, for example a build or test
 
     Args:
         name: The name of the phase
-        work: A list of work items to perform in this phase
+        tasks: A list of tasks to perform in this phase
 
     Returns:
         A dictionary representing the phase
     """
-    
+    if len(tasks) == 0:
+        tasks = work
+
     package = backend.thread.get("package", default={
         "phases": [],
         "functions": {},
     })
 
-    # Create new phases for any work items that are not in this phase
-    registered_work = backend.thread.get("work", default=[])
-    for w in registered_work:
+    # Create new phases for any tasks that are not in this phase
+    registered_tasks = backend.thread.get("tasks", default=[])
+    for t in registered_tasks:
         match = False
-        for r in work:
-            if r["work_id"] == w["work_id"]:
+        for r in tasks:
+            if r["task_id"] == t["task_id"]:
                 match = True
                 break
         if not match:
             package["phases"].append({
                 "name": "",
-                "work": [w],
+                "tasks": [t],
             })
-    backend.thread.set("work", [])
+    backend.thread.set("tasks", [])
 
     # Add this phase to the list stored on the thread
     package["phases"].append({
         "name": name,
-        "work": work,
+        "tasks": tasks,
     })
     backend.thread.set("package", package)
 
     return {
         "phase": {
             "name": name,
-            "work": work,
+            "tasks": tasks,
         },
     }
 
@@ -57,7 +59,7 @@ _default_down = lambda ctx, result: None
 
 def deploy(environment=None, up=_default_up, down=_default_down, inputs={}):
     """
-    deploy defines a deployment to a specific environment as a work item in a phase.
+    deploy defines a deployment to a specific environment as a task.
 
     The functions provided to up and down must return with either of the following functions:
     - done
@@ -88,8 +90,8 @@ def deploy(environment=None, up=_default_up, down=_default_down, inputs={}):
     _add_func(r_up)
     _add_func(r_down)
 
-    work = {
-        "work_id": backend.ulid(),
+    task = {
+        "task_id": backend.ulid(),
         "deploy": {
             "environment": environment.name,
             "up": r_up,
@@ -98,17 +100,20 @@ def deploy(environment=None, up=_default_up, down=_default_down, inputs={}):
         },
     }
 
-    # Add this work item to the list stored on the thread
-    work_items = backend.thread.get("work", default=[])
-    work_items.append(work)
-    backend.thread.set("work", work_items)
+    # Add this task to the list stored on the thread
+    task_items = backend.thread.get("tasks", default=[])
+    task_items.append(task)
+    backend.thread.set("tasks", task_items)
 
-    return work
+    return task
 
 
 def call(fn, name, annotation="", inputs={}):
+    return task(fn, name, annotation, inputs)
+
+def task(fn, name, annotation="", inputs={}):
     """
-    call requests that a function be called.
+    task defines a standalone task that is part of a release.
 
     The function provided to fn must return with either of the following functions:
     - done
@@ -116,22 +121,22 @@ def call(fn, name, annotation="", inputs={}):
     These functions may also error out or exit using the fail function.
 
     Args:
-        fn: The function to call
-        name: The name of the call, which must be unique within the release
-        annotation: An optional annotation for the call
+        fn: The function implementing this task
+        name: The name of the task, which must be unique within the release
+        annotation: An optional annotation for the task
         inputs: The inputs to the function, as a dictionary
 
     Returns:
-        A dictionary representing the call work item
+        A dictionary representing the task
     """
 
     checked_inputs = _check_inputs(fn, inputs)
     fn = render_function(fn)["function"]
     _add_func(fn)
 
-    work = {
-        "work_id": backend.ulid(),
-        "call": {
+    task = {
+        "task_id": backend.ulid(),
+        "task": {
             "fn": fn,
             "name": name,
             "annotation": annotation,
@@ -139,12 +144,12 @@ def call(fn, name, annotation="", inputs={}):
         },
     }
 
-    # Add this work item to the list stored on the thread
-    work_items = backend.thread.get("work", default=[])
-    work_items.append(work)
-    backend.thread.set("work", work_items)
+    # Add this task to the list stored on the thread
+    tasks = backend.thread.get("tasks", default=[])
+    tasks.append(task)
+    backend.thread.set("tasks", tasks)
 
-    return work
+    return task
 
 def _env_or_name(env):
     if type(env) == str:

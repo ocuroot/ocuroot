@@ -69,9 +69,9 @@ func (w *releaseStore) InitDeploymentUp(ctx context.Context, env string) error {
 		return fmt.Errorf("failed to get release state: %w", err)
 	}
 
-	var work *sdk.Work
+	var work *sdk.Task
 	for _, phase := range ri.Package.Phases {
-		for _, w := range phase.Work {
+		for _, w := range phase.Tasks {
 			if w.Deployment != nil && w.Deployment.Environment == sdk.EnvironmentName(env) {
 				work = &w
 				break
@@ -121,7 +121,7 @@ func (w *releaseStore) InitDeploymentDown(ctx context.Context, env string) error
 
 	var downFunc *sdk.FunctionDef
 	for _, phase := range ri.Package.Phases {
-		for _, w := range phase.Work {
+		for _, w := range phase.Tasks {
 			if w.Deployment != nil && w.Deployment.Environment == sdk.EnvironmentName(env) {
 				downFunc = &w.Deployment.Down
 				break
@@ -454,7 +454,7 @@ const (
 	statusPathSegment = "status"
 )
 
-func (r *releaseStore) sdkWorkToFunctionChain(ctx context.Context, work sdk.Work) (refs.Ref, models.Run, *models.Function, error) {
+func (r *releaseStore) sdkWorkToFunctionChain(ctx context.Context, work sdk.Task) (refs.Ref, models.Run, *models.Function, error) {
 	workRef := r.ReleaseRef
 
 	mWork := models.Run{
@@ -471,13 +471,13 @@ func (r *releaseStore) sdkWorkToFunctionChain(ctx context.Context, work sdk.Work
 		fs.Inputs = work.Deployment.Inputs
 	}
 
-	if work.Call != nil {
+	if work.Task != nil {
 		workRef = workRef.
 			SetSubPathType(refs.SubPathTypeTask).
-			SetSubPath(work.Call.Name)
+			SetSubPath(work.Task.Name)
 		mWork.Type = models.JobTypeTask
-		fs.Fn = work.Call.Fn
-		fs.Inputs = work.Call.Inputs
+		fs.Fn = work.Task.Fn
+		fs.Inputs = work.Task.Inputs
 	}
 
 	workRefString, err := refstore.IncrementPath(ctx, r.Store, fmt.Sprintf("%s/", workRef.String()))
@@ -542,7 +542,7 @@ func (r *releaseStore) SDKPackageToFunctions(ctx context.Context, pkg *sdk.Packa
 	var previousPhaseRefs []refs.Ref
 	for _, phase := range pkg.Phases {
 		var currentPhaseRefs []refs.Ref
-		for _, work := range phase.Work {
+		for _, work := range phase.Tasks {
 			workRef, _, fc, err := r.sdkWorkToFunctionChain(ctx, work)
 			if err != nil {
 				return nil, err

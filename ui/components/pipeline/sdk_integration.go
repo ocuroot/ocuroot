@@ -28,7 +28,7 @@ func SDKPackageToReleaseSummary(
 			Name: string(phase.Name),
 		}
 
-		for _, work := range phase.Work {
+		for _, work := range phase.Tasks {
 			ws := WorkSummary{}
 
 			var workRuns []string
@@ -49,10 +49,10 @@ func SDKPackageToReleaseSummary(
 				workRuns = globFilter(childRefs, fmt.Sprintf("**/-/**/@*/deploy/%s/*", chainName))
 			}
 
-			if work.Call != nil {
-				chainName = string(work.Call.Name)
-				function = work.Call.Fn
-				inputs = work.Call.Inputs
+			if work.Task != nil {
+				chainName = string(work.Task.Name)
+				function = work.Task.Fn
+				inputs = work.Task.Inputs
 
 				// Identify any runs of this call
 				workRuns = globFilter(childRefs, fmt.Sprintf("**/-/**/@*/task/%s/*", chainName))

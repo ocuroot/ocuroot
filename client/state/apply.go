@@ -169,7 +169,7 @@ func applyDeployIntent(ctx context.Context, ref refs.Ref, store refstore.Store) 
 	var deployment *sdk.Deployment
 	expectedEnvironment := sdk.EnvironmentName(strings.SplitAfter(ref.SubPath, "/")[0])
 	for _, p := range releaseInfo.Package.Phases {
-		for _, w := range p.Work {
+		for _, w := range p.Tasks {
 			if w.Deployment == nil || w.Deployment.Environment != expectedEnvironment {
 				continue
 			}

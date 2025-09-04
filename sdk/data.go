@@ -20,18 +20,17 @@ type Environment struct {
 type Package struct {
 	Functions map[string]Function `json:"functions"`
 
-	Phases      []Phase                        `json:"phases"`
-	Deployments map[EnvironmentName]Deployment `json:"deployments"`
+	Phases []Phase `json:"phases"`
 }
 
 type Phase struct {
-	Name string `json:"name"`
-	Work []Work `json:"work"`
+	Name  string `json:"name"`
+	Tasks []Task `json:"tasks"`
 }
 
-type Work struct {
+type Task struct {
 	Deployment *Deployment `json:"deploy,omitempty"`
-	Call       *WorkCall   `json:"call,omitempty"`
+	Task       *SimpleTask `json:"task,omitempty"`
 }
 
 type Deployment struct {
@@ -78,7 +77,7 @@ type WorkResult struct {
 	Err  error     `json:"error,omitempty"`
 }
 
-type WorkCall struct {
+type SimpleTask struct {
 	Name   string                     `json:"name"`
 	Inputs map[string]InputDescriptor `json:"inputs"`
 	Fn     FunctionDef                `json:"fn,omitempty"`

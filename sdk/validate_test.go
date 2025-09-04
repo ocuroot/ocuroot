@@ -17,7 +17,7 @@ func TestPackageValidate(t *testing.T) {
 				Phases: []Phase{
 					{
 						Name: "development",
-						Work: []Work{
+						Tasks: []Task{
 							{
 								Deployment: &Deployment{
 									Environment: "dev",
@@ -27,7 +27,7 @@ func TestPackageValidate(t *testing.T) {
 					},
 					{
 						Name: "staging",
-						Work: []Work{
+						Tasks: []Task{
 							{
 								Deployment: &Deployment{
 									Environment: "staging",
@@ -37,7 +37,7 @@ func TestPackageValidate(t *testing.T) {
 					},
 					{
 						Name: "production",
-						Work: []Work{
+						Tasks: []Task{
 							{
 								Deployment: &Deployment{
 									Environment: "prod",
@@ -55,14 +55,14 @@ func TestPackageValidate(t *testing.T) {
 				Phases: []Phase{
 					{
 						Name: "development",
-						Work: []Work{
+						Tasks: []Task{
 							{
 								Deployment: &Deployment{
 									Environment: "dev",
 								},
 							},
 							{
-								Call: &WorkCall{
+								Task: &SimpleTask{
 									Name: "qa-approval",
 									Fn: FunctionDef{
 										Name: "approve_function",
@@ -70,7 +70,7 @@ func TestPackageValidate(t *testing.T) {
 								},
 							},
 							{
-								Call: &WorkCall{
+								Task: &SimpleTask{
 									Name: "stability-period",
 									Fn: FunctionDef{
 										Name: "delay_function",
@@ -78,7 +78,7 @@ func TestPackageValidate(t *testing.T) {
 								},
 							},
 							{
-								Call: &WorkCall{
+								Task: &SimpleTask{
 									Name: "notify-deployment",
 									Fn: FunctionDef{
 										Name: "handoff_function",
@@ -97,14 +97,14 @@ func TestPackageValidate(t *testing.T) {
 				Phases: []Phase{
 					{
 						Name: "development",
-						Work: []Work{
+						Tasks: []Task{
 							{
 								Deployment: &Deployment{
 									Environment: "dev",
 								},
 							},
 							{
-								Call: &WorkCall{
+								Task: &SimpleTask{
 									Name: "dev-approval",
 									Fn: FunctionDef{
 										Name: "dev_approve_function",
@@ -112,7 +112,7 @@ func TestPackageValidate(t *testing.T) {
 								},
 							},
 							{
-								Call: &WorkCall{
+								Task: &SimpleTask{
 									Name: "dev-notification",
 									Fn: FunctionDef{
 										Name: "dev_handoff_function",
@@ -123,14 +123,14 @@ func TestPackageValidate(t *testing.T) {
 					},
 					{
 						Name: "staging",
-						Work: []Work{
+						Tasks: []Task{
 							{
 								Deployment: &Deployment{
 									Environment: "staging",
 								},
 							},
 							{
-								Call: &WorkCall{
+								Task: &SimpleTask{
 									Name: "staging-delay",
 									Fn: FunctionDef{
 										Name: "staging_delay_function",
@@ -138,7 +138,7 @@ func TestPackageValidate(t *testing.T) {
 								},
 							},
 							{
-								Call: &WorkCall{
+								Task: &SimpleTask{
 									Name: "staging-approval",
 									Fn: FunctionDef{
 										Name: "staging_approve_function",
@@ -149,14 +149,14 @@ func TestPackageValidate(t *testing.T) {
 					},
 					{
 						Name: "production",
-						Work: []Work{
+						Tasks: []Task{
 							{
 								Deployment: &Deployment{
 									Environment: "prod",
 								},
 							},
 							{
-								Call: &WorkCall{
+								Task: &SimpleTask{
 									Name: "prod-approval",
 									Fn: FunctionDef{
 										Name: "prod_approve_function",
@@ -164,7 +164,7 @@ func TestPackageValidate(t *testing.T) {
 								},
 							},
 							{
-								Call: &WorkCall{
+								Task: &SimpleTask{
 									Name: "prod-notification",
 									Fn: FunctionDef{
 										Name: "prod_handoff_function",
@@ -183,7 +183,7 @@ func TestPackageValidate(t *testing.T) {
 				Phases: []Phase{
 					{
 						Name: "development",
-						Work: []Work{
+						Tasks: []Task{
 							{
 								Deployment: &Deployment{
 									Environment: "dev",
@@ -193,7 +193,7 @@ func TestPackageValidate(t *testing.T) {
 					},
 					{
 						Name: "staging",
-						Work: []Work{
+						Tasks: []Task{
 							{
 								Deployment: &Deployment{
 									Environment: "staging",
@@ -208,7 +208,7 @@ func TestPackageValidate(t *testing.T) {
 					},
 					{
 						Name: "production",
-						Work: []Work{
+						Tasks: []Task{
 							{
 								Deployment: &Deployment{
 									Environment: "prod",
@@ -226,14 +226,14 @@ func TestPackageValidate(t *testing.T) {
 				Phases: []Phase{
 					{
 						Name: "phase-one",
-						Work: []Work{
+						Tasks: []Task{
 							{
 								Deployment: &Deployment{
 									Environment: "dev",
 								},
 							},
 							{
-								Call: &WorkCall{
+								Task: &SimpleTask{
 									Name: "approve-deploy",
 									Fn: FunctionDef{
 										Name: "approve_function",
@@ -244,9 +244,9 @@ func TestPackageValidate(t *testing.T) {
 					},
 					{
 						Name: "phase-two",
-						Work: []Work{
+						Tasks: []Task{
 							{
-								Call: &WorkCall{
+								Task: &SimpleTask{
 									Name: "approve-deploy", // Same name as previous approval
 									Fn: FunctionDef{
 										Name: "another_approve_function",
@@ -265,14 +265,14 @@ func TestPackageValidate(t *testing.T) {
 				Phases: []Phase{
 					{
 						Name: "phase-one",
-						Work: []Work{
+						Tasks: []Task{
 							{
 								Deployment: &Deployment{
 									Environment: "dev",
 								},
 							},
 							{
-								Call: &WorkCall{
+								Task: &SimpleTask{
 									Name: "wait-period",
 									Fn: FunctionDef{
 										Name: "delay_function",
@@ -283,9 +283,9 @@ func TestPackageValidate(t *testing.T) {
 					},
 					{
 						Name: "phase-two",
-						Work: []Work{
+						Tasks: []Task{
 							{
-								Call: &WorkCall{
+								Task: &SimpleTask{
 									Name: "wait-period", // Same name as previous delay
 									Fn: FunctionDef{
 										Name: "another_delay_function",
@@ -304,14 +304,14 @@ func TestPackageValidate(t *testing.T) {
 				Phases: []Phase{
 					{
 						Name: "phase-one",
-						Work: []Work{
+						Tasks: []Task{
 							{
 								Deployment: &Deployment{
 									Environment: "dev",
 								},
 							},
 							{
-								Call: &WorkCall{
+								Task: &SimpleTask{
 									Name: "notify-team",
 									Fn: FunctionDef{
 										Name: "handoff_function",
@@ -322,9 +322,9 @@ func TestPackageValidate(t *testing.T) {
 					},
 					{
 						Name: "phase-two",
-						Work: []Work{
+						Tasks: []Task{
 							{
-								Call: &WorkCall{
+								Task: &SimpleTask{
 									Name: "notify-team", // Same name as previous handoff
 									Fn: FunctionDef{
 										Name: "another_handoff_function",
@@ -343,14 +343,14 @@ func TestPackageValidate(t *testing.T) {
 				Phases: []Phase{
 					{
 						Name: "phase-one",
-						Work: []Work{
+						Tasks: []Task{
 							{
 								Deployment: &Deployment{
 									Environment: "dev",
 								},
 							},
 							{
-								Call: &WorkCall{
+								Task: &SimpleTask{
 									Name: "shared-name",
 									Fn: FunctionDef{
 										Name: "approval_function",
@@ -361,9 +361,9 @@ func TestPackageValidate(t *testing.T) {
 					},
 					{
 						Name: "phase-two",
-						Work: []Work{
+						Tasks: []Task{
 							{
-								Call: &WorkCall{
+								Task: &SimpleTask{
 									Name: "shared-name", // Same name as approval in previous phase
 									Fn: FunctionDef{
 										Name: "delay_function",
@@ -374,9 +374,9 @@ func TestPackageValidate(t *testing.T) {
 					},
 					{
 						Name: "phase-three",
-						Work: []Work{
+						Tasks: []Task{
 							{
-								Call: &WorkCall{
+								Task: &SimpleTask{
 									Name: "shared-name", // Same name as approval and delay
 									Fn: FunctionDef{
 										Name: "handoff_function",
@@ -395,14 +395,14 @@ func TestPackageValidate(t *testing.T) {
 				Phases: []Phase{
 					{
 						Name: "phase-one",
-						Work: []Work{
+						Tasks: []Task{
 							{
 								Deployment: &Deployment{
 									Environment: "dev",
 								},
 							},
 							{
-								Call: &WorkCall{
+								Task: &SimpleTask{
 									Name: "duplicate-one",
 									Fn: FunctionDef{
 										Name: "approval_function",
@@ -410,7 +410,7 @@ func TestPackageValidate(t *testing.T) {
 								},
 							},
 							{
-								Call: &WorkCall{
+								Task: &SimpleTask{
 									Name: "duplicate-two",
 									Fn: FunctionDef{
 										Name: "delay_function",
@@ -421,9 +421,9 @@ func TestPackageValidate(t *testing.T) {
 					},
 					{
 						Name: "phase-two",
-						Work: []Work{
+						Tasks: []Task{
 							{
-								Call: &WorkCall{
+								Task: &SimpleTask{
 									Name: "duplicate-one", // Duplicate approval name
 									Fn: FunctionDef{
 										Name: "another_approval_function",
@@ -431,7 +431,7 @@ func TestPackageValidate(t *testing.T) {
 								},
 							},
 							{
-								Call: &WorkCall{
+								Task: &SimpleTask{
 									Name: "duplicate-two", // Duplicate with delay name
 									Fn: FunctionDef{
 										Name: "handoff_function",
