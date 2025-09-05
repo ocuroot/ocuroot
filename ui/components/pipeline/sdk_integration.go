@@ -3,8 +3,8 @@ package pipeline
 import (
 	"fmt"
 	"path"
-	"sort"
 
+	"github.com/charmbracelet/log"
 	libglob "github.com/gobwas/glob"
 	"github.com/ocuroot/ocuroot/sdk"
 	"github.com/ocuroot/ocuroot/store/models"
@@ -27,86 +27,69 @@ func SDKPackageToReleaseSummary(
 			Name: string(phase.Name),
 		}
 
-		for _, work := range phase.Work {
-			ws := WorkSummary{}
+		for _, task := range phase.Tasks {
+			ts := TaskSummary{}
 
-			var workRuns []string
+			var runs []string
 
-			var chainName string
+			var taskName string
 			var function sdk.FunctionDef
 			var inputs map[string]sdk.InputDescriptor
-			if work.Deployment != nil {
-				chainName = string(work.Deployment.Environment)
-				function = work.Deployment.Up
-				inputs = work.Deployment.Inputs
-				ws.Environment = &EnvironmentSummary{
+			if task.Deployment != nil {
+				taskName = string(task.Deployment.Environment)
+				function = task.Deployment.Up
+				inputs = task.Deployment.Inputs
+				ts.Environment = &EnvironmentSummary{
 					ID:   models.NewID[models.EnvironmentID](),
-					Name: string(work.Deployment.Environment),
+					Name: string(task.Deployment.Environment),
 				}
 
 				// Identify any runs of this deployment
-				workRuns = globFilter(childRefs, fmt.Sprintf("**/-/**/@*/deploy/%s/*", chainName))
+				runs = globFilter(childRefs, fmt.Sprintf("**/-/**/@*/deploy/%s/*", taskName))
 			}
 
-			if work.Call != nil {
-				chainName = string(work.Call.Name)
-				function = work.Call.Fn
-				inputs = work.Call.Inputs
+			if task.Task != nil {
+				taskName = string(task.Task.Name)
+				function = task.Task.Fn
+				inputs = task.Task.Inputs
 
 				// Identify any runs of this call
-				workRuns = globFilter(childRefs, fmt.Sprintf("**/-/**/@*/call/%s/*", chainName))
+				runs = globFilter(childRefs, fmt.Sprintf("**/-/**/@*/task/%s/*", taskName))
 			}
 
-			if len(workRuns) == 0 {
-				ws.Chains = append(ws.Chains, &FunctionChainSummary{
-					ID:   models.NewID[models.FunctionChainID](),
-					Name: chainName,
+			ts.Name = taskName
+			if len(runs) == 0 {
+				ts.Runs = append(ts.Runs, models.Run{
 					Functions: []*models.Function{
 						{
-							ID:     models.NewID[models.FunctionID](),
 							Fn:     function,
 							Inputs: inputs,
-							Status: models.StatusPending,
 						},
 					},
 				})
-				p.Work = append(p.Work, ws)
+				p.Tasks = append(p.Tasks, ts)
 				continue
 			}
 
-			for _, run := range workRuns {
-				chain := &FunctionChainSummary{
-					ID:   models.FunctionChainID(run),
-					Name: chainName,
+			for _, run := range runs {
+				ts.Runs = append(ts.Runs, models.Run{
 					Functions: []*models.Function{
 						{
-							ID:     models.NewID[models.FunctionID](),
 							Fn:     function,
 							Inputs: inputs,
-							Status: models.StatusPending,
 						},
 					},
+				})
+				statusRefs := globFilter(childRefs, fmt.Sprintf("%s/status/*", run))
+				if len(statusRefs) > 0 {
+					log.Error("Multiple status refs", "run", run, "refs", statusRefs)
 				}
-				functions := globFilter(childRefs, fmt.Sprintf("%s/functions/*", run))
-				functions = earliestFirst(functions)
-				for index, fn := range functions {
-					var status models.Status = models.StatusPending
-					statusRefs := globFilter(childRefs, fmt.Sprintf("%s/status/*", fn))
-					if len(statusRefs) > 0 {
-						status = models.Status(path.Base(statusRefs[0]))
-					}
-					var fn *models.Function
-					if index == 0 {
-						fn = chain.Functions[0]
-						chain.Functions = nil
-					}
-					fn.Status = status
-					chain.Functions = append(chain.Functions, fn)
-				}
-				ws.Chains = append(ws.Chains, chain)
+				status := models.Status(path.Base(statusRefs[0]))
+				ts.RunRefs = append(ts.RunRefs, run)
+				ts.RunStatuses = append(ts.RunStatuses, status)
 			}
 
-			p.Work = append(p.Work, ws)
+			p.Tasks = append(p.Tasks, ts)
 		}
 
 		summary.Phases = append(summary.Phases, p)
@@ -124,20 +107,4 @@ func globFilter(refs []string, glob string) []string {
 		}
 	}
 	return out
-}
-
-func earliestFirst(refs []string) []string {
-	sort.Slice(refs, func(i, j int) bool {
-		return refs[i] < refs[j]
-	})
-
-	return refs
-}
-
-func latestFirst(refs []string) []string {
-	sort.Slice(refs, func(i, j int) bool {
-		return refs[i] > refs[j]
-	})
-
-	return refs
 }

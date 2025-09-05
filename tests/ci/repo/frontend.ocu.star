@@ -45,7 +45,7 @@ phase(
             environment=environment,
             inputs={
                 "foo": input(ref="./-/backend.ocu.star/@/deploy/{environment}/#output/foo".format(environment=environment.name)),
-                "message": input(ref="./call/build/#output/message"),
+                "message": input(ref="./task/build/#output/message"),
                 "backend_message": input(ref="./-/backend.ocu.star/@/deploy/{environment}/#output/message".format(environment=environment.name)),
             },
         ) for environment in staging
@@ -61,7 +61,7 @@ phase(
             environment=environment,
             inputs={
                 "foo": input(ref="./-/backend.ocu.star/@/deploy/{environment}/#output/foo".format(environment=environment.name)),
-                "message": input(ref="./call/build/#output/message"),
+                "message": input(ref="./task/build/#output/message"),
                 "backend_message": input(ref="./-/backend.ocu.star/@/deploy/{environment}/#output/message".format(environment=environment.name)),
             },
         ) for environment in prod

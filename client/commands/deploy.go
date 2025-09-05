@@ -4,10 +4,10 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/charmbracelet/log"
 	"github.com/ocuroot/ocuroot/client/release"
+	"github.com/ocuroot/ocuroot/client/tui"
+	"github.com/ocuroot/ocuroot/client/tui/tuiwork"
 	"github.com/ocuroot/ocuroot/refs"
-	"github.com/ocuroot/ocuroot/sdk"
 	"github.com/spf13/cobra"
 
 	librelease "github.com/ocuroot/ocuroot/lib/release"
@@ -67,6 +67,11 @@ Example:
 			return fmt.Errorf("deployment ID must not contain a slash")
 		}
 
+		workTui := tui.StartWorkTui()
+		defer workTui.Cleanup()
+
+		tc.Store = tuiwork.WatchForJobUpdates(ctx, tc.Store, workTui)
+
 		tracker, err := release.TrackerForExistingRelease(ctx, tc)
 		if err != nil {
 			return err
@@ -84,9 +89,7 @@ Example:
 			return err
 		}
 
-		err = tracker.RunToPause(ctx, func(fnRef refs.Ref, l sdk.Log) {
-			log.Info("log", "message", l.Message, "attributes", l.Attributes, "function", fnRef.String())
-		})
+		err = tracker.RunToPause(ctx, tuiwork.TuiLogger(workTui))
 		if err != nil {
 			return err
 		}

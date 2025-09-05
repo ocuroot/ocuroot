@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 
 export OCU_REPO_COMMIT_OVERRIDE=${OCU_REPO_COMMIT_OVERRIDE:-commitid}
+export OCUROOT_HOME=$(pwd)/$(dirname "$0")/.ocuroot
 
 source $(dirname "$0")/../test_helpers.sh
 
@@ -9,6 +10,7 @@ build_ocuroot
 pushd "$(dirname "$0")" > /dev/null
 
 rm -rf .store
+rm -rf .ocuroot
 
 echo "== set up environments =="
 ocuroot release new environments/package.ocu.star

@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
 
+export OCUROOT_HOME=$(pwd)/$(dirname "$0")/.ocuroot
+
 source $(dirname "$0")/../test_helpers.sh
 
 retry_explicit_ref() {
@@ -15,7 +17,7 @@ retry_explicit_ref() {
 
     check_ref_exists "release.ocu.star/@/deploy/production"
     # Ensure that the release was completed after the retry
-    check_ref_exists "release.ocu.star/@r1/call/postrelease/1/status/complete"
+    check_ref_exists "release.ocu.star/@r1/task/postrelease/1/status/complete"
 
     echo "Test passed"
 }
@@ -42,6 +44,7 @@ retry_package_only() {
 setup_test() {
     rm -rf .store
     rm -rf .data
+    rm -rf .ocuroot
 
     ocuroot release new environments.ocu.star
 }

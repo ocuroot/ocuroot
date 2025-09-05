@@ -53,8 +53,8 @@ phase(
         prerelease, 
         name="prerelease", 
         inputs={
-            "prev_prerelease": input(ref="./@/call/version#output/prerelease", default=""),
-            "prev_version": input(ref="./@/call/finalize#output/version", default=""),
+            "prev_prerelease": input(ref="./@/task/version#output/prerelease", default=""),
+            "prev_version": input(ref="./@/task/finalize#output/version", default=""),
         },
     )],
 )
@@ -65,7 +65,7 @@ phase(
         build, 
         name="build", 
         inputs={
-            "prerelease": input(ref="./@/call/prerelease#output/prerelease"),
+            "prerelease": input(ref="./@/task/prerelease#output/prerelease"),
         },
     )],
 )
@@ -112,7 +112,7 @@ phase(
             release,
             name="release",
             inputs={
-                "prerelease": input(ref="./@/call/prerelease#output/prerelease"),
+                "prerelease": input(ref="./@/task/prerelease#output/prerelease"),
             },
         ),
     ],
@@ -133,7 +133,7 @@ phase(
             finalize,
             name="finalize",
             inputs={
-                "version": input(ref="./@/call/version#output/version"),
+                "version": input(ref="./@/task/version#output/version"),
             },
         ),
     ],

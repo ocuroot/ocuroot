@@ -9,10 +9,7 @@ func NewID[T ~string]() T {
 }
 
 // ID type definitions
-type RepoRemoteURL string
 type ReleaseID string
-type FunctionChainID string
-type FunctionID string
 type EnvironmentID string
 type PhaseID string
 type LogID string

@@ -123,68 +123,68 @@ func TestPhaseSummaryStatus(t *testing.T) {
 		{
 			name: "empty phase is complete",
 			phase: PhaseSummary{
-				ID:   models.PhaseID(newID()),
-				Name: "Empty Phase",
-				Work: []WorkSummary{},
+				ID:    models.PhaseID(newID()),
+				Name:  "Empty Phase",
+				Tasks: []TaskSummary{},
 			},
 			expected: models.StatusComplete,
 		},
 		{
-			name: "phase with all complete chains is complete",
+			name: "phase with all complete tasks is complete",
 			phase: PhaseSummary{
 				ID:   models.PhaseID(newID()),
 				Name: "Complete Phase",
-				Work: []WorkSummary{
-					createWorkSummary(models.StatusComplete),
-					createWorkSummary(models.StatusComplete),
+				Tasks: []TaskSummary{
+					createTaskSummary(models.StatusComplete),
+					createTaskSummary(models.StatusComplete),
 				},
 			},
 			expected: models.StatusComplete,
 		},
 		{
-			name: "phase with any pending chain is pending",
+			name: "phase with any pending task is pending",
 			phase: PhaseSummary{
 				ID:   models.PhaseID(newID()),
 				Name: "Pending Phase",
-				Work: []WorkSummary{
-					createWorkSummary(models.StatusComplete),
-					createWorkSummary(models.StatusPending),
+				Tasks: []TaskSummary{
+					createTaskSummary(models.StatusComplete),
+					createTaskSummary(models.StatusPending),
 				},
 			},
 			expected: models.StatusPending,
 		},
 		{
-			name: "phase with any running chain is running",
+			name: "phase with any running task is running",
 			phase: PhaseSummary{
 				ID:   models.PhaseID(newID()),
 				Name: "Running Phase",
-				Work: []WorkSummary{
-					createWorkSummary(models.StatusComplete),
-					createWorkSummary(models.StatusRunning),
+				Tasks: []TaskSummary{
+					createTaskSummary(models.StatusComplete),
+					createTaskSummary(models.StatusRunning),
 				},
 			},
 			expected: models.StatusRunning,
 		},
 		{
-			name: "phase with any failed chain is failed",
+			name: "phase with any failed task is failed",
 			phase: PhaseSummary{
 				ID:   models.PhaseID(newID()),
 				Name: "Failed Phase",
-				Work: []WorkSummary{
-					createWorkSummary(models.StatusComplete),
-					createWorkSummary(models.StatusFailed),
+				Tasks: []TaskSummary{
+					createTaskSummary(models.StatusComplete),
+					createTaskSummary(models.StatusFailed),
 				},
 			},
 			expected: models.StatusFailed,
 		},
 		{
-			name: "phase with any cancelled chain is cancelled",
+			name: "phase with any cancelled task is cancelled",
 			phase: PhaseSummary{
 				ID:   models.PhaseID(newID()),
 				Name: "Cancelled Phase",
-				Work: []WorkSummary{
-					createWorkSummary(models.StatusComplete),
-					createWorkSummary(models.StatusCancelled),
+				Tasks: []TaskSummary{
+					createTaskSummary(models.StatusComplete),
+					createTaskSummary(models.StatusCancelled),
 				},
 			},
 			expected: models.StatusCancelled,
@@ -194,12 +194,12 @@ func TestPhaseSummaryStatus(t *testing.T) {
 			phase: PhaseSummary{
 				ID:   models.PhaseID(newID()),
 				Name: "Priority Phase",
-				Work: []WorkSummary{
-					createWorkSummary(models.StatusComplete),
-					createWorkSummary(models.StatusPending),
-					createWorkSummary(models.StatusRunning),
-					createWorkSummary(models.StatusCancelled),
-					createWorkSummary(models.StatusFailed),
+				Tasks: []TaskSummary{
+					createTaskSummary(models.StatusComplete),
+					createTaskSummary(models.StatusPending),
+					createTaskSummary(models.StatusRunning),
+					createTaskSummary(models.StatusCancelled),
+					createTaskSummary(models.StatusFailed),
 				},
 			},
 			expected: models.StatusFailed,
@@ -209,69 +209,6 @@ func TestPhaseSummaryStatus(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			status := tt.phase.Status()
-			assert.Equal(t, tt.expected, status)
-		})
-	}
-}
-
-// TestFunctionChainSummaryStatus tests the Status calculation of a FunctionChainSummary
-func TestFunctionChainSummaryStatus(t *testing.T) {
-	tests := []struct {
-		name     string
-		chain    FunctionChainSummary
-		expected models.Status
-	}{
-		{
-			name: "empty chain is pending",
-			chain: FunctionChainSummary{
-				ID:        models.FunctionChainID(newID()),
-				Name:      "Empty Chain",
-				Functions: []*models.Function{},
-			},
-			expected: models.StatusPending,
-		},
-		{
-			name: "chain status is the status of the last function",
-			chain: FunctionChainSummary{
-				ID:   models.FunctionChainID(newID()),
-				Name: "Status Chain",
-				Functions: []*models.Function{
-					createFunctionSummary(models.StatusComplete),
-					createFunctionSummary(models.StatusComplete),
-					createFunctionSummary(models.StatusFailed),
-				},
-			},
-			expected: models.StatusFailed,
-		},
-		{
-			name: "chain with only one function",
-			chain: FunctionChainSummary{
-				ID:   models.FunctionChainID(newID()),
-				Name: "Single Function Chain",
-				Functions: []*models.Function{
-					createFunctionSummary(models.StatusRunning),
-				},
-			},
-			expected: models.StatusRunning,
-		},
-		{
-			name: "chain with multiple functions in various states",
-			chain: FunctionChainSummary{
-				ID:   models.FunctionChainID(newID()),
-				Name: "Multi-Function Chain",
-				Functions: []*models.Function{
-					createFunctionSummary(models.StatusComplete),
-					createFunctionSummary(models.StatusFailed),
-					createFunctionSummary(models.StatusPending),
-				},
-			},
-			expected: models.StatusPending,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			status := tt.chain.Status()
 			assert.Equal(t, tt.expected, status)
 		})
 	}
@@ -312,7 +249,7 @@ func TestStatusCountMap(t *testing.T) {
 }
 
 // TestReleaseSummaryIntegration tests the entire release summary status calculation
-// including phases, chains, and functions
+// including phases, tasks and runs
 func TestReleaseSummaryIntegration(t *testing.T) {
 	// Create a release with multiple phases in different states
 	// to validate the status calculation logic works across the entire structure
@@ -324,7 +261,7 @@ func TestReleaseSummaryIntegration(t *testing.T) {
 	})
 	assert.Equal(t, models.StatusComplete, allCompleteRelease.Status())
 
-	// Case 2: Release with a failed function in one chain
+	// Case 2: Release with a failed function in one task
 	failedFunctionRelease := createRelease([][]models.Status{
 		{models.StatusComplete, models.StatusComplete},
 		{models.StatusComplete, models.StatusFailed},
@@ -339,7 +276,7 @@ func TestReleaseSummaryIntegration(t *testing.T) {
 	})
 	assert.Equal(t, models.StatusRunning, mixedStatusRelease.Status())
 
-	// Case 4: Release with pending functions
+	// Case 4: Release with pending runs
 	pendingRelease := createRelease([][]models.Status{
 		{models.StatusComplete, models.StatusComplete},
 		{models.StatusComplete, models.StatusPending},
@@ -352,87 +289,80 @@ func createPhaseSummary(status models.Status) PhaseSummary {
 	return PhaseSummary{
 		ID:   models.PhaseID(newID()),
 		Name: "Test Phase",
-		Work: []WorkSummary{
-			createWorkSummary(status),
+		Tasks: []TaskSummary{
+			createTaskSummary(status),
 		},
 	}
 }
 
-// Helper function to create a WorkSummary with a specific status
-func createWorkSummary(status models.Status) WorkSummary {
-	return WorkSummary{
+// Helper function to create a TaskSummary with a specific status
+func createTaskSummary(status models.Status) TaskSummary {
+	return TaskSummary{
 		Environment: &EnvironmentSummary{
 			ID:   models.EnvironmentID(newID()),
 			Name: "Test Environment",
 		},
-		Chains: []*FunctionChainSummary{
+		Runs: []models.Run{
 			{
-				ID:   models.FunctionChainID(newID()),
-				Name: "Test Chain",
 				Functions: []*models.Function{
-					createFunctionSummary(status),
+					createFunctionSummary(),
 				},
 			},
 		},
+		RunStatuses: []models.Status{status},
 	}
 }
 
 // Helper function to create a FunctionSummary with a specific status
-func createFunctionSummary(status models.Status) *models.Function {
+func createFunctionSummary() *models.Function {
 	return &models.Function{
-		ID: models.FunctionID(newID()),
 		Fn: sdk.FunctionDef{
 			Name: "Test Function",
 		},
-		Status: status,
 		Inputs: map[string]sdk.InputDescriptor{
 			"input": {
 				Default: "test-input",
 			},
 		},
-		Outputs: map[string]any{
-			"output": "test-output",
-		},
 	}
 }
 
-// Helper function to create a complete release with phases and chains
+// Helper function to create a complete release with phases and tasks
 func createRelease(phaseStatuses [][]models.Status) *ReleaseSummary {
 	phases := make([]PhaseSummary, 0, len(phaseStatuses))
 
 	// Create a phase for each status array
-	for i, chainStatuses := range phaseStatuses {
-		work := make([]WorkSummary, 0, len(chainStatuses))
+	for i, taskStatuses := range phaseStatuses {
+		tasks := make([]TaskSummary, 0, len(taskStatuses))
 
-		// Create chains with the specified statuses
-		for j, status := range chainStatuses {
+		// Create runs with the specified statuses
+		for j, status := range taskStatuses {
 			functions := make([]*models.Function, 0, 1)
 
 			// Add a function with the specified status
-			functions = append(functions, createFunctionSummary(status))
+			functions = append(functions, createFunctionSummary())
 
-			// Create the chain
-			chain := &FunctionChainSummary{
-				ID:        models.FunctionChainID(newID()),
-				Name:      fmt.Sprintf("Chain %d-%d", i, j),
+			// Create the run
+			run := models.Run{
 				Functions: functions,
 			}
 
-			// Add the chain to the work
-			work = append(work, WorkSummary{
+			// Add the run to the task
+			tasks = append(tasks, TaskSummary{
 				Environment: &EnvironmentSummary{
 					ID:   models.EnvironmentID(newID()),
 					Name: fmt.Sprintf("Environment %d-%d", i, j),
 				},
-				Chains: []*FunctionChainSummary{chain},
+				Runs:        []models.Run{run},
+				RunStatuses: []models.Status{status},
 			})
 		}
 
 		// Create the phase
 		phases = append(phases, PhaseSummary{
-			ID:   models.PhaseID(newID()),
-			Name: fmt.Sprintf("Phase %d", i),
-			Work: work,
+			ID:    models.PhaseID(newID()),
+			Name:  fmt.Sprintf("Phase %d", i),
+			Tasks: tasks,
 		})
 	}
 

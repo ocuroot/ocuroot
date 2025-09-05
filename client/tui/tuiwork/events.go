@@ -17,18 +17,18 @@ import (
 )
 
 func initEvent(ref refs.Ref, t tui.Tui, store refstore.Store) *TaskEvent {
-	wr, err := librelease.WorkRefFromChainRef(ref)
+	tr, err := librelease.ReduceToTaskRef(ref)
 	if err != nil {
-		log.Error("failed to get work ref", "error", err)
+		log.Error("failed to get task ref", "error", err)
 		return nil
 	}
-	chainRef := librelease.ChainRefFromFunctionRef(ref)
+	runRef := librelease.ReduceToRunRef(ref)
 
 	var out *TaskEvent = &TaskEvent{}
 
-	tr, found := t.GetTaskByID(wr.String())
+	ttr, found := t.GetTaskByID(tr.String())
 	if found {
-		out.Old, _ = tr.(*Task)
+		out.Old, _ = ttr.(*Task)
 	}
 
 	if out.Old != nil {
@@ -41,19 +41,19 @@ func initEvent(ref refs.Ref, t tui.Tui, store refstore.Store) *TaskEvent {
 		}
 	}
 	if out.New == nil {
-		name := strings.Split(chainRef.SubPath, "/")[0]
-		if chainRef.SubPathType == refs.SubPathTypeDeploy {
+		name := strings.Split(runRef.SubPath, "/")[0]
+		if runRef.SubPathType == refs.SubPathTypeDeploy {
 			name = fmt.Sprintf("deploy to %s", name)
 		}
 
 		out.New = &Task{
-			TaskID:       wr.String(),
+			TaskID:       tr.String(),
 			Name:         name,
 			Status:       WorkStatusPending,
 			CreationTime: time.Now(),
 
-			Store:    store,
-			ChainRef: chainRef,
+			Store:  store,
+			JobRef: runRef,
 		}
 	}
 
@@ -61,15 +61,15 @@ func initEvent(ref refs.Ref, t tui.Tui, store refstore.Store) *TaskEvent {
 }
 
 func updateStatus(ctx context.Context, store refstore.Store, ref refs.Ref, ev *TaskEvent) {
-	chainRef := librelease.ChainRefFromFunctionRef(ref)
-	chainStatus, err := librelease.GetFunctionChainStatusFromFunctions(ctx, store, chainRef)
+	runRef := librelease.ReduceToRunRef(ref)
+	runStatus, err := librelease.GetRunStatus(ctx, store, runRef)
 	if err != nil {
-		log.Error("failed to get function chain status", "chainRef", ref.String(), "error", err)
+		log.Error("failed to get work status", "runRef", ref.String(), "error", err)
 		return
 	}
 
 	var status WorkStatus
-	switch chainStatus {
+	switch runStatus {
 	case models.StatusPending:
 		status = WorkStatusPending
 	case models.StatusRunning:
@@ -87,7 +87,7 @@ func updateStatus(ctx context.Context, store refstore.Store, ref refs.Ref, ev *T
 
 func TuiLogger(tuiWork tui.Tui) func(fnRef refs.Ref, msg sdk.Log) {
 	return func(fnRef refs.Ref, msg sdk.Log) {
-		wr, err := librelease.WorkRefFromChainRef(fnRef)
+		wr, err := librelease.ReduceToTaskRef(fnRef)
 		if err != nil {
 			log.Error("failed to get work ref", "error", err)
 			return
@@ -101,7 +101,7 @@ func TuiLogger(tuiWork tui.Tui) func(fnRef refs.Ref, msg sdk.Log) {
 	}
 }
 
-func WatchForChainUpdates(ctx context.Context, store refstore.Store, tuiWork tui.Tui) refstore.Store {
+func WatchForJobUpdates(ctx context.Context, store refstore.Store, tuiWork tui.Tui) refstore.Store {
 	updater := tuiStateChange(ctx, store, tuiWork)
 
 	store, err := refstore.ListenToStateChanges(
@@ -115,7 +115,7 @@ func WatchForChainUpdates(ctx context.Context, store refstore.Store, tuiWork tui
 			updater(r)
 		},
 		store,
-		"**/{call,deploy}/*/*/status/*",
+		"**/{task,deploy}/*/*/status/*",
 	)
 	if err != nil {
 		log.Error("failed to listen to state changes", "error", err)
@@ -127,10 +127,10 @@ func WatchForChainUpdates(ctx context.Context, store refstore.Store, tuiWork tui
 
 func tuiStateChange(ctx context.Context, store refstore.Store, tuiWork tui.Tui) func(ref refs.Ref) {
 	return func(ref refs.Ref) {
-		chainRef := librelease.ChainRefFromFunctionRef(ref)
+		runRef := librelease.ReduceToRunRef(ref)
 
-		out := initEvent(chainRef, tuiWork, store)
-		updateStatus(ctx, store, chainRef, out)
+		out := initEvent(runRef, tuiWork, store)
+		updateStatus(ctx, store, runRef, out)
 
 		if out.New.Status == WorkStatusRunning {
 			if out.Old == nil || out.Old.Status != WorkStatusRunning {

@@ -1,24 +1,26 @@
 #!/usr/bin/env bash
 
+export OCUROOT_HOME=$(pwd)/$(dirname "$0")/.ocuroot
+
 source $(dirname "$0")/../test_helpers.sh
 
 bad_inputs() {
     setup_test
 
     ocuroot release new badinputs.ocu.star
-    assert_not_equal "0" "$?" "Expected a failure"
+    assert_not_equal "0" "$?" "Expected a failure in badinputs.ocu.star"
 
     ocuroot release new badinputsinnext.ocu.star
-    assert_not_equal "0" "$?" "Expected a failure"
+    assert_not_equal "0" "$?" "Expected a failure in badinputsinnext.ocu.star"
 
     ocuroot release new tags.ocu.star
-    assert_not_equal "0" "$?" "Expected a failure"
+    assert_not_equal "0" "$?" "Expected a failure in tags.ocu.star"
 
     ocuroot release new tags2.ocu.star
-    assert_not_equal "0" "$?" "Expected a failure"
+    assert_not_equal "0" "$?" "Expected a failure in tags2.ocu.star"
 
     ocuroot release new environments.ocu.star
-    assert_not_equal "0" "$?" "Expected a failure"
+    assert_not_equal "0" "$?" "Expected a failure in environments.ocu.star"
 
     check_ref_does_not_exist "@/environment/invalid/name"
 
@@ -34,13 +36,14 @@ bad_inputs() {
     check_ref_does_not_exist "@/environment/shouldmatch"
 
     ocuroot release new functionargs.ocu.star
-    assert_not_equal "0" "$?" "Expected a failure"
+    assert_not_equal "0" "$?" "Expected a failure in functionargs.ocu.star"
     
     echo "Test passed"
 }
 
 setup_test() {
     rm -rf .store
+    rm -rf .ocuroot
 }
 
 build_ocuroot

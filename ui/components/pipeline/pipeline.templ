@@ -4,14 +4,13 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/ocuroot/ui/components"
-	"github.com/ocuroot/ui/components/icons"
 	"github.com/ocuroot/ocuroot/ui/components/keyvalue"
 	"github.com/ocuroot/ocuroot/ui/components/logs"
 	"github.com/ocuroot/ui/components/progress"
 	"github.com/ocuroot/ocuroot/store/models"
 )
 
-type LogURLFunction func(fc *FunctionChainSummary) string
+type LogURLFunction func(fc models.Run) string
 
 type PipelineProps struct {
 	Summary *ReleaseSummary
@@ -148,34 +147,33 @@ func getFunctionBorderClass(status models.Status) string {
 	}
 }
 
-// modalsForChain renders the modals for a chain's functions
-templ modalsForChain(chain []*FunctionChainSummary, logURL LogURLFunction) {
-	for _, c := range chain {
-		@components.Modal(fmt.Sprintf("modal-chain-logs-%s", c.ID), fmt.Sprintf("Chain Logs: %s", c.Name), "full") {
-			if logURL != nil {
-				@logs.LogView(logURL(c), fmt.Sprintf("chain-logs-%s", c.ID))
+// modalsForTask renders the modals for a task's functions
+templ modalsForTask(task *TaskSummary, logURL LogURLFunction) {
+	{{ c := task.Runs[0] }}
+	@components.Modal(fmt.Sprintf("modal-task-logs-%s", task.Name), fmt.Sprintf("Task Logs: %s", task.Name), "full") {
+		if logURL != nil {
+			@logs.LogView(logURL(c), fmt.Sprintf("task-logs-%s", task.Name))
+		} else {
+			<p>No log URL provided</p>
+		}
+	}
+	if len(c.Functions) > 0 {
+		// First function's inputs
+		@components.Modal(fmt.Sprintf("modal-task-inputs-%s", task.Name), "Task Inputs") {
+			if len(c.Functions[0].Inputs) > 0 {
+				@keyvalue.FromInputMap(c.Functions[0].Inputs)
 			} else {
-				<p>No log URL provided</p>
+				<p>No inputs</p>
 			}
 		}
-		if len(c.Functions) > 0 {
-			// First function's inputs
-			@components.Modal(fmt.Sprintf("chain-inputs-%s", c.ID), "Chain Inputs") {
-				if len(c.Functions[0].Inputs) > 0 {
-					@keyvalue.FromInputMap(c.Functions[0].Inputs)
-				} else {
-					<p>No inputs</p>
-				}
-			}
-		}
-		// Last function's outputs
-		if c.Status() == models.StatusComplete {
-			@components.Modal(fmt.Sprintf("chain-outputs-%s", c.ID), "Chain Outputs") {
-				if len(c.Functions[len(c.Functions)-1].Outputs) > 0 {
-					@keyvalue.FromVarMap(c.Functions[len(c.Functions)-1].Outputs)
-				} else {
-					<p>No outputs</p>
-				}
+	}
+	// Last function's outputs
+	if task.RunStatuses[len(task.RunStatuses)-1] == models.StatusComplete {
+		@components.Modal(fmt.Sprintf("modal-task-outputs-%s", task.Name), "Task Outputs") {
+			if len(task.Runs[len(task.Runs)-1].Outputs) > 0 {
+				@keyvalue.FromVarMap(task.Runs[len(task.Runs)-1].Outputs)
+			} else {
+				<p>No outputs</p>
 			}
 		}
 	}
@@ -217,22 +215,22 @@ templ RenderPhaseProgress(counts StatusCountMap) {
 	}
 }
 
-// ChainHeader renders a simplified header for a function chain
-templ WorkHeader(work *WorkSummary, logURL LogURLFunction) {
-	@modalsForChain(work.Chains, logURL)
+// TaskHeader renders a simplified header for a task
+templ TaskHeader(task *TaskSummary, logURL LogURLFunction) {
+	@modalsForTask(task, logURL)
 	<div class="group relative mb-2">
 		<div class="border border-gray-200 rounded overflow-hidden">
 			<div class="bg-gray-50 hover:bg-gray-100 px-3 py-2 transition-all duration-150 ease-in-out">
 				<div class="flex justify-between items-start">
 					<div class="font-medium">
 						<div class="flex items-center mb-1">
-							if work.Environment != nil {
+							if task.Environment != nil {
 								<!-- Environment icon: location pin -->
 								<svg class="h-4 w-4 text-gray-700 mr-1" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
 									<circle cx="12" cy="10" r="3"></circle>
 									<path d="M12 21.7C17.3 17 20 13 20 10a8 8 0 1 0-16 0c0 3 2.7 7 8 11.7z"></path>
 								</svg>
-								<span class="text-gray-800">{ work.Environment.Name }</span>
+								<span class="text-gray-800">{ task.Environment.Name }</span>
 							} else {
 								<!-- Call icon: fast-forward arrow -->
 								<svg class="h-4 w-4 text-gray-700 mr-1" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -242,77 +240,32 @@ templ WorkHeader(work *WorkSummary, logURL LogURLFunction) {
 								<span class="font-semibold text-gray-800">Call</span>
 							}
 						</div>
-						<div class="text-xs text-gray-500">{ work.Chains[0].Name }</div>
+						<div class="text-xs text-gray-500">{ task.Name }</div>
 					</div>
 					<div class="flex items-center gap-2">
-						if len(work.Chains) > 3 {
+						if len(task.Runs) > 3 {
 							<div style="margin-right: 4px;">...</div>
-							for _, chain := range work.Chains[len(work.Chains)-3:] {
-								<a style="margin-right: 4px;" href={ fmt.Sprintf("/ref/%s", chain.ID) }>
-									@MapStatusToProgress(chain.Status())
+							{{ runRefs := task.RunRefs[len(task.RunRefs)-3:] }}
+							for index, runStatus := range task.RunStatuses[len(task.RunStatuses)-3:] {
+								<a style="margin-right: 4px;" href={ fmt.Sprintf("/ref/%s", runRefs[index]) }>
+									@MapStatusToProgress(runStatus)
 								</a>
 							}
 						} else {
-							for _, chain := range work.Chains {
-								<a href={ fmt.Sprintf("/ref/%s", chain.ID) }>
-									@MapStatusToProgress(chain.Status())
+							for index, runStatus := range task.RunStatuses {
+								<a href={ fmt.Sprintf("/ref/%s", task.RunRefs[index]) }>
+									@MapStatusToProgress(runStatus)
 								</a>
 							}
 						}
 					</div>
 				</div>
 			</div>
-			<!-- Action drawer - slides down on hover -->
-			// <div class="h-0 group-hover:h-10 overflow-hidden transition-all duration-150 ease-in-out">
-			// 	<div class="bg-gray-200 px-3 py-2 flex items-center justify-end gap-1 border-t border-gray-200">
-			// 		@ChainActionIcons(work.Chain)
-			// 	</div>
-			// </div>
 		</div>
 	</div>
 }
 
-// ChainActionIcons renders the action icons for a chain
-templ ChainActionIcons(chain *FunctionChainSummary) {
-	if len(chain.Functions) > 0 {
-		<button
-			class="p-1 hover:bg-gray-300 rounded"
-			title="View inputs"
-			onclick={ components.OpenModal(fmt.Sprintf("chain-inputs-%s", chain.ID)) }
-		>
-			@icons.Inputs()
-		</button>
-		if chain.Status() == models.StatusComplete {
-			<button
-				class="p-1 hover:bg-gray-300 rounded"
-				title="View outputs"
-				onclick={ components.OpenModal(fmt.Sprintf("chain-outputs-%s", chain.ID)) }
-			>
-				@icons.Outputs()
-			</button>
-		}
-		if chain.Status() != models.StatusComplete {
-			<button
-				class="p-1 opacity-50 cursor-not-allowed rounded"
-				title="Outputs not available until chain is complete"
-				disabled
-			>
-				@icons.Outputs()
-			</button>
-		}
-		<button class="p-1 hover:bg-gray-300 rounded" title="View links">
-			@icons.Links()
-		</button>
-		<button class="p-1 hover:bg-gray-300 rounded" title="View logs" onclick={ components.OpenModal(fmt.Sprintf("modal-chain-logs-%s", chain.ID)) }>
-			@icons.Logs()
-		</button>
-	}
-	<button class="p-1 hover:bg-gray-300 rounded" title="View dependencies">
-		@icons.Dependencies()
-	</button>
-}
-
-// RenderPhaseSummary renders a phase summary with its chains
+// RenderPhaseSummary renders a phase summary with its tasks
 templ RenderPhaseSummary(phase *PhaseSummary, logURL LogURLFunction) {
 	<div class="pipeline-card border rounded p-2 bg-white relative">
 		<div class="flex justify-between items-center mb-2">
@@ -322,9 +275,9 @@ templ RenderPhaseSummary(phase *PhaseSummary, logURL LogURLFunction) {
 			</div>
 		</div>
 		<div class="space-y-2">
-			<!-- Loop through all work items in the phase -->
-			for _, work := range phase.Work {
-				@WorkHeader(&work, logURL)
+			<!-- Loop through all tasks in the phase -->
+			for _, task := range phase.Tasks {
+				@TaskHeader(&task, logURL)
 			}
 		</div>
 	</div>

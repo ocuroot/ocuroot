@@ -19,6 +19,7 @@ const (
 	StatusFailed        Status = "failed"
 	StatusFailedRetried Status = "failed_retried"
 	StatusCancelled     Status = "cancelled"
+	StatusPaused        Status = "paused"
 )
 
 // Log represents a log entry for a function

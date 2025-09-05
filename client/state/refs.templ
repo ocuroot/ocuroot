@@ -59,19 +59,19 @@ templ RefHeader(props RefPageProps) {
                 fmt.Sprintf("/ref/%s/-/%s/@%s", rp.Repo, rp.Filename, rp.ReleaseOrIntent.Value),
             )
         }
-        if rp.SubPathType == refs.SubPathTypeCall {
+        if rp.SubPathType == refs.SubPathTypeTask {
             @HeaderLink(
                 props.Ref, 
-                release.GlobCall, 
-                fmt.Sprintf("Call '%s'", strings.Split(rp.SubPath, "/")[0]), 
-                fmt.Sprintf("/ref/%s/-/%s/@%s/call/%s", rp.Repo, rp.Filename, rp.ReleaseOrIntent.Value, strings.Split(rp.SubPath, "/")[0]),
+                release.GlobTask, 
+                fmt.Sprintf("Task '%s'", strings.Split(rp.SubPath, "/")[0]), 
+                fmt.Sprintf("/ref/%s/-/%s/@%s/task/%s", rp.Repo, rp.Filename, rp.ReleaseOrIntent.Value, strings.Split(rp.SubPath, "/")[0]),
             )
             if len(strings.Split(rp.SubPath, "/")) > 1 {
                 @HeaderLink(
                     props.Ref, 
-                    release.GlobChain, 
-                    fmt.Sprintf("#%s", strings.Split(rp.SubPath, "/")[1]), 
-                    fmt.Sprintf("/ref/%s/-/%s/@%s/call/%s/%s", rp.Repo, rp.Filename, rp.ReleaseOrIntent.Value, strings.Split(rp.SubPath, "/")[0], strings.Split(rp.SubPath, "/")[1]),
+                    release.GlobRun, 
+                    fmt.Sprintf("Run %s", strings.Split(rp.SubPath, "/")[1]), 
+                    fmt.Sprintf("/ref/%s/-/%s/@%s/task/%s/%s", rp.Repo, rp.Filename, rp.ReleaseOrIntent.Value, strings.Split(rp.SubPath, "/")[0], strings.Split(rp.SubPath, "/")[1]),
                 )
             }
         }
@@ -85,8 +85,8 @@ templ RefHeader(props RefPageProps) {
             if len(strings.Split(rp.SubPath, "/")) > 1 {
                 @HeaderLink(
                     props.Ref, 
-                    release.GlobChain, 
-                    fmt.Sprintf("#%s", strings.Split(rp.SubPath, "/")[1]), 
+                    release.GlobRun, 
+                    fmt.Sprintf("Run %s", strings.Split(rp.SubPath, "/")[1]), 
                     fmt.Sprintf("/ref/%s/-/%s/@%s/deploy/%s/%s", rp.Repo, rp.Filename, rp.ReleaseOrIntent.Value, strings.Split(rp.SubPath, "/")[0], strings.Split(rp.SubPath, "/")[1]),
                 )
             }
@@ -134,16 +134,14 @@ templ StateContent(props RefPageProps) {
     switch c := props.Content.(type) {
         case release.ReleaseInfo:
             @ReleaseCard(props)
-        case models.Work:
-            @WorkView(props)
+        case models.Run:
+            @RunView(props)
         case models.Intent:
             @components.Card() {
                 <pre><code class="language-json">{ toJson(c) }</code></pre>
             }
         case []sdk.Log:
             @Logs(c)
-        case release.FunctionState:
-            @FunctionState(props)
         case models.Environment:
             @Environment(props)
         default:

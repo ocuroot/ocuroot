@@ -25,6 +25,10 @@ func Parse(ref string) (Ref, error) {
 		case item.typ == itemPackage:
 			outRef.Filename = item.val
 		case item.typ == itemSubpathType:
+			// Backwards compatibility, transform call to task
+			if item.val == "call" {
+				item.val = "task"
+			}
 			pt := SubPathType(item.val)
 			outRef.SubPathType = pt
 		case item.typ == itemSubpath:
@@ -93,7 +97,7 @@ func (i item) String() string {
 	case itemPackage:
 		return fmt.Sprintf("itemPackage(%s)", i.val)
 	case itemFragment:
-		return fmt.Sprintf("itemWorkPath(%s)", i.val)
+		return fmt.Sprintf("itemFragment(%s)", i.val)
 	case itemSubpathType:
 		return fmt.Sprintf("itemTypeIdentifier(%s)", i.val)
 	case itemSubpath:

@@ -8,6 +8,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"runtime/debug"
 	"sort"
 	"strings"
 
@@ -48,6 +49,7 @@ const (
 type StorageObject struct {
 	Kind     StorageKind     `json:"kind"`
 	BodyType string          `json:"body_type,omitempty"`
+	SetStack string          `json:"set_stack,omitempty"`
 	Links    []string        `json:"links,omitempty"`
 	Body     json.RawMessage `json:"body"`
 }
@@ -195,6 +197,10 @@ func (f *FSStateStore) Set(ctx context.Context, ref string, v any) error {
 		Kind:     StorageKindRef,
 		BodyType: fmt.Sprintf("%T", v),
 		Body:     jsonBody,
+	}
+
+	if os.Getenv("OCUROOT_DEBUG") != "" {
+		storageObject.SetStack = string(debug.Stack())
 	}
 
 	storageObject.Links, err = f.linksAtPath(fp)

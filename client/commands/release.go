@@ -47,7 +47,6 @@ var NewReleaseCmd = &cobra.Command{
 			return err
 		}
 
-		logMode := cmd.Flag("logmode").Changed
 		force := cmd.Flag("force").Changed
 
 		if !force {
@@ -66,10 +65,10 @@ var NewReleaseCmd = &cobra.Command{
 
 		cmd.SilenceUsage = true
 
-		workTui := tui.StartWorkTui(logMode)
+		workTui := tui.StartWorkTui()
 		defer workTui.Cleanup()
 
-		tc.Store = tuiwork.WatchForChainUpdates(ctx, tc.Store, workTui)
+		tc.Store = tuiwork.WatchForJobUpdates(ctx, tc.Store, workTui)
 
 		tracker, environments, err := release.TrackerForNewRelease(ctx, tc)
 		if err != nil {
@@ -130,8 +129,6 @@ var ContinueReleaseCmd = &cobra.Command{
 			return err
 		}
 
-		logMode := cmd.Flag("logmode").Changed
-
 		if tc.Ref.ReleaseOrIntent.Type != refs.Release {
 			fmt.Println("A release ID or tag must be specified")
 			return nil
@@ -139,10 +136,10 @@ var ContinueReleaseCmd = &cobra.Command{
 
 		cmd.SilenceUsage = true
 
-		workTui := tui.StartWorkTui(logMode)
+		workTui := tui.StartWorkTui()
 		defer workTui.Cleanup()
 
-		tc.Store = tuiwork.WatchForChainUpdates(ctx, tc.Store, workTui)
+		tc.Store = tuiwork.WatchForJobUpdates(ctx, tc.Store, workTui)
 
 		tracker, err := release.TrackerForExistingRelease(ctx, tc)
 		if err != nil {
@@ -157,11 +154,6 @@ var ContinueReleaseCmd = &cobra.Command{
 			ctx,
 			tuiwork.TuiLogger(workTui),
 		)
-		if err != nil {
-			return err
-		}
-
-		err = workTui.Cleanup()
 		if err != nil {
 			return err
 		}
@@ -204,12 +196,10 @@ var RetryReleaseCmd = &cobra.Command{
 
 		cmd.SilenceUsage = true
 
-		logMode := cmd.Flag("logmode").Changed
-
-		workTui := tui.StartWorkTui(logMode)
+		workTui := tui.StartWorkTui()
 		defer workTui.Cleanup()
 
-		tc.Store = tuiwork.WatchForChainUpdates(ctx, tc.Store, workTui)
+		tc.Store = tuiwork.WatchForJobUpdates(ctx, tc.Store, workTui)
 
 		tracker, err := release.TrackerForExistingRelease(ctx, tc)
 		if err != nil {
@@ -250,7 +240,6 @@ func checkFinalReleaseState(
 
 func init() {
 	ReleaseCmd.AddCommand(NewReleaseCmd)
-	ReleaseCmd.PersistentFlags().BoolP("logmode", "l", false, "Enable log mode when initializing the TUI")
 
 	NewReleaseCmd.Flags().BoolP("force", "f", false, "Create a new release even if there are existing releases for this commit")
 

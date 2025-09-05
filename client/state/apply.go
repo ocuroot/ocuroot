@@ -13,7 +13,6 @@ import (
 	"github.com/ocuroot/ocuroot/refs/refstore"
 	"github.com/ocuroot/ocuroot/sdk"
 	"github.com/ocuroot/ocuroot/store/models"
-	"github.com/ocuroot/ocuroot/ui/components/pipeline"
 )
 
 func ApplyIntent(ctx context.Context, ref refs.Ref, store refstore.Store) error {
@@ -81,7 +80,7 @@ func applyEnvironmentIntent(ctx context.Context, ref refs.Ref, store refstore.St
 		return fmt.Errorf("failed to set state: %w", err)
 	}
 
-	// Add a task to all deployed releases
+	// Add an operation to all deployed releases
 	deployments, err := store.Match(ctx, "**/@/deploy/*")
 	if err != nil {
 		return fmt.Errorf("failed to match deployments: %w", err)
@@ -95,10 +94,10 @@ func applyEnvironmentIntent(ctx context.Context, ref refs.Ref, store refstore.St
 		if err != nil {
 			return fmt.Errorf("failed to parse deployment: %w", err)
 		}
-		parsedDeployment = parsedDeployment.SetSubPathType(refs.SubPathTypeTask).SetSubPath("check_envs")
+		parsedDeployment = parsedDeployment.SetSubPathType(refs.SubPathTypeOp).SetSubPath("check_envs")
 
 		if err := store.Set(ctx, parsedDeployment.String(), models.NewMarker()); err != nil {
-			return fmt.Errorf("failed to set task: %w", err)
+			return fmt.Errorf("failed to set operation: %w", err)
 		}
 	}
 
@@ -138,6 +137,7 @@ func applyDeletedEnvironmentIntent(ctx context.Context, ref refs.Ref, store refs
 }
 
 func applyCustomIntent(ctx context.Context, ref refs.Ref, store refstore.Store) error {
+	log.Info("Applying custom intent", "ref", ref.String())
 	var content any
 	if err := store.Get(ctx, ref.String(), &content); err != nil {
 		return fmt.Errorf("failed to get intent: %w", err)
@@ -152,17 +152,13 @@ func applyCustomIntent(ctx context.Context, ref refs.Ref, store refstore.Store) 
 }
 
 func applyDeployIntent(ctx context.Context, ref refs.Ref, store refstore.Store) error {
+	log.Info("Applying deploy intent", "ref", ref.String())
 	var intentContent models.Intent
 	if err := store.Get(ctx, ref.String(), &intentContent); err != nil {
 		if err == refstore.ErrRefNotFound {
 			return applyDeletedDeployIntent(ctx, ref, store)
 		}
 		return fmt.Errorf("failed to get intent: %w", err)
-	}
-
-	var releaseSummary pipeline.ReleaseSummary
-	if err := store.Get(ctx, intentContent.Release.String(), &releaseSummary); err != nil {
-		return fmt.Errorf("failed to get release summary: %w", err)
 	}
 
 	var releaseInfo librelease.ReleaseInfo
@@ -173,7 +169,7 @@ func applyDeployIntent(ctx context.Context, ref refs.Ref, store refstore.Store) 
 	var deployment *sdk.Deployment
 	expectedEnvironment := sdk.EnvironmentName(strings.SplitAfter(ref.SubPath, "/")[0])
 	for _, p := range releaseInfo.Package.Phases {
-		for _, w := range p.Work {
+		for _, w := range p.Tasks {
 			if w.Deployment == nil || w.Deployment.Environment != expectedEnvironment {
 				continue
 			}
@@ -199,12 +195,12 @@ func applyDeployIntent(ctx context.Context, ref refs.Ref, store refstore.Store) 
 		return fmt.Errorf("failed to compare deploy intent: %w", err)
 	}
 	if match {
-		fmt.Println("Intent already applied")
+		log.Info("Intent already applied")
 		return nil
 	}
 
 	// Check that there isn't already a deployment pending or in progress to apply this config
-	matchStr := deployRef.String() + "/*/status/{pending,running}"
+	matchStr := deployRef.String() + "/*/status/{pending,paused,running}"
 	existingDeployments, err := store.Match(ctx, matchStr)
 	if err != nil {
 		return fmt.Errorf("failed to match pending deployments: %w", err)
@@ -214,6 +210,7 @@ func applyDeployIntent(ctx context.Context, ref refs.Ref, store refstore.Store) 
 		for _, existingDeployment := range existingDeployments {
 			existingDeployment = strings.TrimSuffix(existingDeployment, "/status/pending")
 			existingDeployment = strings.TrimSuffix(existingDeployment, "/status/running")
+			existingDeployment = strings.TrimSuffix(existingDeployment, "/status/paused")
 
 			existingDeploymentRef, err := refs.Parse(existingDeployment)
 			if err != nil {
@@ -225,7 +222,7 @@ func applyDeployIntent(ctx context.Context, ref refs.Ref, store refstore.Store) 
 				return fmt.Errorf("failed to compare deploy intent: %w", err)
 			}
 			if match {
-				fmt.Println("Deploy intent already pending or in progress")
+				log.Info("Deploy intent already pending or in progress")
 				return nil
 			}
 		}
@@ -236,33 +233,35 @@ func applyDeployIntent(ctx context.Context, ref refs.Ref, store refstore.Store) 
 		return fmt.Errorf("failed to initialize release store: %w", err)
 	}
 
-	chainRefString, err := refstore.IncrementPath(ctx, store, fmt.Sprintf("%s/", deployRef.String()))
+	runRefString, err := refstore.IncrementPath(ctx, store, fmt.Sprintf("%s/", deployRef.String()))
 	if err != nil {
 		return fmt.Errorf("failed to increment path: %w", err)
 	}
-	chainRef, err := refs.Parse(chainRefString)
+	runRef, err := refs.Parse(runRefString)
 	if err != nil {
-		return fmt.Errorf("failed to parse chain ref: %w", err)
+		return fmt.Errorf("failed to parse run ref: %w", err)
 	}
-	err = rs.InitializeFunction(ctx, models.Work{
-		Release:    intentContent.Release,
-		Entrypoint: chainRef,
-	}, chainRef, &models.Function{
-		ID:     "1",
-		Fn:     deployment.Up,
-		Inputs: intentContent.Inputs,
-		Status: models.StatusPending,
-	})
+	err = rs.InitializeFunction(
+		ctx,
+		models.Run{
+			Release: intentContent.Release,
+		},
+		runRef,
+		&models.Function{
+			Fn:     deployment.Up,
+			Inputs: intentContent.Inputs,
+		},
+	)
 	if err != nil {
 		return fmt.Errorf("failed to initialize function: %w", err)
 	}
-
-	fmt.Println("Created work:", chainRef.String())
 
 	return nil
 }
 
 func applyDeletedDeployIntent(ctx context.Context, ref refs.Ref, store refstore.Store) error {
+	log.Info("Ref was deleted", "ref", ref)
+
 	ref = ref.MakeRelease()
 	if ref.SubPathType != refs.SubPathTypeDeploy {
 		return fmt.Errorf("deployment ID must be a deployment ref")

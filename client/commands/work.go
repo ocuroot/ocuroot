@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"path"
 	"reflect"
 	"strings"
 
@@ -37,14 +36,12 @@ var WorkContinueCmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx := cmd.Context()
 
-		logMode := cmd.Flag("logmode").Changed
-
 		tc, err := getTrackerConfig(ctx, cmd, args)
 		if err != nil {
 			return fmt.Errorf("failed to get tracker config: %w", err)
 		}
 
-		if err := doReleaseWorkForCommit(ctx, tc, logMode); err != nil {
+		if err := doRunsForCommit(ctx, tc); err != nil {
 			return err
 		}
 
@@ -58,14 +55,12 @@ var WorkAnyCommand = &cobra.Command{
 	Long: `Pick up any outstanding work based on the contents of the state store.
 
 Will start by running any release work (equivalent to 'ocuroot work continue'), then
-any tasks ('ocuroot work tasks'), then sync any intent ('ocuroot state diff | xargs -r -n1 ocuroot state apply'),
+any ops ('ocuroot work ops'), then sync any intent ('ocuroot state diff | xargs -r -n1 ocuroot state apply'),
 finally it will trigger work for other commits ('ocuroot work trigger').
 	`,
 	Args: cobra.RangeArgs(0, 1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx := cmd.Context()
-
-		logMode := cmd.Flag("logmode").Changed
 
 		tc, err := getTrackerConfig(ctx, cmd, args)
 		if err != nil {
@@ -79,13 +74,13 @@ finally it will trigger work for other commits ('ocuroot work trigger').
 			return err
 		}
 
-		log.Info("Starting task work")
-		if err := doTasks(ctx, tc); err != nil {
+		log.Info("Starting op work")
+		if err := doOps(ctx, tc); err != nil {
 			return err
 		}
 
 		log.Info("Starting release work")
-		if err := doReleaseWorkForCommit(ctx, tc, logMode); err != nil {
+		if err := doRunsForCommit(ctx, tc); err != nil {
 			return err
 		}
 
@@ -98,22 +93,28 @@ finally it will trigger work for other commits ('ocuroot work trigger').
 	},
 }
 
-func doReleaseWorkForCommit(ctx context.Context, tc release.TrackerConfig, logMode bool) error {
+func doRunsForCommit(ctx context.Context, tc release.TrackerConfig) error {
 	// Update inputs for existing deployments
 	if err := reconcileAllDeploymentsAtCommit(ctx, tc.Store, tc.Ref.Repo, tc.Commit); err != nil {
 		return fmt.Errorf("failed to reconcile deployments: %w", err)
 	}
 
-	// Match any outstanding functions for this repo/commit
-	// This uses the old pattern of including the commit id in the version
-	mr := fmt.Sprintf(
-		"%v/-/**/@%v*/{deploy,call}/**/functions/*/status/pending",
+	// Match any outstanding work for this repo/commit
+	mrPending := fmt.Sprintf(
+		"%v/-/**/@%v*/{deploy,task}/*/*/status/pending",
+		tc.Ref.Repo,
+		tc.Commit,
+	)
+	mrPaused := fmt.Sprintf(
+		"%v/-/**/@%v*/{deploy,task}/*/*/status/paused",
 		tc.Ref.Repo,
 		tc.Commit,
 	)
 	outstanding, err := tc.Store.Match(
 		ctx,
-		mr)
+		mrPending,
+		mrPaused,
+	)
 	if err != nil {
 		return fmt.Errorf("failed to match refs: %w", err)
 	}
@@ -124,18 +125,19 @@ func doReleaseWorkForCommit(ctx context.Context, tc release.TrackerConfig, logMo
 	}
 	for _, ref := range releasesForCommit {
 		log.Info("Found release for commit", "ref", ref)
-		outstandingWork, err := tc.Store.Match(
+		outstandingRuns, err := tc.Store.Match(
 			ctx,
-			fmt.Sprintf("%v/{deploy,call}/**/functions/*/status/pending", ref.String()))
+			fmt.Sprintf("%v/{deploy,task}/*/*/status/pending", ref.String()),
+			fmt.Sprintf("%v/{deploy,task}/*/*/status/paused", ref.String()))
 		if err != nil {
 			return fmt.Errorf("failed to match refs: %w", err)
 		}
-		outstanding = append(outstanding, outstandingWork...)
+		outstanding = append(outstanding, outstandingRuns...)
 	}
 
 	releases := make(map[refs.Ref]struct{})
 	for _, ref := range outstanding {
-		log.Info("Found outstanding function", "ref", ref)
+		log.Info("Found outstanding run", "ref", ref)
 		pr, err := refs.Parse(ref)
 		if err != nil {
 			return fmt.Errorf("failed to parse ref: %w", err)
@@ -147,14 +149,14 @@ func doReleaseWorkForCommit(ctx context.Context, tc release.TrackerConfig, logMo
 	}
 
 	if len(releases) == 0 {
-		fmt.Println("No work to continue")
+		fmt.Println("No runs to continue")
 		return nil
 	}
 
 	for releaseRef := range releases {
 		tc.Ref = releaseRef
 
-		if err := continueRelease(ctx, tc, logMode); err != nil {
+		if err := continueRelease(ctx, tc); err != nil {
 			return err
 		}
 	}
@@ -164,8 +166,8 @@ func doReleaseWorkForCommit(ctx context.Context, tc release.TrackerConfig, logMo
 
 var WorkTriggerCommand = &cobra.Command{
 	Use:   "trigger",
-	Short: "Trigger outstanding work in the state store",
-	Long:  `Trigger outstanding work in the state store.`,
+	Short: "Trigger outstanding runs in the state store",
+	Long:  `Trigger outstanding runs in the state store.`,
 	Args:  cobra.RangeArgs(0, 1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx := cmd.Context()
@@ -178,7 +180,7 @@ var WorkTriggerCommand = &cobra.Command{
 		dryRun := cmd.Flag("dryrun").Changed
 		intent := cmd.Flag("intent").Changed
 		if intent {
-			// Match any outstanding functions in the state repo
+			// Match repo config files to identify unique repos
 			mr := "**/-/repo.ocu.star/+"
 			repo, err := store.Match(
 				ctx,
@@ -196,7 +198,7 @@ var WorkTriggerCommand = &cobra.Command{
 				}
 
 				if err := triggerWork(ctx, store, resolved, dryRun); err != nil {
-					fmt.Println("Failed to trigger work against " + resolved + ": " + err.Error())
+					fmt.Println("Failed to trigger run against " + resolved + ": " + err.Error())
 				}
 			}
 
@@ -210,19 +212,20 @@ var WorkTriggerCommand = &cobra.Command{
 func doTriggerWork(ctx context.Context, store refstore.Store, dryRun bool) error {
 	repos := make(map[RepoCommitTuple]struct{})
 
-	// Match any outstanding functions in the state repo
+	// Match any outstanding runs in the state repo
 	outstanding, err := store.Match(
 		ctx,
-		"**/@*/{deploy,call}/**/functions/*/status/pending",
+		"**/@*/{deploy,task}/*/*/status/pending",
+		"**/@*/{deploy,task}/*/*/status/paused",
 	)
 	if err != nil {
 		return fmt.Errorf("failed to match refs: %w", err)
 	}
 
 	for _, ref := range outstanding {
-		funcReady, err := librelease.FunctionIsReady(ctx, store, ref)
+		funcReady, err := librelease.JobIsReady(ctx, store, ref)
 		if err != nil {
-			return fmt.Errorf("failed to check function: %w", err)
+			return fmt.Errorf("failed to check run: %w", err)
 		}
 		if !funcReady {
 			continue
@@ -256,17 +259,17 @@ func doTriggerWork(ctx context.Context, store refstore.Store, dryRun bool) error
 		repos[repoCommit] = struct{}{}
 	}
 
-	// Identify any tasks
+	// Identify any ops
 	outstanding, err = store.Match(
 		ctx,
-		"**/@*/task/*",
+		"**/@*/op/*",
 	)
 	if err != nil {
 		return fmt.Errorf("failed to match refs: %w", err)
 	}
 
 	for _, ref := range outstanding {
-		log.Info("Found outstanding task", "ref", ref)
+		log.Info("Found outstanding op", "ref", ref)
 		if dryRun {
 			fmt.Println("Outstanding ref: " + ref)
 		}
@@ -280,17 +283,17 @@ func doTriggerWork(ctx context.Context, store refstore.Store, dryRun bool) error
 	for repoCommit := range repos {
 		configRef := repoCommit.Repo + "/-/repo.ocu.star/@" + repoCommit.Commit
 		if err := triggerWork(ctx, store, configRef, dryRun); err != nil {
-			fmt.Println("Failed to trigger work: " + err.Error())
+			fmt.Println("Failed to trigger run: " + err.Error())
 		}
 	}
 
 	return nil
 }
 
-var WorkTasksCmd = &cobra.Command{
-	Use:   "tasks",
-	Short: "Run scheduled tasks",
-	Long:  `Run scheduled tasks against this commit.`,
+var WorkOpsCmd = &cobra.Command{
+	Use:   "ops",
+	Short: "Run scheduled ops",
+	Long:  `Run scheduled operations against this commit.`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx := cmd.Context()
 
@@ -299,7 +302,7 @@ var WorkTasksCmd = &cobra.Command{
 			return fmt.Errorf("failed to get tracker config: %w", err)
 		}
 
-		if err := doTasks(ctx, tc); err != nil {
+		if err := doOps(ctx, tc); err != nil {
 			return err
 		}
 
@@ -307,33 +310,33 @@ var WorkTasksCmd = &cobra.Command{
 	},
 }
 
-func doTasks(ctx context.Context, tc release.TrackerConfig) error {
+func doOps(ctx context.Context, tc release.TrackerConfig) error {
 	releasesForCommit, err := releasesForCommit(ctx, tc.Store, tc.Ref.Repo, tc.Commit)
 	if err != nil {
 		return fmt.Errorf("failed to get releases for commit: %w", err)
 	}
 
-	var tasks []string
+	var ops []string
 	for _, ref := range releasesForCommit {
-		mr := fmt.Sprintf("%v/task/*", ref.String())
-		log.Info("Checking for tasks", "glob", mr)
-		matchedTasks, err := tc.Store.Match(ctx, mr)
+		mr := fmt.Sprintf("%v/op/*", ref.String())
+		log.Info("Checking for ops", "glob", mr)
+		matchedOps, err := tc.Store.Match(ctx, mr)
 		if err != nil {
 			return fmt.Errorf("failed to match refs: %w", err)
 		}
-		tasks = append(tasks, matchedTasks...)
+		ops = append(ops, matchedOps...)
 	}
 
-	for _, ref := range tasks {
-		log.Info("Found outstanding task", "ref", ref)
-		if err := runTask(ctx, tc, ref); err != nil {
-			return fmt.Errorf("failed to run task: %w", err)
+	for _, ref := range ops {
+		log.Info("Found outstanding op", "ref", ref)
+		if err := runOp(ctx, tc, ref); err != nil {
+			return fmt.Errorf("failed to run op: %w", err)
 		}
 	}
 	return nil
 }
 
-func runTask(ctx context.Context, tc release.TrackerConfig, ref string) error {
+func runOp(ctx context.Context, tc release.TrackerConfig, ref string) error {
 	var err error
 
 	tc.Ref, err = refs.Parse(ref)
@@ -361,11 +364,11 @@ func runTask(ctx context.Context, tc release.TrackerConfig, ref string) error {
 	return nil
 }
 
-func continueRelease(ctx context.Context, tc release.TrackerConfig, logMode bool) error {
-	workTui := tui.StartWorkTui(logMode)
+func continueRelease(ctx context.Context, tc release.TrackerConfig) error {
+	workTui := tui.StartWorkTui()
 	defer workTui.Cleanup()
 
-	tc.Store = tuiwork.WatchForChainUpdates(ctx, tc.Store, workTui)
+	tc.Store = tuiwork.WatchForJobUpdates(ctx, tc.Store, workTui)
 
 	tracker, err := release.TrackerForExistingRelease(ctx, tc)
 	if err != nil {
@@ -466,9 +469,13 @@ func getReconcilableDeployments(ctx context.Context, store refstore.Store) ([]re
 }
 
 func reconcileDeployment(ctx context.Context, store refstore.Store, ref string) (*refs.Ref, error) {
-	var deployment models.Work
+	var deployment models.Task
 	if err := store.Get(ctx, ref, &deployment); err != nil {
 		return nil, fmt.Errorf("failed to get deployment at %s: %w", ref, err)
+	}
+	var run models.Run
+	if err := store.Get(ctx, deployment.RunRef.String(), &run); err != nil {
+		return nil, fmt.Errorf("failed to get run at %s: %w", deployment.RunRef.String(), err)
 	}
 
 	resolvedDeployment, err := store.ResolveLink(ctx, ref)
@@ -485,13 +492,8 @@ func reconcileDeployment(ctx context.Context, store refstore.Store, ref string) 
 		return nil, fmt.Errorf("failed to get release: %w", err)
 	}
 
-	entryFunction := deployment.Entrypoint
-	var entryFunctionState librelease.FunctionState
-	if err := store.Get(ctx, entryFunction.String(), &entryFunctionState); err != nil {
-		return nil, fmt.Errorf("failed to get entry function at %s: %w", entryFunction.String(), err)
-	}
-
-	dependenciesSatisfied, err := librelease.CheckDependencies(ctx, store, entryFunctionState)
+	entryFunction := run.Functions[0]
+	dependenciesSatisfied, err := librelease.CheckDependencies(ctx, store, entryFunction)
 	if err != nil {
 		return nil, fmt.Errorf("failed to check dependencies: %w", err)
 	}
@@ -500,8 +502,7 @@ func reconcileDeployment(ctx context.Context, store refstore.Store, ref string) 
 		return nil, nil
 	}
 
-	entryFunctionInputs := entryFunctionState.Current.Inputs
-
+	entryFunctionInputs := entryFunction.Inputs
 	inputs, err := librelease.PopulateInputs(ctx, store, entryFunctionInputs)
 	if err != nil {
 		return nil, fmt.Errorf("failed to populate inputs: %w", err)
@@ -509,8 +510,8 @@ func reconcileDeployment(ctx context.Context, store refstore.Store, ref string) 
 
 	var changed bool
 	for k, v := range inputs {
-		// Ensure we don't create loops with the outputs of this chain
-		if v.Ref != nil && isForSameWork(*v.Ref, parsedResolvedDeployment) {
+		// Ensure we don't create loops with the outputs of this job
+		if v.Ref != nil && isForSameJob(*v.Ref, parsedResolvedDeployment) {
 			continue
 		}
 
@@ -528,7 +529,7 @@ func reconcileDeployment(ctx context.Context, store refstore.Store, ref string) 
 	return &parsedResolvedDeployment, nil
 }
 
-func isForSameWork(ref1, ref2 refs.Ref) bool {
+func isForSameJob(ref1, ref2 refs.Ref) bool {
 	sub1 := ref1.SubPath
 	sub1 = strings.SplitN(sub1, "/", 2)[0]
 
@@ -551,9 +552,14 @@ func reconcileAllDeploymentsAtCommit(ctx context.Context, store refstore.Store, 
 	}
 
 	for _, ref := range allDeployments {
-		var deployment models.Work
+		var deployment models.Task
 		if err := store.Get(ctx, ref, &deployment); err != nil {
 			log.Error("Failed to get deployment", "ref", ref, "error", err)
+			continue
+		}
+		var run models.Run
+		if err := store.Get(ctx, deployment.RunRef.String(), &run); err != nil {
+			log.Error("Failed to get run", "ref", deployment.RunRef.String(), "error", err)
 			continue
 		}
 
@@ -562,14 +568,14 @@ func reconcileAllDeploymentsAtCommit(ctx context.Context, store refstore.Store, 
 			log.Error("Failed to resolve inputs", "ref", ref, "error", err)
 			continue
 		}
-		parsedResolvedDeployment, err := refs.Parse(resolvedDeployment)
+		parsedResolvedTask, err := refs.Parse(resolvedDeployment)
 		if err != nil {
 			log.Error("Failed to parse resolved deployment", "ref", ref, "error", err)
 			continue
 		}
 
 		var release librelease.ReleaseInfo
-		if err := store.Get(ctx, parsedResolvedDeployment.SetSubPathType(refs.SubPathTypeNone).SetSubPath("").SetFragment("").String(), &release); err != nil {
+		if err := store.Get(ctx, parsedResolvedTask.SetSubPathType(refs.SubPathTypeNone).SetSubPath("").SetFragment("").String(), &release); err != nil {
 			log.Error("Failed to get release", "ref", ref, "error", err)
 			continue
 		}
@@ -579,14 +585,7 @@ func reconcileAllDeploymentsAtCommit(ctx context.Context, store refstore.Store, 
 			continue
 		}
 
-		entryFunction := deployment.Entrypoint
-		var entryFunctionState librelease.FunctionState
-		if err := store.Get(ctx, entryFunction.String(), &entryFunctionState); err != nil {
-			log.Error("Failed to get entry function", "ref", ref, "error", err)
-			continue
-		}
-		entryFunctionInputs := entryFunctionState.Current.Inputs
-
+		entryFunctionInputs := deployment.Inputs
 		inputs, err := librelease.PopulateInputs(ctx, store, entryFunctionInputs)
 		if err != nil {
 			continue
@@ -595,12 +594,12 @@ func reconcileAllDeploymentsAtCommit(ctx context.Context, store refstore.Store, 
 		var changed bool
 		for k, v := range inputs {
 			if !reflect.DeepEqual(entryFunctionInputs[k].Value, v.Value) {
-				// Ensure we don't create loops with the outputs of this chain
-				if isForSameWork(*v.Ref, parsedResolvedDeployment) {
+				// Ensure we don't create loops with the outputs of this job
+				if isForSameJob(*v.Ref, parsedResolvedTask) {
 					continue
 				}
 
-				log.Info("input changed", "key", k, "oldValue", toJSON(entryFunctionInputs[k].Value), "newValue", v.Value, "vRef", v.Ref.String(), "parsedResolvedDeployment", parsedResolvedDeployment.String())
+				log.Info("input changed", "key", k, "oldValue", toJSON(entryFunctionInputs[k].Value), "newValue", v.Value, "vRef", v.Ref.String(), "parsedResolvedDeployment", parsedResolvedTask.String())
 				changed = true
 			}
 		}
@@ -611,34 +610,32 @@ func reconcileAllDeploymentsAtCommit(ctx context.Context, store refstore.Store, 
 		}
 
 		log.Info("Duplicating deployment", "ref", resolvedDeployment)
-		parsedResolvedDeployment, err = refs.Parse(resolvedDeployment)
+		parsedResolvedTask, err = refs.Parse(resolvedDeployment)
 		if err != nil {
 			log.Error("Failed to parse resolved deployment", "ref", ref, "error", err)
 			continue
 		}
-		newFunctionChainRef := parsedResolvedDeployment.SetSubPath(path.Join(path.Dir(parsedResolvedDeployment.SubPath)))
-		newFunctionChainRefString, err := refstore.IncrementPath(ctx, store, fmt.Sprintf("%s/", newFunctionChainRef.String()))
+		newRunRefString, err := refstore.IncrementPath(ctx, store, fmt.Sprintf("%s/", parsedResolvedTask.String()))
 		if err != nil {
 			log.Error("Failed to increment path", "ref", ref, "error", err)
 			continue
 		}
-		newFunctionChainRef, err = refs.Parse(newFunctionChainRefString)
+		log.Info("Incremented path", "ref", ref, "newRef", newRunRefString)
+		newRunRef, err := refs.Parse(newRunRefString)
 		if err != nil {
 			log.Error("Failed to parse path", "ref", ref, "error", err)
 			continue
 		}
-		err = librelease.InitializeFunctionChain(ctx, store, newFunctionChainRef, &models.Function{
-			ID:     "1",
-			Fn:     entryFunctionState.Current.Fn,
-			Status: models.StatusPending,
+		err = librelease.InitializeRun(ctx, store, newRunRef, &models.Function{
+			Fn:     run.Functions[0].Fn,
 			Inputs: inputs,
 		})
 		if err != nil {
-			log.Error("Failed to initialize function chain", "ref", ref, "error", err)
+			log.Error("Failed to initialize run", "ref", ref, "error", err)
 			continue
 		}
 
-		log.Info("Duplicated deployment", "oldRef", resolvedDeployment, "newRef", newFunctionChainRef)
+		log.Info("Duplicated deployment", "oldRef", resolvedDeployment, "newRef", newRunRef)
 	}
 
 	return nil
@@ -647,14 +644,12 @@ func reconcileAllDeploymentsAtCommit(ctx context.Context, store refstore.Store, 
 func init() {
 	RootCmd.AddCommand(WorkCmd)
 
-	WorkContinueCmd.Flags().BoolP("logmode", "l", false, "Enable log mode when initializing the TUI")
 	WorkCmd.AddCommand(WorkContinueCmd)
 
 	WorkTriggerCommand.Flags().BoolP("dryrun", "d", false, "List refs for work that would be triggered")
 	WorkTriggerCommand.Flags().BoolP("intent", "i", false, "Trigger intents instead of deployments")
 	WorkCmd.AddCommand(WorkTriggerCommand)
 
-	WorkCmd.AddCommand(WorkTasksCmd)
+	WorkCmd.AddCommand(WorkOpsCmd)
 	WorkCmd.AddCommand(WorkAnyCommand)
-	WorkAnyCommand.Flags().BoolP("logmode", "l", false, "Enable log mode when initializing the TUI")
 }

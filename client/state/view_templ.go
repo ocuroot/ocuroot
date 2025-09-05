@@ -20,7 +20,7 @@ const (
 	GlobReleases     = "**/@r*"
 	GlobDeployments  = "**/@*/deploy/*"
 	GlobCustomState  = "**/@*/custom/*"
-	GlobWork         = "**/@*/*/*/*/status/{pending,running}"
+	GlobTask         = "**/@*/*/*/*/status/{pending,running}"
 )
 
 func InBody(components ...templ.Component) templ.Component {
@@ -131,8 +131,8 @@ func ViewBody() templ.Component {
 						URL:  "/match/" + GlobCustomState,
 					},
 					navbar.NavLink{
-						Name: "Pending Work",
-						URL:  "/match/" + GlobWork,
+						Name: "Pending Tasks",
+						URL:  "/match/" + GlobTask,
 					},
 				},
 				ShowThemeToggle: true,

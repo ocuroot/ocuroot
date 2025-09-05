@@ -5,8 +5,6 @@ import (
 	"fmt"
 	"reflect"
 
-	"github.com/charmbracelet/log"
-	librelease "github.com/ocuroot/ocuroot/lib/release"
 	"github.com/ocuroot/ocuroot/refs"
 	"github.com/ocuroot/ocuroot/refs/refstore"
 	"github.com/ocuroot/ocuroot/store/models"
@@ -30,7 +28,6 @@ func Diff(ctx context.Context, store refstore.Store) ([]string, error) {
 	var diffs []string
 
 	for _, ref := range stateRefs {
-		log.Info("State ref", "ref", ref)
 		pr, err := refs.Parse(ref)
 		if err != nil {
 			return nil, fmt.Errorf("failed to parse state ref: %w", err)
@@ -40,7 +37,6 @@ func Diff(ctx context.Context, store refstore.Store) ([]string, error) {
 	}
 
 	for _, ref := range intentRefs {
-		log.Info("Intent ref", "ref", ref)
 		ir, err := refs.Parse(ref)
 		if err != nil {
 			return nil, fmt.Errorf("failed to parse intent ref: %w", err)
@@ -137,7 +133,7 @@ func compareDeployIntent(
 ) (bool, error) {
 	var (
 		intentContent models.Intent
-		stateContent  models.Work
+		stateContent  models.Intent
 	)
 	if err := store.Get(ctx, intentRef.String(), &intentContent); err != nil {
 		if err == refstore.ErrRefNotFound {
@@ -152,19 +148,7 @@ func compareDeployIntent(
 		return false, fmt.Errorf("failed to get state content: %w", err)
 	}
 
-	if intentContent.Release.String() != stateContent.Release.String() {
-		return false, nil
-	}
-
-	var fn librelease.FunctionState
-	if err := store.Get(ctx, stateContent.Entrypoint.String(), &fn); err != nil {
-		if err == refstore.ErrRefNotFound {
-			return false, nil
-		}
-		return false, fmt.Errorf("failed to get function summary: %w", err)
-	}
-
-	if !reflect.DeepEqual(intentContent.Inputs, fn.Current.Inputs) {
+	if !reflect.DeepEqual(intentContent, stateContent) {
 		return false, nil
 	}
 

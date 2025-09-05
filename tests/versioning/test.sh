@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
 
+export OCUROOT_HOME=$(pwd)/$(dirname "$0")/.ocuroot
+
 source $(dirname "$0")/../test_helpers.sh
 
 build_ocuroot
@@ -7,6 +9,7 @@ build_ocuroot
 pushd "$(dirname "$0")" > /dev/null
 
 rm -rf .store
+rm -rf .ocuroot
 
 export OCU_REPO_COMMIT_OVERRIDE=commit1
 echo "== release 0.1.0-1 =="

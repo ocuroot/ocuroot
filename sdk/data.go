@@ -8,8 +8,6 @@ import (
 	"go.starlark.net/starlark"
 )
 
-type WorkID string
-
 type EnvironmentName string
 
 type Environment struct {
@@ -20,18 +18,17 @@ type Environment struct {
 type Package struct {
 	Functions map[string]Function `json:"functions"`
 
-	Phases      []Phase                        `json:"phases"`
-	Deployments map[EnvironmentName]Deployment `json:"deployments"`
+	Phases []Phase `json:"phases"`
 }
 
 type Phase struct {
-	Name string `json:"name"`
-	Work []Work `json:"work"`
+	Name  string `json:"name"`
+	Tasks []Task `json:"tasks"`
 }
 
-type Work struct {
+type Task struct {
 	Deployment *Deployment `json:"deploy,omitempty"`
-	Call       *WorkCall   `json:"call,omitempty"`
+	Task       *SimpleTask `json:"task,omitempty"`
 }
 
 type Deployment struct {
@@ -72,24 +69,24 @@ func (f FunctionDef) String() string {
 	return fmt.Sprintf("%s/%s", f.Name, f.Pos)
 }
 
-type WorkResult struct {
-	Next *WorkNext `json:"next,omitempty"`
-	Done *WorkDone `json:"done,omitempty"`
-	Err  error     `json:"error,omitempty"`
+type Result struct {
+	Next *Next `json:"next,omitempty"`
+	Done *Done `json:"done,omitempty"`
+	Err  error `json:"error,omitempty"`
 }
 
-type WorkCall struct {
+type SimpleTask struct {
 	Name   string                     `json:"name"`
 	Inputs map[string]InputDescriptor `json:"inputs"`
 	Fn     FunctionDef                `json:"fn,omitempty"`
 }
 
-type WorkNext struct {
+type Next struct {
 	Fn     FunctionDef                `json:"fn,omitempty"`
 	Inputs map[string]InputDescriptor `json:"inputs,omitempty"`
 }
 
-type WorkDone struct {
+type Done struct {
 	Outputs map[string]any `json:"outputs"`
 	Tags    []string       `json:"tags"`
 }

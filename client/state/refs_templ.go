@@ -184,12 +184,12 @@ func RefHeader(props RefPageProps) templ.Component {
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			if rp.SubPathType == refs.SubPathTypeCall {
+			if rp.SubPathType == refs.SubPathTypeTask {
 				templ_7745c5c3_Err = HeaderLink(
 					props.Ref,
-					release.GlobCall,
-					fmt.Sprintf("Call '%s'", strings.Split(rp.SubPath, "/")[0]),
-					fmt.Sprintf("/ref/%s/-/%s/@%s/call/%s", rp.Repo, rp.Filename, rp.ReleaseOrIntent.Value, strings.Split(rp.SubPath, "/")[0]),
+					release.GlobTask,
+					fmt.Sprintf("Task '%s'", strings.Split(rp.SubPath, "/")[0]),
+					fmt.Sprintf("/ref/%s/-/%s/@%s/task/%s", rp.Repo, rp.Filename, rp.ReleaseOrIntent.Value, strings.Split(rp.SubPath, "/")[0]),
 				).Render(ctx, templ_7745c5c3_Buffer)
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
@@ -201,9 +201,9 @@ func RefHeader(props RefPageProps) templ.Component {
 				if len(strings.Split(rp.SubPath, "/")) > 1 {
 					templ_7745c5c3_Err = HeaderLink(
 						props.Ref,
-						release.GlobChain,
-						fmt.Sprintf("#%s", strings.Split(rp.SubPath, "/")[1]),
-						fmt.Sprintf("/ref/%s/-/%s/@%s/call/%s/%s", rp.Repo, rp.Filename, rp.ReleaseOrIntent.Value, strings.Split(rp.SubPath, "/")[0], strings.Split(rp.SubPath, "/")[1]),
+						release.GlobRun,
+						fmt.Sprintf("Run %s", strings.Split(rp.SubPath, "/")[1]),
+						fmt.Sprintf("/ref/%s/-/%s/@%s/task/%s/%s", rp.Repo, rp.Filename, rp.ReleaseOrIntent.Value, strings.Split(rp.SubPath, "/")[0], strings.Split(rp.SubPath, "/")[1]),
 					).Render(ctx, templ_7745c5c3_Buffer)
 					if templ_7745c5c3_Err != nil {
 						return templ_7745c5c3_Err
@@ -231,8 +231,8 @@ func RefHeader(props RefPageProps) templ.Component {
 				if len(strings.Split(rp.SubPath, "/")) > 1 {
 					templ_7745c5c3_Err = HeaderLink(
 						props.Ref,
-						release.GlobChain,
-						fmt.Sprintf("#%s", strings.Split(rp.SubPath, "/")[1]),
+						release.GlobRun,
+						fmt.Sprintf("Run %s", strings.Split(rp.SubPath, "/")[1]),
 						fmt.Sprintf("/ref/%s/-/%s/@%s/deploy/%s/%s", rp.Repo, rp.Filename, rp.ReleaseOrIntent.Value, strings.Split(rp.SubPath, "/")[0], strings.Split(rp.SubPath, "/")[1]),
 					).Render(ctx, templ_7745c5c3_Buffer)
 					if templ_7745c5c3_Err != nil {
@@ -494,8 +494,8 @@ func StateContent(props RefPageProps) templ.Component {
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-		case models.Work:
-			templ_7745c5c3_Err = WorkView(props).Render(ctx, templ_7745c5c3_Buffer)
+		case models.Run:
+			templ_7745c5c3_Err = RunView(props).Render(ctx, templ_7745c5c3_Buffer)
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -537,11 +537,6 @@ func StateContent(props RefPageProps) templ.Component {
 			}
 		case []sdk.Log:
 			templ_7745c5c3_Err = Logs(c).Render(ctx, templ_7745c5c3_Buffer)
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
-			}
-		case release.FunctionState:
-			templ_7745c5c3_Err = FunctionState(props).Render(ctx, templ_7745c5c3_Buffer)
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -598,7 +593,7 @@ func StateContent(props RefPageProps) templ.Component {
 						var templ_7745c5c3_Var22 string
 						templ_7745c5c3_Var22, templ_7745c5c3_Err = templ.JoinStringErrs(toJson(props.Content))
 						if templ_7745c5c3_Err != nil {
-							return templ.Error{Err: templ_7745c5c3_Err, FileName: `client/state/refs.templ`, Line: 154, Col: 80}
+							return templ.Error{Err: templ_7745c5c3_Err, FileName: `client/state/refs.templ`, Line: 152, Col: 80}
 						}
 						_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var22))
 						if templ_7745c5c3_Err != nil {
@@ -702,7 +697,7 @@ func RefList(prefix string, refs RefMap) templ.Component {
 			var templ_7745c5c3_Var25 templ.SafeURL
 			templ_7745c5c3_Var25, templ_7745c5c3_Err = templ.JoinURLErrs(fmt.Sprintf("/ref/%s", key))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `client/state/refs.templ`, Line: 177, Col: 49}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `client/state/refs.templ`, Line: 175, Col: 49}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var25))
 			if templ_7745c5c3_Err != nil {
@@ -715,7 +710,7 @@ func RefList(prefix string, refs RefMap) templ.Component {
 			var templ_7745c5c3_Var26 string
 			templ_7745c5c3_Var26, templ_7745c5c3_Err = templ.JoinStringErrs(strings.TrimPrefix(key, prefix))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `client/state/refs.templ`, Line: 177, Col: 85}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `client/state/refs.templ`, Line: 175, Col: 85}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var26))
 			if templ_7745c5c3_Err != nil {

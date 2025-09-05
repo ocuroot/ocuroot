@@ -55,8 +55,8 @@ phase(
         increment_version, 
         name="increment_version", 
         inputs={
-            "prev_prerelease": input(ref="./@/call/increment_version#output/prerelease", default="0.3.4-1"),
-            "prev_version": input(ref="./@/call/release#output/version", default="0.3.4"),
+            "prev_prerelease": input(ref="./@/task/increment_version#output/prerelease", default="0.3.4-1"),
+            "prev_version": input(ref="./@/task/release#output/version", default="0.3.4"),
         },
     )],
 )
@@ -112,7 +112,7 @@ phase(
             inputs={
                 "os": os,
                 "arch": arch,
-                "version": input(ref="./call/increment_version#output/prerelease"),
+                "version": input(ref="./task/increment_version#output/prerelease"),
             },
         )
         for os in oses
@@ -187,13 +187,13 @@ def copy_release(source_tag, target_tag):
 
 def release_inputs():
     inputs = {
-        "prerelease": input(ref="./@/call/increment_version#output/prerelease"),
+        "prerelease": input(ref="./@/task/increment_version#output/prerelease"),
     }
 
     for os in oses:
         for arch in arches:
             key = "bucket_path_{os}_{arch}".format(os=os, arch=arch)
-            inputs[key] = ref("./call/build_{os}_{arch}#output/bucket_path".format(os=os, arch=arch))
+            inputs[key] = ref("./task/build_{os}_{arch}#output/bucket_path".format(os=os, arch=arch))
 
     return inputs
 

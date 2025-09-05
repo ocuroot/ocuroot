@@ -5,36 +5,39 @@ import (
 	"github.com/ocuroot/ocuroot/sdk"
 )
 
-type WorkType string
+type JobType string
 
 const (
-	WorkTypeUp   WorkType = "up"
-	WorkTypeDown WorkType = "down"
-	WorkTypeCall WorkType = "call"
+	JobTypeUp   JobType = "up"
+	JobTypeDown JobType = "down"
+	JobTypeTask JobType = "task"
 )
 
 type Intent struct {
-	Type    WorkType                       `json:"type"`
+	Type    JobType                        `json:"type"`
 	Release refs.Ref                       `json:"release"`
 	Inputs  map[string]sdk.InputDescriptor `json:"input"`
 }
 
-// Work represents a call or deploy
-type Work struct {
-	Type    WorkType `json:"type"`
+type Task struct {
+	RunRef refs.Ref `json:"run_ref"`
+	Intent
+	Outputs map[string]any `json:"output"`
+}
+
+// Run represents a call or deploy
+type Run struct {
+	Type    JobType  `json:"type"`
 	Release refs.Ref `json:"release"`
-	// Entrypoint is the ref of the first function in the chain
-	Entrypoint refs.Ref       `json:"entrypoint"`
-	Outputs    map[string]any `json:"output"`
+
+	Functions []*Function    `json:"functions"`
+	Outputs   map[string]any `json:"output"`
 }
 
 type Function struct {
-	ID           FunctionID                     `json:"id"`
 	Fn           sdk.FunctionDef                `json:"fn"`
-	Status       Status                         `json:"status"`
 	Dependencies []refs.Ref                     `json:"dependencies,omitempty"`
 	Inputs       map[string]sdk.InputDescriptor `json:"inputs"`
-	Outputs      map[string]any                 `json:"outputs,omitempty"`
 }
 
 type Environment struct {

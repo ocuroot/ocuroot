@@ -65,8 +65,8 @@ type Task struct {
 	Error  error
 	Logs   []string
 
-	Store    refstore.Store
-	ChainRef refs.Ref
+	Store  refstore.Store
+	JobRef refs.Ref
 }
 
 func (t *Task) SortKey() string {
@@ -154,22 +154,22 @@ func (t *Task) message() string {
 		return ""
 	}
 
-	// Get chain outputs and render as a message
-	var chainWork models.Work
-	if err := t.Store.Get(ctx, t.ChainRef.String(), &chainWork); err != nil {
-		log.Error("failed to get chain work", "ref", t.ChainRef.String(), "error", err)
-		return "failed to get chain work"
+	// Get job outputs and render as a message
+	var jobWork *models.Run
+	if err := t.Store.Get(ctx, t.JobRef.String(), &jobWork); err != nil {
+		log.Error("failed to get job", "ref", t.JobRef.String(), "error", err)
+		return "failed to get job: " + t.JobRef.String() + "\n" + err.Error()
 	}
 
-	if t.Status == WorkStatusDone && len(chainWork.Outputs) > 0 {
+	if t.Status == WorkStatusDone && len(jobWork.Outputs) > 0 {
 		outputs := tree.Root("Outputs")
-		keys := make([]string, 0, len(chainWork.Outputs))
-		for k := range chainWork.Outputs {
+		keys := make([]string, 0, len(jobWork.Outputs))
+		for k := range jobWork.Outputs {
 			keys = append(keys, k)
 		}
 		sort.Strings(keys)
 		for _, k := range keys {
-			v := chainWork.Outputs[k]
+			v := jobWork.Outputs[k]
 			outputs = outputs.Child(
 				tree.Root(
 					fmt.Sprintf("%s#output/%s", t.TaskID, k),
@@ -180,21 +180,16 @@ func (t *Task) message() string {
 	}
 
 	if t.Status == WorkStatusPending {
-		var fn librelease.FunctionState
-		if err := t.Store.Get(ctx, chainWork.Entrypoint.String(), &fn); err != nil {
-			log.Error("failed to get function summary", "chainRef", t.ChainRef.String(), "entrypoint", chainWork.Entrypoint.String(), "error", err)
-			return "failed to get function summary"
-		}
-
+		fn := jobWork.Functions[0]
 		hasPending := false
 		pendingInputs := tree.Root("Pending Inputs")
-		keys := make([]string, 0, len(fn.Current.Inputs))
-		for k := range fn.Current.Inputs {
+		keys := make([]string, 0, len(fn.Inputs))
+		for k := range fn.Inputs {
 			keys = append(keys, k)
 		}
 		sort.Strings(keys)
 		for _, k := range keys {
-			v := fn.Current.Inputs[k]
+			v := fn.Inputs[k]
 			retrieved, err := librelease.RetrieveInput(ctx, t.Store, v)
 			if err != nil {
 				log.Error("failed to retrieve input", "ref", v.Ref.String(), "error", err)

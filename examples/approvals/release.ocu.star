@@ -46,7 +46,7 @@ phase(
         down=_destroy,
         environment=env,
         inputs={
-            "artifact": ref("./call/build#output/artifact"),
+            "artifact": ref("./task/build#output/artifact"),
         },
     ) for env in staging_envs],
 )
@@ -71,7 +71,7 @@ phase(
         down=_destroy,
         environment=env,
         inputs={
-            "artifact": ref("./call/build#output/artifact"),
+            "artifact": ref("./task/build#output/artifact"),
         },
     ) for env in prod_envs],
 )

@@ -6,11 +6,11 @@ envs = environments()
 staging = [e for e in envs if e.attributes["type"] == "staging"]
 prod = [e for e in envs if e.attributes["type"] == "prod"]
 
-call(build, name="build")
+task(build, name="build")
 
 phase(
     name="staging",
-    work=[
+    tasks=[
         deploy(
             up=up,
             down=down,
@@ -34,7 +34,7 @@ phase(
             down=down,
             environment=environment,
             inputs={
-                "input1": ref("./call/build#output/output1"),
+                "input1": ref("./task/build#output/output1"),
                 "staging_name": ref("./@/deploy/staging#output/env_name"),
                 "previous_count": input(
                     ref=ref("./@/deploy/{}#output/count".format(environment.name)),

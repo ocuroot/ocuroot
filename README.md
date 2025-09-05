@@ -76,7 +76,7 @@ References are of the form:
 * [subpath]: A path to a document within the release, such as a deployment to a specific environment.
 * [fragment]: An optional path to a field within the document.
 
-For example, `github.com/ocuroot/example/-/frontend/release.ocu.star/@1.0.0/call/build#output/image` would
+For example, `github.com/ocuroot/example/-/frontend/release.ocu.star/@1.0.0/task/build#output/image` would
 refer to the container image for the 1.0.0 release of the frontend in an example repo.
 
 Intent References are denoted by the use of `+` instead of `@` for the release. So

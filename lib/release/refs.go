@@ -14,23 +14,21 @@ var (
 	GlobPackage                 = libglob.MustCompile(`**/[^@+]+/**`, '/')
 	GlobRepoConfig              = libglob.MustCompile("**/-/repo.ocu.star/@*", '/')
 	GlobRelease                 = libglob.MustCompile("**/{@,+}*", '/')
-	GlobWork                    = libglob.MustCompile("**/@*/{call,deploy}/*", '/')
-	GlobTask                    = libglob.MustCompile("**/@*/task/*", '/')
+	GlobTask                    = libglob.MustCompile("**/@*/{task,deploy}/*", '/')
+	GlobOp                      = libglob.MustCompile("**/@*/op/*", '/')
 	GlobDeploymentState         = libglob.MustCompile("**/@*/deploy/*", '/')
 	GlobDeploymentIntent        = libglob.MustCompile("**/+*/deploy/*", '/')
 	GlobDeploymentStateOrIntent = libglob.MustCompile("**/{@,+}*/deploy/*", '/')
-	GlobCall                    = libglob.MustCompile("**/{@,+}*/call/*", '/')
-	GlobChain                   = libglob.MustCompile("**/{@,+}*/{call,deploy}/*/*", '/')
-	GlobFunction                = libglob.MustCompile("**/{@,+}*/{call,deploy}/*/*/functions/*", '/')
-	GlobLog                     = libglob.MustCompile("**/{@,+}*/{call,deploy}/*/*/logs", '/')
+	GlobRun                     = libglob.MustCompile("**/{@,+}*/{task,deploy}/*/*", '/')
+	GlobLog                     = libglob.MustCompile("**/{@,+}*/{task,deploy}/*/*/logs", '/')
 	GlobCustomState             = libglob.MustCompile("**/@*/custom/*", '/')
 	GlobCustomIntent            = libglob.MustCompile("**/+*/custom/*", '/')
 	GlobCustomStateOrIntent     = libglob.MustCompile("**/{@,+}*/custom/*", '/')
 	GlobEnvironment             = libglob.MustCompile("{@,+}*/environment/*", '/')
 )
 
-func WorkRefFromChainRef(ref refs.Ref) (refs.Ref, error) {
-	wr, err := refs.Reduce(ref.String(), GlobWork)
+func ReduceToTaskRef(ref refs.Ref) (refs.Ref, error) {
+	wr, err := refs.Reduce(ref.String(), GlobTask)
 	if err != nil {
 		return ref, err
 	}
@@ -41,8 +39,8 @@ func WorkRefFromChainRef(ref refs.Ref) (refs.Ref, error) {
 	return out, nil
 }
 
-func ChainRefFromFunctionRef(ref refs.Ref) refs.Ref {
-	wr, err := refs.Reduce(ref.String(), GlobChain)
+func ReduceToRunRef(ref refs.Ref) refs.Ref {
+	wr, err := refs.Reduce(ref.String(), GlobRun)
 	if err != nil {
 		return ref
 	}
@@ -51,10 +49,6 @@ func ChainRefFromFunctionRef(ref refs.Ref) refs.Ref {
 		return ref
 	}
 	return out
-}
-
-func FunctionRefFromChainRef(ref refs.Ref, fn *models.Function) refs.Ref {
-	return ref.JoinSubPath("functions", string(fn.ID))
 }
 
 type Custom any
@@ -66,16 +60,14 @@ func LoadRef(ctx context.Context, store refstore.Store, ref refs.Ref) (any, erro
 		return LoadRefOfType[models.RepoConfig](ctx, store, ref)
 	case GlobRelease.Match(ref.String()):
 		return LoadRefOfType[ReleaseInfo](ctx, store, ref)
-	case GlobWork.Match(ref.String()):
-		return LoadRefOfType[models.Work](ctx, store, ref)
-	case GlobChain.Match(ref.String()):
-		return LoadRefOfType[models.Work](ctx, store, ref)
+	case GlobTask.Match(ref.String()):
+		return LoadRefOfType[models.Run](ctx, store, ref)
+	case GlobRun.Match(ref.String()):
+		return LoadRefOfType[models.Run](ctx, store, ref)
 	case GlobDeploymentIntent.Match(ref.String()):
 		return LoadRefOfType[models.Intent](ctx, store, ref)
 	case GlobLog.Match(ref.String()):
 		return LoadRefOfType[[]sdk.Log](ctx, store, ref)
-	case GlobFunction.Match(ref.String()):
-		return LoadRefOfType[FunctionState](ctx, store, ref)
 	case GlobEnvironment.Match(ref.String()):
 		return LoadRefOfType[models.Environment](ctx, store, ref)
 	default:

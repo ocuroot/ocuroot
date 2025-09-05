@@ -94,7 +94,7 @@ func TrackerForExistingRelease(ctx context.Context, tc TrackerConfig) (*release.
 }
 
 func GetExistingReleases(ctx context.Context, tc TrackerConfig) ([]string, error) {
-	// Match releases for this repo/commit and find outstanding work for them
+	// Match releases for this repo/commit and find outstanding runs for them
 	mr := fmt.Sprintf(
 		"%v/-/%v/@*/commit/%v",
 		tc.Ref.Repo,

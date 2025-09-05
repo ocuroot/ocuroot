@@ -4,52 +4,9 @@ import (
     "fmt"
     "encoding/json"
 
-    "github.com/ocuroot/ui/components"
-    "github.com/ocuroot/ocuroot/lib/release"
     "github.com/ocuroot/ocuroot/sdk"
     "github.com/ocuroot/ui/components/badges"
 )
-
-templ FunctionState(props RefPageProps) {
-    @components.Card(){
-        @FunctionStateContent(props.Content.(release.FunctionState), props.ChildRefs)
-    }
-}
-
-templ FunctionStateContent(fs release.FunctionState, children []string) {
-    <div class="functionheader">
-        <h2 class="functionname">{ fs.Current.Fn.Name }</h2>
-        <div class="functionstatus"> 
-            @StatusBadge(StatusFromChildren(children))
-        </div>
-    </div>
-
-    <h3>Inputs</h3>
-    <ul>
-        for key, input := range fs.Current.Inputs {
-            <div class="input">
-                @Input(key, input)
-            </div>
-        }
-    </ul>
-    <div class="divider"></div>
-    <h3>Outputs</h3>
-    <ul>
-        for key, output := range fs.Current.Outputs {
-            <div class="output">
-                @Output(key, output)
-            </div>
-        }
-    </ul>
-    <div class="divider"></div>
-
-    <h3>History</h3>
-    <ul>
-        for _, history := range fs.History {
-            <li>{ history.Time.Format("2006-01-02 15:04:05") }: { history.Status }</li>
-        }
-    </ul>
-}
 
 templ Input(key string, desc sdk.InputDescriptor) {
     <strong>{ key }</strong>
