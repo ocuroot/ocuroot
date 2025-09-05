@@ -97,7 +97,7 @@ func (i item) String() string {
 	case itemPackage:
 		return fmt.Sprintf("itemPackage(%s)", i.val)
 	case itemFragment:
-		return fmt.Sprintf("itemWorkPath(%s)", i.val)
+		return fmt.Sprintf("itemFragment(%s)", i.val)
 	case itemSubpathType:
 		return fmt.Sprintf("itemTypeIdentifier(%s)", i.val)
 	case itemSubpath:

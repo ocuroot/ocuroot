@@ -8,8 +8,6 @@ import (
 	"go.starlark.net/starlark"
 )
 
-type WorkID string
-
 type EnvironmentName string
 
 type Environment struct {
@@ -71,10 +69,10 @@ func (f FunctionDef) String() string {
 	return fmt.Sprintf("%s/%s", f.Name, f.Pos)
 }
 
-type WorkResult struct {
-	Next *WorkNext `json:"next,omitempty"`
-	Done *WorkDone `json:"done,omitempty"`
-	Err  error     `json:"error,omitempty"`
+type Result struct {
+	Next *Next `json:"next,omitempty"`
+	Done *Done `json:"done,omitempty"`
+	Err  error `json:"error,omitempty"`
 }
 
 type SimpleTask struct {
@@ -83,12 +81,12 @@ type SimpleTask struct {
 	Fn     FunctionDef                `json:"fn,omitempty"`
 }
 
-type WorkNext struct {
+type Next struct {
 	Fn     FunctionDef                `json:"fn,omitempty"`
 	Inputs map[string]InputDescriptor `json:"inputs,omitempty"`
 }
 
-type WorkDone struct {
+type Done struct {
 	Outputs map[string]any `json:"outputs"`
 	Tags    []string       `json:"tags"`
 }

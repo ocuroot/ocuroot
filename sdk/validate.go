@@ -44,19 +44,19 @@ func (p *Package) Validate() []error {
 		}
 	}
 
-	// Check for duplicate names in work items
-	workNames := make(map[string]int)
+	// Check for duplicate names in tasks
+	taskNames := make(map[string]int)
 	for _, phase := range p.Phases {
 		for _, task := range phase.Tasks {
 			if task.Task != nil {
-				workNames[task.Task.Name]++
+				taskNames[task.Task.Name]++
 			}
 		}
 	}
-	for name, count := range workNames {
+	for name, count := range taskNames {
 		if count > 1 {
 			errors = append(errors, ValidationError{
-				Message: fmt.Sprintf("Work item '%s' is used in %d phases, should be used in exactly one", name, count),
+				Message: fmt.Sprintf("Task '%s' is used in %d phases, should be used in exactly one", name, count),
 			})
 		}
 	}

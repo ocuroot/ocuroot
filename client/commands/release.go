@@ -68,7 +68,7 @@ var NewReleaseCmd = &cobra.Command{
 		workTui := tui.StartWorkTui()
 		defer workTui.Cleanup()
 
-		tc.Store = tuiwork.WatchForChainUpdates(ctx, tc.Store, workTui)
+		tc.Store = tuiwork.WatchForJobUpdates(ctx, tc.Store, workTui)
 
 		tracker, environments, err := release.TrackerForNewRelease(ctx, tc)
 		if err != nil {
@@ -139,7 +139,7 @@ var ContinueReleaseCmd = &cobra.Command{
 		workTui := tui.StartWorkTui()
 		defer workTui.Cleanup()
 
-		tc.Store = tuiwork.WatchForChainUpdates(ctx, tc.Store, workTui)
+		tc.Store = tuiwork.WatchForJobUpdates(ctx, tc.Store, workTui)
 
 		tracker, err := release.TrackerForExistingRelease(ctx, tc)
 		if err != nil {
@@ -199,7 +199,7 @@ var RetryReleaseCmd = &cobra.Command{
 		workTui := tui.StartWorkTui()
 		defer workTui.Cleanup()
 
-		tc.Store = tuiwork.WatchForChainUpdates(ctx, tc.Store, workTui)
+		tc.Store = tuiwork.WatchForJobUpdates(ctx, tc.Store, workTui)
 
 		tracker, err := release.TrackerForExistingRelease(ctx, tc)
 		if err != nil {

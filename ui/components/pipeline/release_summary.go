@@ -59,9 +59,9 @@ func (m StatusCountMap) CompletionFraction() float64 {
 }
 
 type PhaseSummary struct {
-	ID   models.PhaseID `json:"id"`
-	Name string         `json:"name"`
-	Work []WorkSummary  `json:"work"`
+	ID    models.PhaseID `json:"id"`
+	Name  string         `json:"name"`
+	Tasks []TaskSummary  `json:"tasks"`
 }
 
 func (ps *PhaseSummary) Status() models.Status {
@@ -81,25 +81,25 @@ func (ps *PhaseSummary) Status() models.Status {
 	return models.StatusComplete
 }
 
-// StatusCounts returns a StatusCountMap showing how many function chains are in each status.
+// StatusCounts returns a StatusCountMap showing how many runs are in each status.
 func (ps *PhaseSummary) StatusCounts() StatusCountMap {
 	counts := NewStatusCountMap()
 
-	// Count latest result for all chains by environment
-	for _, work := range ps.Work {
-		if len(work.JobStatuses) == 0 {
+	// Count latest result for all runs by environment
+	for _, task := range ps.Tasks {
+		if len(task.RunStatuses) == 0 {
 			continue
 		}
-		counts[work.JobStatuses[len(work.JobStatuses)-1]]++
+		counts[task.RunStatuses[len(task.RunStatuses)-1]]++
 	}
 
 	return counts
 }
 
-type WorkSummary struct {
+type TaskSummary struct {
 	Name        string
 	Environment *EnvironmentSummary `json:"environment"`
-	Jobs        []models.Run
-	JobRefs     []string
-	JobStatuses []models.Status
+	Runs        []models.Run
+	RunRefs     []string
+	RunStatuses []models.Status
 }

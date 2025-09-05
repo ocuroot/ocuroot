@@ -495,7 +495,7 @@ func StateContent(props RefPageProps) templ.Component {
 				return templ_7745c5c3_Err
 			}
 		case models.Run:
-			templ_7745c5c3_Err = WorkView(props).Render(ctx, templ_7745c5c3_Buffer)
+			templ_7745c5c3_Err = RunView(props).Render(ctx, templ_7745c5c3_Buffer)
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}

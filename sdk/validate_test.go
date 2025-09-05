@@ -50,7 +50,7 @@ func TestPackageValidate(t *testing.T) {
 			expectedErrors: 0,
 		},
 		{
-			name: "Valid package - multiple work items in same phase with different names",
+			name: "Valid package - multiple tasks in same phase with different names",
 			pkg: Package{
 				Phases: []Phase{
 					{
@@ -92,7 +92,7 @@ func TestPackageValidate(t *testing.T) {
 			expectedErrors: 0,
 		},
 		{
-			name: "Valid package - different work items across multiple phases",
+			name: "Valid package - different tasks across multiple phases",
 			pkg: Package{
 				Phases: []Phase{
 					{
@@ -221,7 +221,7 @@ func TestPackageValidate(t *testing.T) {
 			expectedErrors: 1, // One error for the duplicate environment
 		},
 		{
-			name: "Invalid package - duplicate approval work names",
+			name: "Invalid package - duplicate approval task names",
 			pkg: Package{
 				Phases: []Phase{
 					{
@@ -260,7 +260,7 @@ func TestPackageValidate(t *testing.T) {
 			expectedErrors: 1, // One error for the duplicate approval name
 		},
 		{
-			name: "Invalid package - duplicate delay work names",
+			name: "Invalid package - duplicate delay task names",
 			pkg: Package{
 				Phases: []Phase{
 					{
@@ -299,7 +299,7 @@ func TestPackageValidate(t *testing.T) {
 			expectedErrors: 1, // One error for the duplicate delay name
 		},
 		{
-			name: "Invalid package - duplicate handoff work names",
+			name: "Invalid package - duplicate handoff task names",
 			pkg: Package{
 				Phases: []Phase{
 					{
@@ -338,7 +338,7 @@ func TestPackageValidate(t *testing.T) {
 			expectedErrors: 1, // One error for the duplicate handoff name
 		},
 		{
-			name: "Invalid package - duplicate names across different work types",
+			name: "Invalid package - duplicate names across different task types",
 			pkg: Package{
 				Phases: []Phase{
 					{
@@ -387,10 +387,10 @@ func TestPackageValidate(t *testing.T) {
 					},
 				},
 			},
-			expectedErrors: 1, // One error for the duplicate name across different work types
+			expectedErrors: 1, // One error for the duplicate name across different tasks
 		},
 		{
-			name: "Invalid package - multiple duplicate work names",
+			name: "Invalid package - multiple duplicaste task names",
 			pkg: Package{
 				Phases: []Phase{
 					{
@@ -442,7 +442,7 @@ func TestPackageValidate(t *testing.T) {
 					},
 				},
 			},
-			expectedErrors: 2, // Two errors for duplicate work names
+			expectedErrors: 2, // Two errors for duplicate task names
 		},
 	}
 

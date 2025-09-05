@@ -40,7 +40,7 @@ func (s *server) handleMatch(w http.ResponseWriter, r *http.Request) {
 	case release.GlobRelease.Match(query):
 		content = s.buildReleaseTable(matches)
 	case release.GlobTask.Match(query) || query == GlobTask:
-		content = s.buildWorkTable(r.Context(), matches)
+		content = s.buildTaskTable(r.Context(), matches)
 	default:
 		content = Match(query, matches)
 	}
@@ -128,7 +128,7 @@ func (s *server) buildDeploymentTable(ctx context.Context, matches []string) tem
 	return ResultTable([]string{"Repo", "Filename", "Environment", "Release"}, tableContent)
 }
 
-func (s *server) buildWorkTable(ctx context.Context, matches []string) templ.Component {
+func (s *server) buildTaskTable(ctx context.Context, matches []string) templ.Component {
 	var tableContent []ResultTableRow
 	for _, match := range matches {
 		resolved, err := s.store.ResolveLink(ctx, match)
@@ -140,31 +140,31 @@ func (s *server) buildWorkTable(ctx context.Context, matches []string) templ.Com
 			continue
 		}
 
-		var work string
+		var task string
 		subpathSegments := strings.Split(resolvedParsed.SubPath, "/")
 		switch resolvedParsed.SubPathType {
 		case refs.SubPathTypeTask:
-			work = fmt.Sprintf("Task '%s'", subpathSegments[0])
+			task = fmt.Sprintf("Task '%s'", subpathSegments[0])
 		case refs.SubPathTypeDeploy:
-			work = fmt.Sprintf("Deploy to '%s'", subpathSegments[0])
+			task = fmt.Sprintf("Deploy to '%s'", subpathSegments[0])
 		default:
-			work = "Unknown"
+			task = "Unknown"
 		}
 
 		var status string = path.Base(resolvedParsed.SubPath)
-		workRef := resolvedParsed.SetSubPath(path.Join(subpathSegments[0], subpathSegments[1]))
+		taskRef := resolvedParsed.SetSubPath(path.Join(subpathSegments[0], subpathSegments[1]))
 
 		tableContent = append(tableContent, ResultTableRow{
-			URL: templ.URL(fmt.Sprintf("/ref/%s", workRef.String())),
+			URL: templ.URL(fmt.Sprintf("/ref/%s", taskRef.String())),
 			Cells: []templ.Component{
 				textCell(resolvedParsed.Repo),
 				textCell(resolvedParsed.Filename),
 				textCell(resolvedParsed.ReleaseOrIntent.Value),
-				textCell(work),
+				textCell(task),
 				textCell(status),
 			},
 		})
 	}
-	return ResultTable([]string{"Repo", "Filename", "Release", "Work", "Status"}, tableContent)
+	return ResultTable([]string{"Repo", "Filename", "Release", "Task", "Status"}, tableContent)
 
 }

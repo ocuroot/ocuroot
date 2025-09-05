@@ -135,7 +135,7 @@ templ StateContent(props RefPageProps) {
         case release.ReleaseInfo:
             @ReleaseCard(props)
         case models.Run:
-            @WorkView(props)
+            @RunView(props)
         case models.Intent:
             @components.Card() {
                 <pre><code class="language-json">{ toJson(c) }</code></pre>

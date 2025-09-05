@@ -16,7 +16,7 @@ type RepoCommitTuple struct {
 }
 
 func releasesForCommit(ctx context.Context, store refstore.Store, repo string, commit string) ([]refs.Ref, error) {
-	// Match releases for this repo/commit and find outstanding work for them
+	// Match releases for this repo/commit and find outstanding runs for them
 	mr := fmt.Sprintf(
 		"%v/-/**/@*/commit/%v",
 		repo,

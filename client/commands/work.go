@@ -41,7 +41,7 @@ var WorkContinueCmd = &cobra.Command{
 			return fmt.Errorf("failed to get tracker config: %w", err)
 		}
 
-		if err := doReleaseWorkForCommit(ctx, tc); err != nil {
+		if err := doRunsForCommit(ctx, tc); err != nil {
 			return err
 		}
 
@@ -80,7 +80,7 @@ finally it will trigger work for other commits ('ocuroot work trigger').
 		}
 
 		log.Info("Starting release work")
-		if err := doReleaseWorkForCommit(ctx, tc); err != nil {
+		if err := doRunsForCommit(ctx, tc); err != nil {
 			return err
 		}
 
@@ -93,7 +93,7 @@ finally it will trigger work for other commits ('ocuroot work trigger').
 	},
 }
 
-func doReleaseWorkForCommit(ctx context.Context, tc release.TrackerConfig) error {
+func doRunsForCommit(ctx context.Context, tc release.TrackerConfig) error {
 	// Update inputs for existing deployments
 	if err := reconcileAllDeploymentsAtCommit(ctx, tc.Store, tc.Ref.Repo, tc.Commit); err != nil {
 		return fmt.Errorf("failed to reconcile deployments: %w", err)
@@ -125,19 +125,19 @@ func doReleaseWorkForCommit(ctx context.Context, tc release.TrackerConfig) error
 	}
 	for _, ref := range releasesForCommit {
 		log.Info("Found release for commit", "ref", ref)
-		outstandingWork, err := tc.Store.Match(
+		outstandingRuns, err := tc.Store.Match(
 			ctx,
 			fmt.Sprintf("%v/{deploy,task}/*/*/status/pending", ref.String()),
 			fmt.Sprintf("%v/{deploy,task}/*/*/status/paused", ref.String()))
 		if err != nil {
 			return fmt.Errorf("failed to match refs: %w", err)
 		}
-		outstanding = append(outstanding, outstandingWork...)
+		outstanding = append(outstanding, outstandingRuns...)
 	}
 
 	releases := make(map[refs.Ref]struct{})
 	for _, ref := range outstanding {
-		log.Info("Found outstanding function", "ref", ref)
+		log.Info("Found outstanding run", "ref", ref)
 		pr, err := refs.Parse(ref)
 		if err != nil {
 			return fmt.Errorf("failed to parse ref: %w", err)
@@ -149,7 +149,7 @@ func doReleaseWorkForCommit(ctx context.Context, tc release.TrackerConfig) error
 	}
 
 	if len(releases) == 0 {
-		fmt.Println("No work to continue")
+		fmt.Println("No runs to continue")
 		return nil
 	}
 
@@ -166,8 +166,8 @@ func doReleaseWorkForCommit(ctx context.Context, tc release.TrackerConfig) error
 
 var WorkTriggerCommand = &cobra.Command{
 	Use:   "trigger",
-	Short: "Trigger outstanding work in the state store",
-	Long:  `Trigger outstanding work in the state store.`,
+	Short: "Trigger outstanding runs in the state store",
+	Long:  `Trigger outstanding runs in the state store.`,
 	Args:  cobra.RangeArgs(0, 1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx := cmd.Context()
@@ -180,7 +180,7 @@ var WorkTriggerCommand = &cobra.Command{
 		dryRun := cmd.Flag("dryrun").Changed
 		intent := cmd.Flag("intent").Changed
 		if intent {
-			// Match any outstanding functions in the state repo
+			// Match repo config files to identify unique repos
 			mr := "**/-/repo.ocu.star/+"
 			repo, err := store.Match(
 				ctx,
@@ -198,7 +198,7 @@ var WorkTriggerCommand = &cobra.Command{
 				}
 
 				if err := triggerWork(ctx, store, resolved, dryRun); err != nil {
-					fmt.Println("Failed to trigger work against " + resolved + ": " + err.Error())
+					fmt.Println("Failed to trigger run against " + resolved + ": " + err.Error())
 				}
 			}
 
@@ -212,7 +212,7 @@ var WorkTriggerCommand = &cobra.Command{
 func doTriggerWork(ctx context.Context, store refstore.Store, dryRun bool) error {
 	repos := make(map[RepoCommitTuple]struct{})
 
-	// Match any outstanding functions in the state repo
+	// Match any outstanding runs in the state repo
 	outstanding, err := store.Match(
 		ctx,
 		"**/@*/{deploy,task}/*/*/status/pending",
@@ -225,7 +225,7 @@ func doTriggerWork(ctx context.Context, store refstore.Store, dryRun bool) error
 	for _, ref := range outstanding {
 		funcReady, err := librelease.JobIsReady(ctx, store, ref)
 		if err != nil {
-			return fmt.Errorf("failed to check function: %w", err)
+			return fmt.Errorf("failed to check run: %w", err)
 		}
 		if !funcReady {
 			continue
@@ -283,7 +283,7 @@ func doTriggerWork(ctx context.Context, store refstore.Store, dryRun bool) error
 	for repoCommit := range repos {
 		configRef := repoCommit.Repo + "/-/repo.ocu.star/@" + repoCommit.Commit
 		if err := triggerWork(ctx, store, configRef, dryRun); err != nil {
-			fmt.Println("Failed to trigger work: " + err.Error())
+			fmt.Println("Failed to trigger run: " + err.Error())
 		}
 	}
 
@@ -368,7 +368,7 @@ func continueRelease(ctx context.Context, tc release.TrackerConfig) error {
 	workTui := tui.StartWorkTui()
 	defer workTui.Cleanup()
 
-	tc.Store = tuiwork.WatchForChainUpdates(ctx, tc.Store, workTui)
+	tc.Store = tuiwork.WatchForJobUpdates(ctx, tc.Store, workTui)
 
 	tracker, err := release.TrackerForExistingRelease(ctx, tc)
 	if err != nil {
@@ -510,8 +510,8 @@ func reconcileDeployment(ctx context.Context, store refstore.Store, ref string) 
 
 	var changed bool
 	for k, v := range inputs {
-		// Ensure we don't create loops with the outputs of this chain
-		if v.Ref != nil && isForSameWork(*v.Ref, parsedResolvedDeployment) {
+		// Ensure we don't create loops with the outputs of this job
+		if v.Ref != nil && isForSameJob(*v.Ref, parsedResolvedDeployment) {
 			continue
 		}
 
@@ -529,7 +529,7 @@ func reconcileDeployment(ctx context.Context, store refstore.Store, ref string) 
 	return &parsedResolvedDeployment, nil
 }
 
-func isForSameWork(ref1, ref2 refs.Ref) bool {
+func isForSameJob(ref1, ref2 refs.Ref) bool {
 	sub1 := ref1.SubPath
 	sub1 = strings.SplitN(sub1, "/", 2)[0]
 
@@ -594,8 +594,8 @@ func reconcileAllDeploymentsAtCommit(ctx context.Context, store refstore.Store, 
 		var changed bool
 		for k, v := range inputs {
 			if !reflect.DeepEqual(entryFunctionInputs[k].Value, v.Value) {
-				// Ensure we don't create loops with the outputs of this chain
-				if isForSameWork(*v.Ref, parsedResolvedTask) {
+				// Ensure we don't create loops with the outputs of this job
+				if isForSameJob(*v.Ref, parsedResolvedTask) {
 					continue
 				}
 
@@ -631,7 +631,7 @@ func reconcileAllDeploymentsAtCommit(ctx context.Context, store refstore.Store, 
 			Inputs: inputs,
 		})
 		if err != nil {
-			log.Error("Failed to initialize function chain", "ref", ref, "error", err)
+			log.Error("Failed to initialize run", "ref", ref, "error", err)
 			continue
 		}
 

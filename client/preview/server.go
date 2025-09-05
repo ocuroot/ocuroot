@@ -82,7 +82,6 @@ func findAvailablePort(start, end int) (int, error) {
 	return 0, fmt.Errorf("no available ports found in range %d-%d", start, end)
 }
 
-// MakeServePreview creates a handler function to preview package configuration
 // makeWatchHandler creates an SSE handler to notify the client when the package file changes
 func makeWatchHandler(rootPath string, packageFilePaths []string) http.HandlerFunc {
 	watchedFiles := make([]string, len(packageFilePaths))

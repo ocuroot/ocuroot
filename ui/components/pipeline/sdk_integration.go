@@ -3,7 +3,6 @@ package pipeline
 import (
 	"fmt"
 	"path"
-	"sort"
 
 	"github.com/charmbracelet/log"
 	libglob "github.com/gobwas/glob"
@@ -28,39 +27,39 @@ func SDKPackageToReleaseSummary(
 			Name: string(phase.Name),
 		}
 
-		for _, work := range phase.Tasks {
-			ws := WorkSummary{}
+		for _, task := range phase.Tasks {
+			ts := TaskSummary{}
 
-			var workRuns []string
+			var runs []string
 
-			var chainName string
+			var taskName string
 			var function sdk.FunctionDef
 			var inputs map[string]sdk.InputDescriptor
-			if work.Deployment != nil {
-				chainName = string(work.Deployment.Environment)
-				function = work.Deployment.Up
-				inputs = work.Deployment.Inputs
-				ws.Environment = &EnvironmentSummary{
+			if task.Deployment != nil {
+				taskName = string(task.Deployment.Environment)
+				function = task.Deployment.Up
+				inputs = task.Deployment.Inputs
+				ts.Environment = &EnvironmentSummary{
 					ID:   models.NewID[models.EnvironmentID](),
-					Name: string(work.Deployment.Environment),
+					Name: string(task.Deployment.Environment),
 				}
 
 				// Identify any runs of this deployment
-				workRuns = globFilter(childRefs, fmt.Sprintf("**/-/**/@*/deploy/%s/*", chainName))
+				runs = globFilter(childRefs, fmt.Sprintf("**/-/**/@*/deploy/%s/*", taskName))
 			}
 
-			if work.Task != nil {
-				chainName = string(work.Task.Name)
-				function = work.Task.Fn
-				inputs = work.Task.Inputs
+			if task.Task != nil {
+				taskName = string(task.Task.Name)
+				function = task.Task.Fn
+				inputs = task.Task.Inputs
 
 				// Identify any runs of this call
-				workRuns = globFilter(childRefs, fmt.Sprintf("**/-/**/@*/task/%s/*", chainName))
+				runs = globFilter(childRefs, fmt.Sprintf("**/-/**/@*/task/%s/*", taskName))
 			}
 
-			ws.Name = chainName
-			if len(workRuns) == 0 {
-				ws.Jobs = append(ws.Jobs, models.Run{
+			ts.Name = taskName
+			if len(runs) == 0 {
+				ts.Runs = append(ts.Runs, models.Run{
 					Functions: []*models.Function{
 						{
 							Fn:     function,
@@ -68,12 +67,12 @@ func SDKPackageToReleaseSummary(
 						},
 					},
 				})
-				p.Work = append(p.Work, ws)
+				p.Tasks = append(p.Tasks, ts)
 				continue
 			}
 
-			for _, run := range workRuns {
-				ws.Jobs = append(ws.Jobs, models.Run{
+			for _, run := range runs {
+				ts.Runs = append(ts.Runs, models.Run{
 					Functions: []*models.Function{
 						{
 							Fn:     function,
@@ -86,11 +85,11 @@ func SDKPackageToReleaseSummary(
 					log.Error("Multiple status refs", "run", run, "refs", statusRefs)
 				}
 				status := models.Status(path.Base(statusRefs[0]))
-				ws.JobRefs = append(ws.JobRefs, run)
-				ws.JobStatuses = append(ws.JobStatuses, status)
+				ts.RunRefs = append(ts.RunRefs, run)
+				ts.RunStatuses = append(ts.RunStatuses, status)
 			}
 
-			p.Work = append(p.Work, ws)
+			p.Tasks = append(p.Tasks, ts)
 		}
 
 		summary.Phases = append(summary.Phases, p)
@@ -108,20 +107,4 @@ func globFilter(refs []string, glob string) []string {
 		}
 	}
 	return out
-}
-
-func earliestFirst(refs []string) []string {
-	sort.Slice(refs, func(i, j int) bool {
-		return refs[i] < refs[j]
-	})
-
-	return refs
-}
-
-func latestFirst(refs []string) []string {
-	sort.Slice(refs, func(i, j int) bool {
-		return refs[i] > refs[j]
-	})
-
-	return refs
 }

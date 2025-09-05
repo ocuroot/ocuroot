@@ -233,20 +233,20 @@ func applyDeployIntent(ctx context.Context, ref refs.Ref, store refstore.Store) 
 		return fmt.Errorf("failed to initialize release store: %w", err)
 	}
 
-	chainRefString, err := refstore.IncrementPath(ctx, store, fmt.Sprintf("%s/", deployRef.String()))
+	runRefString, err := refstore.IncrementPath(ctx, store, fmt.Sprintf("%s/", deployRef.String()))
 	if err != nil {
 		return fmt.Errorf("failed to increment path: %w", err)
 	}
-	chainRef, err := refs.Parse(chainRefString)
+	runRef, err := refs.Parse(runRefString)
 	if err != nil {
-		return fmt.Errorf("failed to parse chain ref: %w", err)
+		return fmt.Errorf("failed to parse run ref: %w", err)
 	}
 	err = rs.InitializeFunction(
 		ctx,
 		models.Run{
 			Release: intentContent.Release,
 		},
-		chainRef,
+		runRef,
 		&models.Function{
 			Fn:     deployment.Up,
 			Inputs: intentContent.Inputs,

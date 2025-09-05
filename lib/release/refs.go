@@ -39,7 +39,7 @@ func ReduceToTaskRef(ref refs.Ref) (refs.Ref, error) {
 	return out, nil
 }
 
-func ReduceToJobRef(ref refs.Ref) refs.Ref {
+func ReduceToRunRef(ref refs.Ref) refs.Ref {
 	wr, err := refs.Reduce(ref.String(), GlobRun)
 	if err != nil {
 		return ref

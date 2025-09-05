@@ -149,9 +149,9 @@ func (c *Config) Run(
 	f FunctionDef,
 	logger Logger,
 	functionContext FunctionContext,
-) (WorkResult, error) {
+) (Result, error) {
 	if _, exists := c.globalFuncs[f.String()]; !exists {
-		return WorkResult{}, fmt.Errorf("function %s not found", f.String())
+		return Result{}, fmt.Errorf("function %s not found", f.String())
 	}
 
 	thread := &starlark.Thread{
@@ -181,19 +181,19 @@ func (c *Config) Run(
 
 	fcJSON, err := json.Marshal(functionContext)
 	if err != nil {
-		return WorkResult{}, err
+		return Result{}, err
 	}
 
 	var fcd map[string]interface{}
 	if err := json.Unmarshal(fcJSON, &fcd); err != nil {
-		return WorkResult{}, err
+		return Result{}, err
 	}
 
 	params := []starlark.Tuple{}
 	for key, value := range fcd {
 		valueJSON, err := json.Marshal(value)
 		if err != nil {
-			return WorkResult{}, err
+			return Result{}, err
 		}
 		params = append(params, starlark.Tuple{starlark.String(key), starlark.String(string(valueJSON))})
 	}
@@ -214,20 +214,20 @@ func (c *Config) Run(
 		params,
 	)
 	if err != nil {
-		return WorkResult{
+		return Result{
 			Err: starlarkerrors.Wrap(err),
 		}, nil
 	}
 
 	resultString, ok := resultValue.(starlark.String)
 	if !ok {
-		return WorkResult{
+		return Result{
 			Err: fmt.Errorf("expected string result, got %T", resultValue),
 		}, nil
 	}
-	var result WorkResult
+	var result Result
 	if err := json.Unmarshal([]byte(resultString.GoString()), &result); err != nil {
-		return WorkResult{
+		return Result{
 			Err: err,
 		}, nil
 	}

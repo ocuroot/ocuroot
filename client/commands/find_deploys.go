@@ -67,11 +67,11 @@ Example:
 				return fmt.Errorf("failed to resolve ref: %w", err)
 			}
 
-			var work models.Run
-			if err := tc.Store.Get(ctx, resolvedRef, &work); err != nil {
-				return fmt.Errorf("failed to get work: %w", err)
+			var run models.Run
+			if err := tc.Store.Get(ctx, resolvedRef, &run); err != nil {
+				return fmt.Errorf("failed to get run: %w", err)
 			}
-			refsToDeployment[ref] = work
+			refsToDeployment[ref] = run
 
 			pr, err := refs.Parse(resolvedRef)
 			if err != nil {

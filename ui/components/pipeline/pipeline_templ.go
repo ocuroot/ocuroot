@@ -146,8 +146,8 @@ func getFunctionBorderClass(status models.Status) string {
 	}
 }
 
-// modalsForChain renders the modals for a chain's functions
-func modalsForChain(chain *WorkSummary, logURL LogURLFunction) templ.Component {
+// modalsForTask renders the modals for a task's functions
+func modalsForTask(task *TaskSummary, logURL LogURLFunction) templ.Component {
 	return templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
 		templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
 		if templ_7745c5c3_CtxErr := ctx.Err(); templ_7745c5c3_CtxErr != nil {
@@ -168,7 +168,7 @@ func modalsForChain(chain *WorkSummary, logURL LogURLFunction) templ.Component {
 			templ_7745c5c3_Var2 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		c := chain.Jobs[0]
+		c := task.Runs[0]
 		templ_7745c5c3_Var3 := templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
 			templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
 			templ_7745c5c3_Buffer, templ_7745c5c3_IsBuffer := templruntime.GetBuffer(templ_7745c5c3_W)
@@ -182,7 +182,7 @@ func modalsForChain(chain *WorkSummary, logURL LogURLFunction) templ.Component {
 			}
 			ctx = templ.InitializeContext(ctx)
 			if logURL != nil {
-				templ_7745c5c3_Err = logs.LogView(logURL(c), fmt.Sprintf("chain-logs-%s", chain.Name)).Render(ctx, templ_7745c5c3_Buffer)
+				templ_7745c5c3_Err = logs.LogView(logURL(c), fmt.Sprintf("task-logs-%s", task.Name)).Render(ctx, templ_7745c5c3_Buffer)
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
@@ -194,7 +194,7 @@ func modalsForChain(chain *WorkSummary, logURL LogURLFunction) templ.Component {
 			}
 			return nil
 		})
-		templ_7745c5c3_Err = components.Modal(fmt.Sprintf("modal-chain-logs-%s", chain.Name), fmt.Sprintf("Chain Logs: %s", chain.Name), "full").Render(templ.WithChildren(ctx, templ_7745c5c3_Var3), templ_7745c5c3_Buffer)
+		templ_7745c5c3_Err = components.Modal(fmt.Sprintf("modal-task-logs-%s", task.Name), fmt.Sprintf("Task Logs: %s", task.Name), "full").Render(templ.WithChildren(ctx, templ_7745c5c3_Var3), templ_7745c5c3_Buffer)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -228,12 +228,12 @@ func modalsForChain(chain *WorkSummary, logURL LogURLFunction) templ.Component {
 				}
 				return nil
 			})
-			templ_7745c5c3_Err = components.Modal(fmt.Sprintf("chain-inputs-%s", chain.Name), "Chain Inputs").Render(templ.WithChildren(ctx, templ_7745c5c3_Var4), templ_7745c5c3_Buffer)
+			templ_7745c5c3_Err = components.Modal(fmt.Sprintf("modal-task-inputs-%s", task.Name), "Task Inputs").Render(templ.WithChildren(ctx, templ_7745c5c3_Var4), templ_7745c5c3_Buffer)
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 		}
-		if chain.JobStatuses[len(chain.JobStatuses)-1] == models.StatusComplete {
+		if task.RunStatuses[len(task.RunStatuses)-1] == models.StatusComplete {
 			templ_7745c5c3_Var5 := templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
 				templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
 				templ_7745c5c3_Buffer, templ_7745c5c3_IsBuffer := templruntime.GetBuffer(templ_7745c5c3_W)
@@ -246,8 +246,8 @@ func modalsForChain(chain *WorkSummary, logURL LogURLFunction) templ.Component {
 					}()
 				}
 				ctx = templ.InitializeContext(ctx)
-				if len(chain.Jobs[len(chain.Jobs)-1].Outputs) > 0 {
-					templ_7745c5c3_Err = keyvalue.FromVarMap(chain.Jobs[len(chain.Jobs)-1].Outputs).Render(ctx, templ_7745c5c3_Buffer)
+				if len(task.Runs[len(task.Runs)-1].Outputs) > 0 {
+					templ_7745c5c3_Err = keyvalue.FromVarMap(task.Runs[len(task.Runs)-1].Outputs).Render(ctx, templ_7745c5c3_Buffer)
 					if templ_7745c5c3_Err != nil {
 						return templ_7745c5c3_Err
 					}
@@ -259,7 +259,7 @@ func modalsForChain(chain *WorkSummary, logURL LogURLFunction) templ.Component {
 				}
 				return nil
 			})
-			templ_7745c5c3_Err = components.Modal(fmt.Sprintf("chain-outputs-%s", chain.Name), "Chain Outputs").Render(templ.WithChildren(ctx, templ_7745c5c3_Var5), templ_7745c5c3_Buffer)
+			templ_7745c5c3_Err = components.Modal(fmt.Sprintf("modal-task-outputs-%s", task.Name), "Task Outputs").Render(templ.WithChildren(ctx, templ_7745c5c3_Var5), templ_7745c5c3_Buffer)
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -393,8 +393,8 @@ func RenderPhaseProgress(counts StatusCountMap) templ.Component {
 	})
 }
 
-// ChainHeader renders a simplified header for a function chain
-func WorkHeader(work *WorkSummary, logURL LogURLFunction) templ.Component {
+// TaskHeader renders a simplified header for a task
+func TaskHeader(task *TaskSummary, logURL LogURLFunction) templ.Component {
 	return templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
 		templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
 		if templ_7745c5c3_CtxErr := ctx.Err(); templ_7745c5c3_CtxErr != nil {
@@ -415,7 +415,7 @@ func WorkHeader(work *WorkSummary, logURL LogURLFunction) templ.Component {
 			templ_7745c5c3_Var8 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = modalsForChain(work, logURL).Render(ctx, templ_7745c5c3_Buffer)
+		templ_7745c5c3_Err = modalsForTask(task, logURL).Render(ctx, templ_7745c5c3_Buffer)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -423,13 +423,13 @@ func WorkHeader(work *WorkSummary, logURL LogURLFunction) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		if work.Environment != nil {
+		if task.Environment != nil {
 			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 17, "<!-- Environment icon: location pin --> <svg class=\"h-4 w-4 text-gray-700 mr-1\" xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><circle cx=\"12\" cy=\"10\" r=\"3\"></circle> <path d=\"M12 21.7C17.3 17 20 13 20 10a8 8 0 1 0-16 0c0 3 2.7 7 8 11.7z\"></path></svg> <span class=\"text-gray-800\">")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			var templ_7745c5c3_Var9 string
-			templ_7745c5c3_Var9, templ_7745c5c3_Err = templ.JoinStringErrs(work.Environment.Name)
+			templ_7745c5c3_Var9, templ_7745c5c3_Err = templ.JoinStringErrs(task.Environment.Name)
 			if templ_7745c5c3_Err != nil {
 				return templ.Error{Err: templ_7745c5c3_Err, FileName: `ui/components/pipeline/pipeline.templ`, Line: 233, Col: 59}
 			}
@@ -452,7 +452,7 @@ func WorkHeader(work *WorkSummary, logURL LogURLFunction) templ.Component {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var10 string
-		templ_7745c5c3_Var10, templ_7745c5c3_Err = templ.JoinStringErrs(work.Name)
+		templ_7745c5c3_Var10, templ_7745c5c3_Err = templ.JoinStringErrs(task.Name)
 		if templ_7745c5c3_Err != nil {
 			return templ.Error{Err: templ_7745c5c3_Err, FileName: `ui/components/pipeline/pipeline.templ`, Line: 243, Col: 52}
 		}
@@ -464,19 +464,19 @@ func WorkHeader(work *WorkSummary, logURL LogURLFunction) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		if len(work.Jobs) > 3 {
+		if len(task.Runs) > 3 {
 			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 22, "<div style=\"margin-right: 4px;\">...</div>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			jobRefs := work.JobRefs[len(work.JobRefs)-3:]
-			for index, jobStatus := range work.JobStatuses[len(work.JobStatuses)-3:] {
+			runRefs := task.RunRefs[len(task.RunRefs)-3:]
+			for index, runStatus := range task.RunStatuses[len(task.RunStatuses)-3:] {
 				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 23, "<a style=\"margin-right: 4px;\" href=\"")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
 				var templ_7745c5c3_Var11 templ.SafeURL
-				templ_7745c5c3_Var11, templ_7745c5c3_Err = templ.JoinURLErrs(fmt.Sprintf("/ref/%s", jobRefs[index]))
+				templ_7745c5c3_Var11, templ_7745c5c3_Err = templ.JoinURLErrs(fmt.Sprintf("/ref/%s", runRefs[index]))
 				if templ_7745c5c3_Err != nil {
 					return templ.Error{Err: templ_7745c5c3_Err, FileName: `ui/components/pipeline/pipeline.templ`, Line: 250, Col: 83}
 				}
@@ -488,7 +488,7 @@ func WorkHeader(work *WorkSummary, logURL LogURLFunction) templ.Component {
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
-				templ_7745c5c3_Err = MapStatusToProgress(jobStatus).Render(ctx, templ_7745c5c3_Buffer)
+				templ_7745c5c3_Err = MapStatusToProgress(runStatus).Render(ctx, templ_7745c5c3_Buffer)
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
@@ -498,13 +498,13 @@ func WorkHeader(work *WorkSummary, logURL LogURLFunction) templ.Component {
 				}
 			}
 		} else {
-			for index, jobStatus := range work.JobStatuses {
+			for index, runStatus := range task.RunStatuses {
 				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 26, "<a href=\"")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
 				var templ_7745c5c3_Var12 templ.SafeURL
-				templ_7745c5c3_Var12, templ_7745c5c3_Err = templ.JoinURLErrs(fmt.Sprintf("/ref/%s", work.JobRefs[index]))
+				templ_7745c5c3_Var12, templ_7745c5c3_Err = templ.JoinURLErrs(fmt.Sprintf("/ref/%s", task.RunRefs[index]))
 				if templ_7745c5c3_Err != nil {
 					return templ.Error{Err: templ_7745c5c3_Err, FileName: `ui/components/pipeline/pipeline.templ`, Line: 256, Col: 61}
 				}
@@ -516,7 +516,7 @@ func WorkHeader(work *WorkSummary, logURL LogURLFunction) templ.Component {
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
-				templ_7745c5c3_Err = MapStatusToProgress(jobStatus).Render(ctx, templ_7745c5c3_Buffer)
+				templ_7745c5c3_Err = MapStatusToProgress(runStatus).Render(ctx, templ_7745c5c3_Buffer)
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
@@ -526,7 +526,7 @@ func WorkHeader(work *WorkSummary, logURL LogURLFunction) templ.Component {
 				}
 			}
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 29, "</div></div></div><!-- Action drawer - slides down on hover --></div></div>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 29, "</div></div></div></div></div>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -534,7 +534,7 @@ func WorkHeader(work *WorkSummary, logURL LogURLFunction) templ.Component {
 	})
 }
 
-// RenderPhaseSummary renders a phase summary with its chains
+// RenderPhaseSummary renders a phase summary with its tasks
 func RenderPhaseSummary(phase *PhaseSummary, logURL LogURLFunction) templ.Component {
 	return templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
 		templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
@@ -563,7 +563,7 @@ func RenderPhaseSummary(phase *PhaseSummary, logURL LogURLFunction) templ.Compon
 		var templ_7745c5c3_Var14 string
 		templ_7745c5c3_Var14, templ_7745c5c3_Err = templ.JoinStringErrs(phase.Name)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `ui/components/pipeline/pipeline.templ`, Line: 278, Col: 67}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `ui/components/pipeline/pipeline.templ`, Line: 272, Col: 67}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var14))
 		if templ_7745c5c3_Err != nil {
@@ -576,18 +576,18 @@ func RenderPhaseSummary(phase *PhaseSummary, logURL LogURLFunction) templ.Compon
 		var templ_7745c5c3_Var15 string
 		templ_7745c5c3_Var15, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("%d/%d", phase.StatusCounts()[models.StatusComplete], phase.StatusCounts().Total()))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `ui/components/pipeline/pipeline.templ`, Line: 280, Col: 142}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `ui/components/pipeline/pipeline.templ`, Line: 274, Col: 142}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var15))
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 32, "</span></div></div><div class=\"space-y-2\"><!-- Loop through all work items in the phase -->")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 32, "</span></div></div><div class=\"space-y-2\"><!-- Loop through all tasks in the phase -->")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		for _, work := range phase.Work {
-			templ_7745c5c3_Err = WorkHeader(&work, logURL).Render(ctx, templ_7745c5c3_Buffer)
+		for _, task := range phase.Tasks {
+			templ_7745c5c3_Err = TaskHeader(&task, logURL).Render(ctx, templ_7745c5c3_Buffer)
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
