@@ -398,10 +398,10 @@ func InitializeRun(
 		},
 	}
 	if runRef.SubPathType == refs.SubPathTypeTask {
-		run.Type = models.JobTypeTask
+		run.Type = models.RunTypeTask
 	}
 	if runRef.SubPathType == refs.SubPathTypeDeploy {
-		run.Type = models.JobTypeUp
+		run.Type = models.RunTypeUp
 	}
 
 	log.Info("Initializing run", "ref", runRef.String(), "runState", run)
@@ -433,7 +433,7 @@ func saveStatus(ctx context.Context, store refstore.Store, ref refs.Ref, status 
 		return fmt.Errorf("failed to set function state: %w", err)
 	}
 
-	log.Info("saved status", "status", status, "ref", ref.String(), "fsr", functionStateRef.String())
+	log.Debug("saved status", "status", status, "ref", ref.String(), "fsr", functionStateRef.String())
 
 	return nil
 }
@@ -463,7 +463,7 @@ func (r *releaseStore) sdkTaskToRunAndFunction(ctx context.Context, task sdk.Tas
 		runRef = runRef.
 			SetSubPathType(refs.SubPathTypeDeploy).
 			SetSubPath(string(task.Deployment.Environment))
-		mRun.Type = models.JobTypeUp
+		mRun.Type = models.RunTypeUp
 		fs.Fn = task.Deployment.Up
 		fs.Inputs = task.Deployment.Inputs
 	}
@@ -472,7 +472,7 @@ func (r *releaseStore) sdkTaskToRunAndFunction(ctx context.Context, task sdk.Tas
 		runRef = runRef.
 			SetSubPathType(refs.SubPathTypeTask).
 			SetSubPath(task.Task.Name)
-		mRun.Type = models.JobTypeTask
+		mRun.Type = models.RunTypeTask
 		fs.Fn = task.Task.Fn
 		fs.Inputs = task.Task.Inputs
 	}
@@ -501,7 +501,7 @@ func (r *releaseStore) sdTaskToDownRun(
 		SetSubPath(environment)
 
 	run := models.Run{
-		Type:    models.JobTypeDown,
+		Type:    models.RunTypeDown,
 		Release: r.ReleaseRef,
 	}
 	fs := &models.Function{

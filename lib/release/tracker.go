@@ -121,11 +121,11 @@ func (r *ReleaseTracker) InitRelease(ctx context.Context, commit string) error {
 		return fmt.Errorf("failed to create runs: %w", err)
 	}
 	for jobRef, fn := range jobs {
-		var t models.JobType
+		var t models.RunType
 		if jobRef.SubPathType == refs.SubPathTypeTask {
-			t = models.JobTypeTask
+			t = models.RunTypeTask
 		} else {
-			t = models.JobTypeUp
+			t = models.RunTypeUp
 		}
 
 		err = r.stateStore.InitializeFunction(ctx, models.Run{
@@ -409,7 +409,7 @@ func (r *ReleaseTracker) checkEnvs(ctx context.Context, logger Logger) error {
 		log.Info("Creating run", "ref", runRef.String())
 
 		err = r.stateStore.InitializeFunction(ctx, models.Run{
-			Type:    models.JobTypeUp,
+			Type:    models.RunTypeUp,
 			Release: r.stateStore.ReleaseRef,
 		}, runRef, fn)
 		if err != nil {
@@ -516,6 +516,7 @@ func (r *ReleaseTracker) updateIntent(ctx context.Context, taskRef refs.Ref, run
 	intentRef := taskRef.MakeIntent().SetVersion("")
 	intentRef = intentRef.SetSubPath(path.Dir(intentRef.SubPath))
 	intent := models.Intent{
+		Type:    run.Type,
 		Release: r.stateStore.ReleaseRef,
 		Inputs:  fn.Inputs,
 	}
@@ -751,7 +752,7 @@ func (r *ReleaseTracker) saveRunState(ctx context.Context, runRef refs.Ref, run 
 		return fmt.Errorf("failed to parse task ref: %w", err)
 	}
 	latestReleaseTaskRef := taskRefParsed.MakeRelease().SetVersion("")
-	if run.Type == models.JobTypeDown {
+	if run.Type == models.RunTypeDown {
 		if err := r.stateStore.Store.Unlink(ctx, latestReleaseTaskRef.String()); err != nil {
 			return fmt.Errorf("failed to unlink task: %w", err)
 		}

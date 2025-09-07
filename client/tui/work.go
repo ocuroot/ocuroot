@@ -1,7 +1,7 @@
 package tui
 
 import (
-	"bytes"
+	"fmt"
 	"sort"
 	"strings"
 
@@ -11,8 +11,6 @@ import (
 )
 
 func NewWorkModel() *WorkModel {
-	buf := new(bytes.Buffer)
-
 	return &WorkModel{
 		Spinner: func() spinner.Model {
 			s := spinner.New()
@@ -20,7 +18,6 @@ func NewWorkModel() *WorkModel {
 			s.Style = lipgloss.NewStyle().Foreground(lipgloss.Color("205"))
 			return s
 		}(),
-		logBuf: buf,
 	}
 }
 
@@ -33,8 +30,9 @@ type DoneEvent struct{}
 
 type Task interface {
 	ID() string
+	Hierarchy() []string
 	SortKey() string
-	Render(spinner spinner.Model, final bool) string
+	Render(depth int, spinner spinner.Model, final bool) string
 }
 
 type WorkModel struct {
@@ -44,8 +42,6 @@ type WorkModel struct {
 	Spinner spinner.Model
 
 	Done bool
-
-	logBuf *bytes.Buffer
 }
 
 func (w *WorkModel) GetTaskByID(id string) (Task, bool) {
@@ -116,13 +112,64 @@ func (m *WorkModel) view(finished bool) string {
 		return m.Tasks[i].SortKey() < m.Tasks[j].SortKey()
 	})
 
-	var s string
-
-	// Iterate over incomplete tasks
+	hierarchy := &HierarchyNode{}
 	for _, task := range m.Tasks {
-		s += task.Render(m.Spinner, finished)
+		hierarchy.Add(task.Hierarchy(), task)
 	}
+
+	s := hierarchy.Render(0, m.Spinner, finished)
 
 	// Send the UI for rendering
 	return s
+}
+
+type HierarchyNode struct {
+	Children map[string]*HierarchyNode
+	Elems    map[string]Task
+}
+
+func (h *HierarchyNode) Render(depth int, spinner spinner.Model, finished bool) string {
+	var s string
+	var elemIDs []string
+	for _, elem := range h.Elems {
+		elemIDs = append(elemIDs, elem.ID())
+	}
+	sort.Slice(elemIDs, func(i, j int) bool {
+		idI := h.Elems[elemIDs[i]]
+		idJ := h.Elems[elemIDs[j]]
+		return idI.SortKey() < idJ.SortKey()
+	})
+
+	for _, id := range elemIDs {
+		s += h.Elems[id].Render(depth+1, spinner, finished)
+	}
+	for name, child := range h.Children {
+		s += fmt.Sprintf("%s%s:\n", strings.Repeat("  ", depth), name)
+		s += child.Render(depth+1, spinner, finished)
+	}
+	return s
+}
+
+func (h *HierarchyNode) Add(hierarchy []string, t Task) {
+	if h.Elems == nil {
+		h.Elems = make(map[string]Task)
+	}
+
+	if len(hierarchy) == 0 {
+		h.Elems[t.ID()] = t
+		return
+	}
+
+	child := hierarchy[0]
+	hierarchy = hierarchy[1:]
+
+	if h.Children == nil {
+		h.Children = make(map[string]*HierarchyNode)
+	}
+
+	if _, ok := h.Children[child]; !ok {
+		h.Children[child] = &HierarchyNode{}
+	}
+
+	h.Children[child].Add(hierarchy, t)
 }

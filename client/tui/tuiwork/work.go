@@ -3,6 +3,7 @@ package tuiwork
 import (
 	"context"
 	"fmt"
+	"os"
 	"sort"
 	"strings"
 	"time"
@@ -54,7 +55,7 @@ func (e *TaskEvent) Description() (string, bool) {
 var _ tui.Task = (*Task)(nil)
 
 type Task struct {
-	TaskID string
+	RunRef refs.Ref
 
 	CreationTime time.Time
 	StartTime    time.Time
@@ -92,10 +93,17 @@ func (t *Task) SortKey() string {
 }
 
 func (t *Task) ID() string {
-	return t.TaskID
+	return t.RunRef.String()
 }
 
-func (task *Task) Render(spinner spinner.Model, final bool) string {
+func (t *Task) Hierarchy() []string {
+	return []string{
+		t.RunRef.Repo,
+		t.RunRef.Filename,
+	}
+}
+
+func (task *Task) Render(depth int, spinner spinner.Model, final bool) string {
 	var s string
 	if task.Status == WorkStatusPending && !final {
 		return ""
@@ -118,21 +126,24 @@ func (task *Task) Render(spinner spinner.Model, final bool) string {
 			endTime = time.Now()
 		}
 		duration = endTime.Sub(task.StartTime).String()
-		s += fmt.Sprintf("%v%s (%v)\n", prefix, task.Name, duration)
+		s += fmt.Sprintf("%s%s%v (%v)\n", strings.Repeat("  ", depth), prefix, task.Name, duration)
 	} else {
-		s += fmt.Sprintf("%v%s\n", prefix, task.Name)
+		s += fmt.Sprintf("%s%s%v\n", strings.Repeat("  ", depth), prefix, task.Name)
 	}
 
 	if task.Error != nil {
-		s += fmt.Sprintf("  %s\n", task.Error)
+		s += fmt.Sprintf("%s%s\n", strings.Repeat("  ", depth+1), task.Error)
 	}
 	msg := task.message()
 	if msg != "" {
 		for _, line := range strings.Split(msg, "\n") {
-			s += fmt.Sprintf("  %s\n", line)
+			s += fmt.Sprintf("%s%s\n", strings.Repeat("  ", depth+1), line)
 		}
 	}
-	if task.Status == WorkStatusDone {
+
+	// Only show streaming for incomplete jobs
+	// Unless in debug mode
+	if task.Status == WorkStatusDone && os.Getenv("OCUROOT_DEBUG") == "" {
 		return s
 	}
 
@@ -141,7 +152,7 @@ func (task *Task) Render(spinner spinner.Model, final bool) string {
 		logs = logs[len(logs)-4:]
 	}
 	for _, log := range logs {
-		s += fmt.Sprintf("  %s\n", log)
+		s += fmt.Sprintf("%s%s\n", strings.Repeat("  ", depth+1), log)
 	}
 	return s
 }
@@ -172,7 +183,7 @@ func (t *Task) message() string {
 			v := jobWork.Outputs[k]
 			outputs = outputs.Child(
 				tree.Root(
-					fmt.Sprintf("%s#output/%s", t.TaskID, k),
+					fmt.Sprintf("%s#output/%s", t.ID(), k),
 				).Child(v),
 			)
 		}

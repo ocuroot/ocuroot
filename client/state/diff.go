@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"reflect"
 
+	"github.com/charmbracelet/log"
 	"github.com/ocuroot/ocuroot/refs"
 	"github.com/ocuroot/ocuroot/refs/refstore"
 	"github.com/ocuroot/ocuroot/store/models"
@@ -20,6 +21,8 @@ func Diff(ctx context.Context, store refstore.Store) ([]string, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to match intent refs: %w", err)
 	}
+
+	log.Debug("Diffing", "stateRefs", stateRefs, "intentRefs", intentRefs)
 
 	var (
 		stateToIntentRefSet = make(map[string]string)
@@ -56,6 +59,8 @@ func Diff(ctx context.Context, store refstore.Store) ([]string, error) {
 		// Intent ref doesn't exist, may need to remove
 		diffs = append(diffs, ref)
 	}
+
+	log.Debug("After matching", "stateToIntentRefSet", stateToIntentRefSet, "diffs", diffs)
 
 	for stateRef, intentRef := range stateToIntentRefSet {
 		ir, err := refs.Parse(intentRef)
@@ -148,9 +153,13 @@ func compareDeployIntent(
 		return false, fmt.Errorf("failed to get state content: %w", err)
 	}
 
+	log.Debug("Comparing deploy", "intentRef", intentRef.String(), "stateRef", stateRef.String(), "intentContent", intentContent, "stateContent", stateContent)
+
 	if !reflect.DeepEqual(intentContent, stateContent) {
+		log.Debug("Not equal")
 		return false, nil
 	}
 
+	log.Debug("Equal")
 	return true, nil
 }
