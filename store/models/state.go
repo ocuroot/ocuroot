@@ -5,16 +5,16 @@ import (
 	"github.com/ocuroot/ocuroot/sdk"
 )
 
-type JobType string
+type RunType string
 
 const (
-	JobTypeUp   JobType = "up"
-	JobTypeDown JobType = "down"
-	JobTypeTask JobType = "task"
+	RunTypeUp   RunType = "up"
+	RunTypeDown RunType = "down"
+	RunTypeTask RunType = "task"
 )
 
 type Intent struct {
-	Type    JobType                        `json:"type"`
+	Type    RunType                        `json:"type"`
 	Release refs.Ref                       `json:"release"`
 	Inputs  map[string]sdk.InputDescriptor `json:"input"`
 }
@@ -27,7 +27,7 @@ type Task struct {
 
 // Run represents a call or deploy
 type Run struct {
-	Type    JobType  `json:"type"`
+	Type    RunType  `json:"type"`
 	Release refs.Ref `json:"release"`
 
 	Functions []*Function    `json:"functions"`

@@ -3,6 +3,7 @@ package tuiwork
 import (
 	"context"
 	"fmt"
+	"path"
 	"strings"
 	"time"
 
@@ -17,16 +18,19 @@ import (
 )
 
 func initEvent(ref refs.Ref, t tui.Tui, store refstore.Store) *TaskEvent {
-	tr, err := librelease.ReduceToTaskRef(ref)
-	if err != nil {
-		log.Error("failed to get task ref", "error", err)
-		return nil
-	}
+	ctx := context.TODO()
+	var err error
+
+	// tr, err := librelease.ReduceToTaskRef(ref)
+	// if err != nil {
+	// 	log.Error("failed to get task ref", "error", err)
+	// 	return nil
+	// }
 	runRef := librelease.ReduceToRunRef(ref)
 
 	var out *TaskEvent = &TaskEvent{}
 
-	ttr, found := t.GetTaskByID(tr.String())
+	ttr, found := t.GetTaskByID(runRef.String())
 	if found {
 		out.Old, _ = ttr.(*Task)
 	}
@@ -43,11 +47,26 @@ func initEvent(ref refs.Ref, t tui.Tui, store refstore.Store) *TaskEvent {
 	if out.New == nil {
 		name := strings.Split(runRef.SubPath, "/")[0]
 		if runRef.SubPathType == refs.SubPathTypeDeploy {
-			name = fmt.Sprintf("deploy to %s", name)
+			var run models.Run
+			if store != nil {
+				err = store.Get(ctx, runRef.String(), &run)
+				if err != nil {
+					log.Error("failed to get run", "error", err)
+				} else {
+					if run.Type == models.RunTypeDown {
+						name = fmt.Sprintf("remove from %s", name)
+					} else {
+						name = fmt.Sprintf("deploy to %s", name)
+					}
+				}
+			} else {
+				log.Error("failed to get run", "error", "no store")
+			}
 		}
+		name += fmt.Sprintf(" [%s]", path.Base(runRef.SubPath))
 
 		out.New = &Task{
-			TaskID:       tr.String(),
+			RunRef:       runRef,
 			Name:         name,
 			Status:       WorkStatusPending,
 			CreationTime: time.Now(),

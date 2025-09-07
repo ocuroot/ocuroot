@@ -47,11 +47,12 @@ const (
 )
 
 type StorageObject struct {
-	Kind     StorageKind     `json:"kind"`
-	BodyType string          `json:"body_type,omitempty"`
-	SetStack string          `json:"set_stack,omitempty"`
-	Links    []string        `json:"links,omitempty"`
-	Body     json.RawMessage `json:"body"`
+	Kind        StorageKind     `json:"kind"`
+	BodyType    string          `json:"body_type,omitempty"`
+	CreateStack []string        `json:"create_stack,omitempty"`
+	SetStack    []string        `json:"set_stack,omitempty"`
+	Links       []string        `json:"links,omitempty"`
+	Body        json.RawMessage `json:"body"`
 }
 
 func NewFSRefStore(basePath string) (*FSStateStore, error) {
@@ -200,7 +201,9 @@ func (f *FSStateStore) Set(ctx context.Context, ref string, v any) error {
 	}
 
 	if os.Getenv("OCUROOT_DEBUG") != "" {
-		storageObject.SetStack = string(debug.Stack())
+		if err := recordStacks(fp, &storageObject); err != nil {
+			return fmt.Errorf("failed to record stacks: %v", err)
+		}
 	}
 
 	storageObject.Links, err = f.linksAtPath(fp)
@@ -214,6 +217,36 @@ func (f *FSStateStore) Set(ctx context.Context, ref string, v any) error {
 	}
 
 	return os.WriteFile(fp, storageObjectJSON, 0644)
+}
+
+func recordStacks(fp string, storageObject *StorageObject) error {
+	storageObject.SetStack = stackAsSlice()
+
+	if _, err := os.Stat(fp); os.IsNotExist(err) {
+		storageObject.CreateStack = stackAsSlice()
+		return nil
+	}
+
+	existingStorageObjectJSON, err := os.ReadFile(fp)
+	if err != nil {
+		return fmt.Errorf("failed to read storage object: %v", err)
+	}
+
+	var existingStorageObject StorageObject
+	if err := json.Unmarshal(existingStorageObjectJSON, &existingStorageObject); err != nil {
+		return fmt.Errorf("failed to unmarshal storage object: %v", err)
+	}
+	storageObject.CreateStack = existingStorageObject.CreateStack
+
+	return nil
+}
+
+func stackAsSlice() []string {
+	var out []string
+	for _, line := range strings.Split(string(debug.Stack()), "\n") {
+		out = append(out, strings.TrimPrefix(line, "\t"))
+	}
+	return out
 }
 
 // Delete implements RefStore.

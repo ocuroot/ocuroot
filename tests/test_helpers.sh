@@ -62,6 +62,29 @@ check_ref_does_not_exist() {
     return 0
 }
 
+
+check_file_exists() {
+    local file_path="$1"
+    local error_message="${2:-"File $file_path does not exist"}"
+
+    if [ ! -f "$file_path" ]; then
+        echo "$error_message"
+        exit 1
+    fi
+    return 0
+}
+
+check_file_does_not_exist() {
+    local file_path="$1"
+    local error_message="${2:-"File $file_path exists"}"
+
+    if [ -f "$file_path" ]; then
+        echo "$error_message"
+        exit 1
+    fi
+    return 0
+}
+
 # Function to check if a package is deployed to an environment
 # Usage: check_deployment "package/path.ocu.star" "environment"
 assert_deployed() {
