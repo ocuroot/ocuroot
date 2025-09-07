@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/charmbracelet/log"
 	"github.com/ocuroot/ocuroot/refs"
 	"github.com/ocuroot/ocuroot/refs/refstore"
 )
@@ -14,6 +15,8 @@ func Sync(ctx context.Context, store refstore.Store) error {
 	if err != nil {
 		return fmt.Errorf("failed to get diffs: %w", err)
 	}
+
+	log.Info("Syncing", "diffs", diffs)
 
 	for _, diff := range diffs {
 		diffRef, err := refs.Parse(diff)

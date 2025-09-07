@@ -433,7 +433,7 @@ func saveStatus(ctx context.Context, store refstore.Store, ref refs.Ref, status 
 		return fmt.Errorf("failed to set function state: %w", err)
 	}
 
-	log.Info("saved status", "status", status, "ref", ref.String(), "fsr", functionStateRef.String())
+	log.Debug("saved status", "status", status, "ref", ref.String(), "fsr", functionStateRef.String())
 
 	return nil
 }

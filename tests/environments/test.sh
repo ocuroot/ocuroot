@@ -124,12 +124,15 @@ delete_environment_omnibus() {
 
     setup_test
 
+    echo "=== Releasing environments ==="
     ocuroot release new environments.ocu.star
     assert_equal "0" "$?" "Failed to release environments"
 
+    echo "=== Releasing package1 ==="
     ocuroot release new package1.ocu.star
     assert_equal "0" "$?" "Failed to release package1"
 
+    echo "=== Releasing package2 ==="
     ocuroot release new package2.ocu.star
     assert_equal "0" "$?" "Failed to release package2"
 
@@ -139,12 +142,30 @@ delete_environment_omnibus() {
     check_file_exists "./.deploys/production2/package1.txt"
     check_file_exists "./.deploys/production2/package2.txt"
 
+    echo "=== Deleting environment ==="
     ocuroot state delete "+/environment/production2"
+
+    echo "=== Running work any ==="
     ocuroot work any
 
     check_ref_does_not_exist "@/environment/production2"    
 
-    #ocuroot work any
+    check_ref_does_not_exist "package1.ocu.star/@/deploy/production2"
+
+    check_file_exists "./.deploys/staging/package1.txt"
+    check_file_exists "./.deploys/staging/package2.txt"
+    check_file_exists "./.deploys/production/package1.txt"
+    check_file_exists "./.deploys/production/package2.txt"
+
+    check_file_does_not_exist "./.deploys/production2/package1.txt"
+    check_file_does_not_exist "./.deploys/production2/package2.txt"
+
+    echo "=== Repeating work any ==="
+
+    # This shouldn't change anything
+    ocuroot work any
+
+    check_ref_does_not_exist "@/environment/production2"    
 
     check_ref_does_not_exist "package1.ocu.star/@/deploy/production2"
 

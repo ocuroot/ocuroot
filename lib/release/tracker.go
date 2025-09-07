@@ -516,6 +516,7 @@ func (r *ReleaseTracker) updateIntent(ctx context.Context, taskRef refs.Ref, run
 	intentRef := taskRef.MakeIntent().SetVersion("")
 	intentRef = intentRef.SetSubPath(path.Dir(intentRef.SubPath))
 	intent := models.Intent{
+		Type:    run.Type,
 		Release: r.stateStore.ReleaseRef,
 		Inputs:  fn.Inputs,
 	}
