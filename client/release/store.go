@@ -24,14 +24,17 @@ func NewRefStore(
 	if storeConfig.State.Git != nil {
 		statePrefix = storeConfig.State.Git.PathPrefix
 	}
+	if storeConfig.Intent != nil && storeConfig.Intent.Git != nil {
+		intentPrefix = storeConfig.Intent.Git.PathPrefix
+	}
 
 	if storeConfig.Intent == nil {
-		intentPrefix = "intent"
+		if intentPrefix == "" {
+			intentPrefix = "intent"
+		}
 		if statePrefix == "" {
 			statePrefix = "state"
 		}
-	} else if storeConfig.Intent.Git != nil {
-		intentPrefix = storeConfig.Intent.Git.PathPrefix
 	}
 
 	stateStore, err := newRefStoreFromBackend(&storeConfig.State, repoURL, repoPath, statePrefix)
