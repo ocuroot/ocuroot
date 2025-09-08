@@ -431,7 +431,7 @@ func triggerWork(ctx context.Context, readOnlyStore refstore.Store, configRef st
 		if err != nil {
 			return fmt.Errorf("failed to parse ref: %w", err)
 		}
-		commit := pr.ReleaseOrIntent.Value
+		commit := pr.Release
 
 		_, err = starlark.Call(thread, be.RepoTrigger, starlark.Tuple{starlark.String(commit)}, nil)
 		if err != nil {

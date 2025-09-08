@@ -35,7 +35,7 @@ func (s *server) handleMatch(w http.ResponseWriter, r *http.Request) {
 	switch {
 	case release.GlobRepoConfig.Match(query):
 		content = s.buildRepositoryTable(matches)
-	case release.GlobDeploymentState.Match(query):
+	case release.GlobDeployment.Match(query):
 		content = s.buildDeploymentTable(r.Context(), matches)
 	case release.GlobRelease.Match(query):
 		content = s.buildReleaseTable(matches)
@@ -93,7 +93,7 @@ func (s *server) buildReleaseTable(matches []string) templ.Component {
 			Cells: []templ.Component{
 				textCell(pr.Repo),
 				textCell(pr.Filename),
-				textCell(pr.ReleaseOrIntent.Value),
+				textCell(string(pr.Release)),
 			},
 		})
 	}
@@ -121,7 +121,7 @@ func (s *server) buildDeploymentTable(ctx context.Context, matches []string) tem
 				textCell(resolvedParsed.Repo),
 				textCell(resolvedParsed.Filename),
 				textCell(matchParsed.SubPath),
-				textCell(resolvedParsed.ReleaseOrIntent.Value),
+				textCell(string(resolvedParsed.Release)),
 			},
 		})
 	}
@@ -159,7 +159,7 @@ func (s *server) buildTaskTable(ctx context.Context, matches []string) templ.Com
 			Cells: []templ.Component{
 				textCell(resolvedParsed.Repo),
 				textCell(resolvedParsed.Filename),
-				textCell(resolvedParsed.ReleaseOrIntent.Value),
+				textCell(string(resolvedParsed.Release)),
 				textCell(task),
 				textCell(status),
 			},

@@ -305,7 +305,7 @@ func (w *releaseStore) AddTags(ctx context.Context, tags []string) error {
 			return fmt.Errorf("tags must not be in the release format (r<number>): %s", tag)
 		}
 		tagRef := w.ReleaseRef
-		tagRef = tagRef.MakeRelease().SetVersion(tag)
+		tagRef = tagRef.SetRelease(tag)
 		if err := w.Store.Link(ctx, tagRef.String(), w.ReleaseRef.String()); err != nil {
 			return err
 		}

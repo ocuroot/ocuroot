@@ -169,12 +169,12 @@ func RefHeader(props RefPageProps) templ.Component {
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			if rp.ReleaseOrIntent.Value != "" {
+			if rp.Release != "" {
 				templ_7745c5c3_Err = HeaderLink(
 					props.Ref,
 					release.GlobRelease,
-					fmt.Sprintf("Release %s", rp.ReleaseOrIntent.Value),
-					fmt.Sprintf("/ref/%s/-/%s/@%s", rp.Repo, rp.Filename, rp.ReleaseOrIntent.Value),
+					fmt.Sprintf("Release %s", rp.Release),
+					fmt.Sprintf("/ref/%s/-/%s/@%s", rp.Repo, rp.Filename, rp.Release),
 				).Render(ctx, templ_7745c5c3_Buffer)
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
@@ -189,7 +189,7 @@ func RefHeader(props RefPageProps) templ.Component {
 					props.Ref,
 					release.GlobTask,
 					fmt.Sprintf("Task '%s'", strings.Split(rp.SubPath, "/")[0]),
-					fmt.Sprintf("/ref/%s/-/%s/@%s/task/%s", rp.Repo, rp.Filename, rp.ReleaseOrIntent.Value, strings.Split(rp.SubPath, "/")[0]),
+					fmt.Sprintf("/ref/%s/-/%s/@%s/task/%s", rp.Repo, rp.Filename, rp.Release, strings.Split(rp.SubPath, "/")[0]),
 				).Render(ctx, templ_7745c5c3_Buffer)
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
@@ -203,7 +203,7 @@ func RefHeader(props RefPageProps) templ.Component {
 						props.Ref,
 						release.GlobRun,
 						fmt.Sprintf("Run %s", strings.Split(rp.SubPath, "/")[1]),
-						fmt.Sprintf("/ref/%s/-/%s/@%s/task/%s/%s", rp.Repo, rp.Filename, rp.ReleaseOrIntent.Value, strings.Split(rp.SubPath, "/")[0], strings.Split(rp.SubPath, "/")[1]),
+						fmt.Sprintf("/ref/%s/-/%s/@%s/task/%s/%s", rp.Repo, rp.Filename, rp.Release, strings.Split(rp.SubPath, "/")[0], strings.Split(rp.SubPath, "/")[1]),
 					).Render(ctx, templ_7745c5c3_Buffer)
 					if templ_7745c5c3_Err != nil {
 						return templ_7745c5c3_Err
@@ -217,9 +217,9 @@ func RefHeader(props RefPageProps) templ.Component {
 			if rp.SubPathType == refs.SubPathTypeDeploy {
 				templ_7745c5c3_Err = HeaderLink(
 					props.Ref,
-					release.GlobDeploymentState,
+					release.GlobDeployment,
 					fmt.Sprintf("Deploy to %s", strings.Split(rp.SubPath, "/")[0]),
-					fmt.Sprintf("/ref/%s/-/%s/@%s/deploy/%s", rp.Repo, rp.Filename, rp.ReleaseOrIntent.Value, rp.SubPath),
+					fmt.Sprintf("/ref/%s/-/%s/@%s/deploy/%s", rp.Repo, rp.Filename, rp.Release, rp.SubPath),
 				).Render(ctx, templ_7745c5c3_Buffer)
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
@@ -233,7 +233,7 @@ func RefHeader(props RefPageProps) templ.Component {
 						props.Ref,
 						release.GlobRun,
 						fmt.Sprintf("Run %s", strings.Split(rp.SubPath, "/")[1]),
-						fmt.Sprintf("/ref/%s/-/%s/@%s/deploy/%s/%s", rp.Repo, rp.Filename, rp.ReleaseOrIntent.Value, strings.Split(rp.SubPath, "/")[0], strings.Split(rp.SubPath, "/")[1]),
+						fmt.Sprintf("/ref/%s/-/%s/@%s/deploy/%s/%s", rp.Repo, rp.Filename, rp.Release, strings.Split(rp.SubPath, "/")[0], strings.Split(rp.SubPath, "/")[1]),
 					).Render(ctx, templ_7745c5c3_Buffer)
 					if templ_7745c5c3_Err != nil {
 						return templ_7745c5c3_Err

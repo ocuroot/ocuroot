@@ -17,9 +17,9 @@ templ MatchHeading(query string) {
             <h1>Releases</h1>
         } else if release.GlobEnvironment.Match(query) {
             <h1>Environments</h1>
-        } else if release.GlobDeploymentState.Match(query) {
+        } else if release.GlobDeployment.Match(query) {
             <h1>Deployments</h1>
-        } else if release.GlobCustomState.Match(query) {
+        } else if release.GlobCustom.Match(query) {
             <h1>Custom state</h1>
         } else {
             <h1>Refs</h1>

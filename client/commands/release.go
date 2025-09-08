@@ -79,7 +79,7 @@ var NewReleaseCmd = &cobra.Command{
 			fmt.Println("Registering environments")
 			for _, env := range environments {
 				// Establishing intent for environment
-				intentRef := "+/environment/" + string(env.Name)
+				intentRef := "@/environment/" + string(env.Name)
 				if err := tc.Intent.Set(ctx, intentRef, env); err != nil {
 					return err
 				}
@@ -129,7 +129,7 @@ var ContinueReleaseCmd = &cobra.Command{
 			return err
 		}
 
-		if tc.Ref.ReleaseOrIntent.Type != refs.Release {
+		if !tc.Ref.HasRelease() {
 			fmt.Println("A release ID or tag must be specified")
 			return nil
 		}
@@ -176,7 +176,7 @@ var RetryReleaseCmd = &cobra.Command{
 			return err
 		}
 
-		if tc.Ref.ReleaseOrIntent.Type != refs.Release {
+		if !tc.Ref.HasRelease() {
 			releasesForCommit, err := releasesForCommit(ctx, tc.State, tc.Ref.Repo, tc.Commit)
 			if err != nil {
 				return fmt.Errorf("failed to get releases for commit: %w", err)

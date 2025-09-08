@@ -25,7 +25,7 @@ type TrackerConfig struct {
 func TrackerForNewRelease(ctx context.Context, tc TrackerConfig) (*release.ReleaseTracker, []sdk.Environment, error) {
 	var err error
 
-	if tc.Ref.ReleaseOrIntent.Type != refs.Unknown {
+	if tc.Ref.HasRelease() {
 		return nil, nil, fmt.Errorf("release should not be specified")
 	}
 
@@ -71,7 +71,7 @@ func TrackerForExistingRelease(ctx context.Context, tc TrackerConfig) (*release.
 		return nil, fmt.Errorf("failed to load config %w", err)
 	}
 
-	if tc.Ref.ReleaseOrIntent.Type != refs.Release {
+	if !tc.Ref.HasRelease() {
 		return nil, fmt.Errorf("no release was specified")
 	}
 

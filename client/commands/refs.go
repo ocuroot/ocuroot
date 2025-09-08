@@ -30,10 +30,7 @@ func GetRef(cmd *cobra.Command, args []string) (refs.Ref, error) {
 		out.Filename, _ = cmd.Flags().GetString("package")
 		releaseName, _ := cmd.Flags().GetString("release")
 		if releaseName != "" {
-			out.ReleaseOrIntent = refs.ReleaseOrIntent{
-				Type:  refs.Release,
-				Value: releaseName,
-			}
+			out = out.SetRelease(releaseName)
 		}
 	}
 
@@ -225,13 +222,12 @@ func getTrackerConfig(ctx context.Context, cmd *cobra.Command, args []string) (r
 
 func saveRepoConfig(ctx context.Context, tc release.TrackerConfig, data []byte) (err error) {
 	// Write the repo file to the state stores for later use
-	repoRef := tc.Ref
-	repoRef.Filename = "repo.ocu.star"
-	repoRef.ReleaseOrIntent.Type = refs.Release
-	repoRef.ReleaseOrIntent.Value = tc.Commit
-	repoRef.SubPathType = refs.SubPathTypeNone
-	repoRef.SubPath = ""
-	repoRef.Fragment = ""
+	repoRef := tc.Ref.
+		SetFilename("repo.ocu.star").
+		SetRelease(tc.Commit).
+		SetSubPathType(refs.SubPathTypeNone).
+		SetSubPath("").
+		SetFragment("")
 
 	repoConfig := models.RepoConfig{
 		Source: data,
@@ -265,7 +261,7 @@ func saveRepoConfig(ctx context.Context, tc release.TrackerConfig, data []byte) 
 		if err = tc.State.Set(ctx, repoRef.String(), repoConfig); err != nil {
 			return fmt.Errorf("failed to set ref store: %w", err)
 		}
-		if err = tc.State.Link(ctx, repoRef.SetVersion("").String(), repoRef.String()); err != nil {
+		if err = tc.State.Link(ctx, repoRef.SetRelease("").String(), repoRef.String()); err != nil {
 			return fmt.Errorf("failed to link ref store: %w", err)
 		}
 
@@ -277,12 +273,11 @@ func saveRepoConfig(ctx context.Context, tc release.TrackerConfig, data []byte) 
 		}
 	}
 
-	repoRef = repoRef.MakeIntent()
 	if err := tc.Intent.Get(ctx, repoRef.String(), &models.RepoConfig{}); err == refstore.ErrRefNotFound {
 		if err := tc.Intent.Set(ctx, repoRef.String(), repoConfig); err != nil {
 			return fmt.Errorf("failed to set ref store: %w", err)
 		}
-		if err := tc.Intent.Link(ctx, repoRef.SetVersion("").String(), repoRef.String()); err != nil {
+		if err := tc.Intent.Link(ctx, repoRef.SetRelease("").String(), repoRef.String()); err != nil {
 			return fmt.Errorf("failed to link ref store: %w", err)
 		}
 

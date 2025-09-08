@@ -17,7 +17,7 @@ func Diff(ctx context.Context, state, intent refstore.Store) ([]string, error) {
 		return nil, fmt.Errorf("failed to match state refs: %w", err)
 	}
 
-	intentRefs, err := intent.Match(ctx, "**/+/{deploy}/*", "**/+*/custom/*", "+/{custom,environment}/*")
+	intentRefs, err := intent.Match(ctx, "**/@/{deploy}/*", "**/@*/custom/*", "@/{custom,environment}/*")
 	if err != nil {
 		return nil, fmt.Errorf("failed to match intent refs: %w", err)
 	}
@@ -35,7 +35,6 @@ func Diff(ctx context.Context, state, intent refstore.Store) ([]string, error) {
 		if err != nil {
 			return nil, fmt.Errorf("failed to parse state ref: %w", err)
 		}
-		pr = pr.MakeIntent()
 		stateToIntentRefSet[ref] = pr.String()
 	}
 
@@ -44,7 +43,6 @@ func Diff(ctx context.Context, state, intent refstore.Store) ([]string, error) {
 		if err != nil {
 			return nil, fmt.Errorf("failed to parse intent ref: %w", err)
 		}
-		ir = ir.MakeRelease()
 		resolvedRef, err := state.ResolveLink(ctx, ir.String())
 		if err != nil {
 			return nil, fmt.Errorf("failed to resolve intent ref: %w", err)

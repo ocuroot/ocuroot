@@ -67,12 +67,12 @@ func MatchHeading(query string) templ.Component {
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-		} else if release.GlobDeploymentState.Match(query) {
+		} else if release.GlobDeployment.Match(query) {
 			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 6, "<h1>Deployments</h1>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-		} else if release.GlobCustomState.Match(query) {
+		} else if release.GlobCustom.Match(query) {
 			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 7, "<h1>Custom state</h1>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err

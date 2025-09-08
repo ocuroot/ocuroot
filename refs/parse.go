@@ -34,15 +34,8 @@ func Parse(ref string) (Ref, error) {
 		case item.typ == itemSubpath:
 			outRef.SubPath = strings.TrimSuffix(item.val, "/")
 		case item.typ == itemRelease:
-			outRef.ReleaseOrIntent = ReleaseOrIntent{
-				Type:  Release,
-				Value: item.val,
-			}
-		case item.typ == itemIntent:
-			outRef.ReleaseOrIntent = ReleaseOrIntent{
-				Type:  Intent,
-				Value: item.val,
-			}
+			outRef.Release = Release(item.val)
+			outRef.hasRelease = true
 		case item.typ == itemFragment:
 			outRef.Fragment = strings.TrimSuffix(item.val, "/")
 		}
@@ -69,7 +62,6 @@ const (
 	itemGlobal
 
 	itemRelease
-	itemIntent
 
 	itemSubpathType
 	itemSubpath
@@ -84,7 +76,6 @@ const (
 	hash          = "#"
 	slash         = "/"
 	releasePrefix = "@"
-	intentPrefix  = "+"
 	repoSeparator = "-"
 )
 
@@ -152,14 +143,9 @@ func lexStart(l *lexer) stateFn {
 	}
 
 	if strings.HasPrefix(l.input[l.pos:], "./") {
-		if strings.HasPrefix(l.input[l.pos:], "./+") || strings.HasPrefix(l.input[l.pos:], "./@") {
+		if strings.HasPrefix(l.input[l.pos:], "./@") {
 			l.pos += len(".")
 			l.emit(itemPackage)
-			if strings.HasPrefix(l.input[l.pos:], slash+intentPrefix) {
-				l.pos += len(slash)
-				l.ignore()
-				return lexIntent
-			}
 			if strings.HasPrefix(l.input[l.pos:], slash+releasePrefix) {
 				l.pos += len(slash)
 				l.ignore()
@@ -178,11 +164,6 @@ func lexStart(l *lexer) stateFn {
 	if strings.HasPrefix(l.input[l.pos:], releasePrefix) {
 		l.emit(itemGlobal)
 		return lexRelease
-	}
-
-	if strings.HasPrefix(l.input[l.pos:], intentPrefix) {
-		l.emit(itemGlobal)
-		return lexIntent
 	}
 
 	return lexPath
@@ -213,24 +194,11 @@ func lexPath(l *lexer) stateFn {
 			return lexRelease // Next state.
 		}
 
-		if strings.HasPrefix(l.input[l.pos:], slash+intentPrefix) {
-			l.emit(itemPackage)
-			_ = l.next()
-			return lexIntent
-		}
-
 		if strings.HasPrefix(l.input[l.pos:], releasePrefix) {
 			if l.pos > l.start {
 				return l.errorf("unexpected release prefix in path")
 			}
 			return lexRelease
-		}
-
-		if strings.HasPrefix(l.input[l.pos:], intentPrefix) {
-			if l.pos > l.start {
-				return l.errorf("unexpected intent prefix in path")
-			}
-			return lexIntent
 		}
 
 		if l.next() == eof {
@@ -261,30 +229,6 @@ func lexRelease(l *lexer) stateFn {
 		}
 		if l.next() == eof {
 			l.emit(itemRelease)
-			l.emit(itemEOF)
-			return nil
-		}
-	}
-}
-
-func lexIntent(l *lexer) stateFn {
-	l.pos += len(intentPrefix)
-	l.ignore() // Ignore the prefixing
-	for {
-		if strings.HasPrefix(l.input[l.pos:], slash) {
-			l.emit(itemIntent)
-			l.pos += len(slash)
-			l.ignore()
-			return lexSubpathType
-		}
-		if strings.HasPrefix(l.input[l.pos:], hash) {
-			l.emit(itemIntent)
-			l.pos += len(hash)
-			l.ignore()
-			return lexFragment
-		}
-		if l.next() == eof {
-			l.emit(itemIntent)
 			l.emit(itemEOF)
 			return nil
 		}

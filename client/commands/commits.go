@@ -51,10 +51,10 @@ func getRepoAndCommitForRelease(ctx context.Context, ref string, state refstore.
 		SetSubPath("").
 		SetFragment("")
 
-	if strings.Contains(pr.ReleaseOrIntent.Value, ".") {
+	if strings.Contains(string(pr.Release), ".") {
 		return RepoCommitTuple{
 			Repo:   pr.Repo,
-			Commit: strings.Split(pr.ReleaseOrIntent.Value, ".")[0],
+			Commit: strings.Split(string(pr.Release), ".")[0],
 		}, nil
 	}
 

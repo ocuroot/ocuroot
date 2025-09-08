@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 
 export ENABLE_OTEL=true
+export OCUROOT_DEBUG=true
 export OCUROOT_DEBUG_TRACES=true
 export OCUROOT_CHECK_STAGED_FILES=true
 
@@ -50,7 +51,7 @@ test_two_releases() {
     assert_equal "0" "$?" "Failed to release v1"
 
     echo "== create approval intent =="
-    ocuroot state set "minimal/repo/-/approvals.ocu.star/+v1/custom/approval" 1
+    ocuroot state set "minimal/repo/-/approvals.ocu.star/@v1/custom/approval" 1
     assert_equal "0" "$?" "Failed to create approval intent"
     echo "== apply approval intent and continue work =="
     ocuroot work any
@@ -60,7 +61,7 @@ test_two_releases() {
     check_ref_exists "minimal/repo/-/approvals.ocu.star/@r1/custom/approval"
 
     echo "== create approval2 intent =="
-    ocuroot state set "minimal/repo/-/approvals.ocu.star/+r1/custom/approval2" 1
+    ocuroot state set "minimal/repo/-/approvals.ocu.star/@r1/custom/approval2" 1
     assert_equal "0" "$?" "Failed to create approval2 intent"
     echo "== apply approval intent and continue work =="
     ocuroot work any
@@ -82,19 +83,19 @@ test_two_releases() {
     ocuroot release new approvals.ocu.star --force
     assert_equal "0" "$?" "Failed to release v2"
     echo "== create approval intent =="
-    ocuroot state set "minimal/repo/-/approvals.ocu.star/+v2/custom/approval" 1
+    ocuroot state set "minimal/repo/-/approvals.ocu.star/@v2/custom/approval" 1
     assert_equal "0" "$?" "Failed to create approval intent"
     echo "== apply approval intent =="
-    ocuroot state apply "minimal/repo/-/approvals.ocu.star/+v2/custom/approval"
+    ocuroot state apply "minimal/repo/-/approvals.ocu.star/@v2/custom/approval"
     assert_equal "0" "$?" "Failed to apply approval intent"
     echo "== continue release up to second approval =="
     ocuroot release continue minimal/repo/-/approvals.ocu.star/@v2
     assert_equal "0" "$?" "Failed to continue release up to second approval"
     echo "== create approval2 intent =="
-    ocuroot state set "minimal/repo/-/approvals.ocu.star/+v2/custom/approval2" 1
+    ocuroot state set "minimal/repo/-/approvals.ocu.star/@v2/custom/approval2" 1
     assert_equal "0" "$?" "Failed to create approval2 intent"
     echo "== apply approval2 intent =="
-    ocuroot state apply "minimal/repo/-/approvals.ocu.star/+v2/custom/approval2"
+    ocuroot state apply "minimal/repo/-/approvals.ocu.star/@v2/custom/approval2"
     assert_equal "0" "$?" "Failed to apply approval2 intent"
     echo "== continue release =="
     ocuroot release continue minimal/repo/-/approvals.ocu.star/@v2
@@ -143,7 +144,7 @@ test_deploy_intent() {
     assert_deployed "basic.ocu.star" "production2"
 
     echo "== delete deployment intent =="
-    ocuroot state delete minimal/repo/-/basic.ocu.star/+/deploy/production
+    ocuroot state delete minimal/repo/-/basic.ocu.star/@/deploy/production
     assert_equal "0" "$?" "Failed to delete deployment intent"
 
     echo "== apply all outstanding intents =="

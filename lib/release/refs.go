@@ -11,20 +11,16 @@ import (
 )
 
 var (
-	GlobPackage                 = libglob.MustCompile(`**/[^@+]+/**`, '/')
-	GlobRepoConfig              = libglob.MustCompile("**/-/repo.ocu.star/@*", '/')
-	GlobRelease                 = libglob.MustCompile("**/{@,+}*", '/')
-	GlobTask                    = libglob.MustCompile("**/@*/{task,deploy}/*", '/')
-	GlobOp                      = libglob.MustCompile("**/@*/op/*", '/')
-	GlobDeploymentState         = libglob.MustCompile("**/@*/deploy/*", '/')
-	GlobDeploymentIntent        = libglob.MustCompile("**/+*/deploy/*", '/')
-	GlobDeploymentStateOrIntent = libglob.MustCompile("**/{@,+}*/deploy/*", '/')
-	GlobRun                     = libglob.MustCompile("**/{@,+}*/{task,deploy}/*/*", '/')
-	GlobLog                     = libglob.MustCompile("**/{@,+}*/{task,deploy}/*/*/logs", '/')
-	GlobCustomState             = libglob.MustCompile("**/@*/custom/*", '/')
-	GlobCustomIntent            = libglob.MustCompile("**/+*/custom/*", '/')
-	GlobCustomStateOrIntent     = libglob.MustCompile("**/{@,+}*/custom/*", '/')
-	GlobEnvironment             = libglob.MustCompile("{@,+}*/environment/*", '/')
+	GlobPackage     = libglob.MustCompile(`**/[^@]+/**`, '/')
+	GlobRepoConfig  = libglob.MustCompile("**/-/repo.ocu.star/@*", '/')
+	GlobRelease     = libglob.MustCompile("**/@*", '/')
+	GlobTask        = libglob.MustCompile("**/@*/{task,deploy}/*", '/')
+	GlobOp          = libglob.MustCompile("**/@*/op/*", '/')
+	GlobDeployment  = libglob.MustCompile("**/@*/deploy/*", '/')
+	GlobRun         = libglob.MustCompile("**/@*/{task,deploy}/*/*", '/')
+	GlobLog         = libglob.MustCompile("**/@*/{task,deploy}/*/*/logs", '/')
+	GlobCustom      = libglob.MustCompile("**/@*/custom/*", '/')
+	GlobEnvironment = libglob.MustCompile("@*/environment/*", '/')
 )
 
 func ReduceToTaskRef(ref refs.Ref) (refs.Ref, error) {
@@ -64,8 +60,6 @@ func LoadRef(ctx context.Context, store refstore.Store, ref refs.Ref) (any, erro
 		return LoadRefOfType[models.Run](ctx, store, ref)
 	case GlobRun.Match(ref.String()):
 		return LoadRefOfType[models.Run](ctx, store, ref)
-	case GlobDeploymentIntent.Match(ref.String()):
-		return LoadRefOfType[models.Intent](ctx, store, ref)
 	case GlobLog.Match(ref.String()):
 		return LoadRefOfType[[]sdk.Log](ctx, store, ref)
 	case GlobEnvironment.Match(ref.String()):

@@ -169,10 +169,6 @@ Set value to '-' to pass the value from stdin.
 		ref := tc.Ref
 		intent := tc.Intent
 
-		if ref.ReleaseOrIntent.Type != refs.Intent {
-			return fmt.Errorf("only intent may be set")
-		}
-
 		// Subsequent failures should not output usage information.
 		cmd.SilenceUsage = true
 

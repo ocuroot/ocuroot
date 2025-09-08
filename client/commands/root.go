@@ -72,6 +72,9 @@ func initLogs(homeDir string, args []string) {
 	logCloser = logFile
 	log.SetOutput(logFile)
 	log.SetReportCaller(true)
+	if os.Getenv("OCUROOT_DEBUG") != "" {
+		log.SetLevel(log.DebugLevel)
+	}
 }
 
 // GetRootCommand returns the root Cobra command for the client

@@ -77,9 +77,9 @@ test_releases_with_intent_update() {
     assert_equal "0" "$?" "Failed to release frontend"
 
     echo "Setting and applying backend credential intent"
-    ocuroot state set "./-/backend/package.ocu.star/+/custom/credential/staging" "efgh"
+    ocuroot state set "./-/backend/package.ocu.star/@/custom/credential/staging" "efgh"
     assert_equal "0" "$?" "Failed to update backend credential"
-    ocuroot state apply "./-/backend/package.ocu.star/+/custom/credential/staging"
+    ocuroot state apply "./-/backend/package.ocu.star/@/custom/credential/staging"
     assert_equal "0" "$?" "Failed to apply backend credential"
 
     # TODO: In ocuroot work trigger, identify stale deployments and run continue.
@@ -131,9 +131,9 @@ test_releases_across_commits() {
     assert_ref_equals "./-/frontend/package.ocu.star/@/deploy/staging#output/backend_credential" "abcd"
 
     echo "Setting and applying backend credential intent"
-    ocuroot state set "./-/backend/package.ocu.star/+/custom/credential/staging" "efgh"
+    ocuroot state set "./-/backend/package.ocu.star/@/custom/credential/staging" "efgh"
     assert_equal "0" "$?" "Failed to update backend credential"
-    ocuroot state apply "./-/backend/package.ocu.star/+/custom/credential/staging"
+    ocuroot state apply "./-/backend/package.ocu.star/@/custom/credential/staging"
     assert_equal "0" "$?" "Failed to apply backend credential"
 
     echo "Triggering work to capture credential for backend"

@@ -14,22 +14,22 @@ func TestReduce(t *testing.T) {
 	}{
 		{
 			ref:    "github.com/example/myrepo/-/path/to/release.ocu.star/@commitid/task/build",
-			glob:   "**/{@,+}*",
+			glob:   "**/@*",
 			result: "github.com/example/myrepo/-/path/to/release.ocu.star/@commitid",
 		},
 		{
 			ref:    "github.com/example/myrepo/-/path/to/release.ocu.star/@commitid",
-			glob:   "**/{@,+}*",
+			glob:   "**/@*",
 			result: "github.com/example/myrepo/-/path/to/release.ocu.star/@commitid",
 		},
 		{
 			ref:    "github.com/example/myrepo/-/path/to/release.ocu.star/@commitid/task/build",
-			glob:   "**/{@,+}",
+			glob:   "**/@",
 			result: "github.com/example/myrepo/-/path/to/release.ocu.star/@",
 		},
 		{
 			ref:    "github.com/example/myrepo/-/path/to/release.ocu.star/@commitid/task/build",
-			glob:   "**/{@,+}/task/*",
+			glob:   "**/@/task/*",
 			result: "github.com/example/myrepo/-/path/to/release.ocu.star/@/task/build",
 		},
 	}
@@ -58,12 +58,12 @@ func TestReduceNoMatch(t *testing.T) {
 	}{
 		{
 			ref:   "github.com/example/myrepo/-/path/to/release.ocu.star/@commitid/task/build",
-			glob:  "**/{@,+}/deploy/*",
+			glob:  "**/@/deploy/*",
 			error: "no match",
 		},
 		{
 			ref:   "github.com/example/myrepo/-/path/to/release.ocu.star/@commitid",
-			glob:  "**/{@,+}/task/*",
+			glob:  "**/@/task/*",
 			error: "no match",
 		},
 	}

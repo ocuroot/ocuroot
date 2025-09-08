@@ -12,10 +12,16 @@ type Ref struct {
 	Filename string
 	Global   bool
 
-	ReleaseOrIntent ReleaseOrIntent
-	SubPathType     SubPathType
-	SubPath         string
-	Fragment        string
+	hasRelease bool
+	Release    Release
+
+	SubPathType SubPathType
+	SubPath     string
+	Fragment    string
+}
+
+func (r Ref) HasRelease() bool {
+	return r.hasRelease
 }
 
 func (r Ref) SetRepo(repo string) Ref {
@@ -30,21 +36,10 @@ func (r Ref) SetFilename(filename string) Ref {
 	return out
 }
 
-func (r Ref) MakeIntent() Ref {
+func (r Ref) SetRelease(release string) Ref {
 	out := r
-	out.ReleaseOrIntent.Type = Intent
-	return out
-}
-
-func (r Ref) MakeRelease() Ref {
-	out := r
-	out.ReleaseOrIntent.Type = Release
-	return out
-}
-
-func (r Ref) SetVersion(version string) Ref {
-	out := r
-	out.ReleaseOrIntent.Value = version
+	out.Release = Release(release)
+	out.hasRelease = true
 	return out
 }
 
@@ -74,7 +69,7 @@ func (r Ref) SetFragment(fragment string) Ref {
 }
 
 func (r Ref) IsRelative() bool {
-	return r.Repo == "" || r.Repo == "." || r.Filename == "." || r.ReleaseOrIntent.Value == "."
+	return r.Repo == "" || r.Repo == "." || r.Filename == "." || r.Release == "."
 }
 
 func (r Ref) Valid() error {
@@ -120,35 +115,18 @@ func (s SubPathType) Valid() error {
 	}
 }
 
-type ReleaseOrIntent struct {
-	Type  ReleaseOrIntentType
-	Value string
+type Release string
+
+func (r Release) CurrentRelease() bool {
+	return r == ""
 }
 
-func (r ReleaseOrIntent) CurrentRelease() bool {
-	return r.Type == Release && r.Value == ""
+func (r Release) String() string {
+	return "@" + string(r)
 }
-
-func (r ReleaseOrIntent) String() string {
-	if r.Type == Intent {
-		return "+" + r.Value
-	}
-	if r.Type == Release {
-		return "@" + r.Value
-	}
-	return ""
-}
-
-type ReleaseOrIntentType int
-
-const (
-	Unknown ReleaseOrIntentType = iota // Should be the default value
-	Release
-	Intent
-)
 
 func (r Ref) CurrentRelease() bool {
-	return r.ReleaseOrIntent.CurrentRelease()
+	return r.Release.CurrentRelease()
 }
 
 // RelativeTo will return a ref based on this ref, but
@@ -172,17 +150,14 @@ func (r Ref) RelativeTo(ref Ref) (Ref, error) {
 		out.Filename = path.Join(ref.Filename, r.Filename)
 	}
 
-	if r.ReleaseOrIntent.Type == Unknown {
-		out.ReleaseOrIntent = ref.ReleaseOrIntent
-	}
-	if r.ReleaseOrIntent.Value == "." {
-		out.ReleaseOrIntent = ref.ReleaseOrIntent
+	if !r.hasRelease && ref.hasRelease {
+		out.hasRelease = true
+		out.Release = ref.Release
 	}
 
-	if strings.Contains(r.String(), "@") {
-		ref.ReleaseOrIntent = ReleaseOrIntent{
-			Type:  Unknown,
-			Value: "",
+	if r.hasRelease && ref.hasRelease {
+		if r.Release != "" {
+			out.Release = ref.Release
 		}
 	}
 
@@ -207,7 +182,7 @@ func (r Ref) MarshalJSON() ([]byte, error) {
 }
 
 func (r Ref) DebugString() string {
-	return fmt.Sprintf("global: %t, repo: %s, package: %s, releaseOrIntent: %s, subPathType: %s, subPath: %s, fragment: %s", r.Global, r.Repo, r.Filename, r.ReleaseOrIntent, r.SubPathType, r.SubPath, r.Fragment)
+	return fmt.Sprintf("global: %t, repo: %s, package: %s, releaseOrIntent: %s, subPathType: %s, subPath: %s, fragment: %s", r.Global, r.Repo, r.Filename, r.Release, r.SubPathType, r.SubPath, r.Fragment)
 }
 
 func (r Ref) String() string {
@@ -223,8 +198,8 @@ func (r Ref) String() string {
 		}
 	}
 
-	if r.ReleaseOrIntent.Type != Unknown {
-		segments = append(segments, r.ReleaseOrIntent.String())
+	if r.hasRelease {
+		segments = append(segments, r.Release.String())
 	}
 
 	if r.SubPathType != "" || r.SubPath != "" {

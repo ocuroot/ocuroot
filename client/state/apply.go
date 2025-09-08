@@ -18,10 +18,6 @@ import (
 func ApplyIntent(ctx context.Context, ref refs.Ref, state, intent refstore.Store) error {
 	log.Info("Applying intent", "ref", ref.String())
 
-	if ref.ReleaseOrIntent.Type == refs.Release {
-		return fmt.Errorf("ref is not an intent")
-	}
-
 	switch ref.SubPathType {
 	case refs.SubPathTypeCustom:
 		err := applyCustomIntent(ctx, ref, state, intent)
@@ -75,8 +71,7 @@ func applyEnvironmentIntent(ctx context.Context, ref refs.Ref, state, intent ref
 		return fmt.Errorf("environment name (%q) must match subpath (%q)", content.Name, ref.SubPath)
 	}
 
-	stateRef := ref.MakeRelease()
-	if err := state.Set(ctx, stateRef.String(), content); err != nil {
+	if err := state.Set(ctx, ref.String(), content); err != nil {
 		return fmt.Errorf("failed to set state: %w", err)
 	}
 
@@ -105,8 +100,6 @@ func applyEnvironmentIntent(ctx context.Context, ref refs.Ref, state, intent ref
 }
 
 func applyDeletedEnvironmentIntent(ctx context.Context, ref refs.Ref, state, intent refstore.Store) error {
-	stateRef := ref.MakeRelease()
-
 	// Undeploy everything in this environment
 	deployments, err := state.Match(ctx, fmt.Sprintf("**/@/deploy/%v", ref.SubPath))
 	if err != nil {
@@ -117,7 +110,6 @@ func applyDeletedEnvironmentIntent(ctx context.Context, ref refs.Ref, state, int
 		if err != nil {
 			return fmt.Errorf("failed to parse deployment: %w", err)
 		}
-		dp = dp.MakeIntent()
 		if err := intent.Delete(ctx, dp.String()); err != nil {
 			return fmt.Errorf("failed to delete deployment: %w", err)
 		}
@@ -129,7 +121,7 @@ func applyDeletedEnvironmentIntent(ctx context.Context, ref refs.Ref, state, int
 	}
 
 	// Finally, delete the actual environment
-	if err := state.Delete(ctx, stateRef.String()); err != nil {
+	if err := state.Delete(ctx, ref.String()); err != nil {
 		return fmt.Errorf("failed to delete state: %w", err)
 	}
 
@@ -144,9 +136,8 @@ func applyCustomIntent(ctx context.Context, ref refs.Ref, state, intent refstore
 		return fmt.Errorf("failed to get intent at %s: %w", ref.String(), err)
 	}
 
-	stateRef := ref.MakeRelease()
-	if err := state.Set(ctx, stateRef.String(), content); err != nil {
-		return fmt.Errorf("failed to set state at %s: %w", stateRef.String(), err)
+	if err := state.Set(ctx, ref.String(), content); err != nil {
+		return fmt.Errorf("failed to set state at %s: %w", ref.String(), err)
 	}
 
 	return nil
@@ -263,7 +254,6 @@ func applyDeployIntent(ctx context.Context, ref refs.Ref, state, intent refstore
 func applyDeletedDeployIntent(ctx context.Context, ref refs.Ref, state, intent refstore.Store) error {
 	log.Info("Ref was deleted", "ref", ref)
 
-	ref = ref.MakeRelease()
 	if ref.SubPathType != refs.SubPathTypeDeploy {
 		return fmt.Errorf("deployment ID must be a deployment ref")
 	}

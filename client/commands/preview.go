@@ -5,7 +5,6 @@ import (
 	"os"
 
 	"github.com/ocuroot/ocuroot/client/preview"
-	"github.com/ocuroot/ocuroot/refs"
 	"github.com/spf13/cobra"
 )
 
@@ -25,19 +24,12 @@ var PreviewCmd = &cobra.Command{
 			return err
 		}
 
-		if tc.Ref.ReleaseOrIntent.Type != refs.Unknown {
+		if tc.Ref.HasRelease() {
 			return fmt.Errorf("a release should not be specified for a preview")
 		}
 
 		// Clean the ref
-		tc.Ref = refs.Ref{
-			Repo:     tc.Ref.Repo,
-			Filename: tc.Ref.Filename,
-			ReleaseOrIntent: refs.ReleaseOrIntent{
-				Type:  refs.Release,
-				Value: "preview",
-			},
-		}
+		tc.Ref = tc.Ref.SetRelease("preview")
 
 		packagePath := args[0]
 		if _, err := os.Stat(packagePath); err != nil {

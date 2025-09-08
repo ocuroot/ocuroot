@@ -18,38 +18,54 @@ func NewRefStore(
 		return nil, nil, fmt.Errorf("state store config has not been set")
 	}
 
-	if storeConfig.Intent != nil {
-		stateStore, err := newRefStoreFromBackend(&storeConfig.State, repoURL, repoPath)
-		if err != nil {
-			return nil, nil, fmt.Errorf("failed to create state store: %w", err)
+	// Prefixes for state and intent
+	var statePrefix, intentPrefix string
+
+	if storeConfig.State.Git != nil {
+		statePrefix = storeConfig.State.Git.PathPrefix
+	}
+
+	if storeConfig.Intent == nil {
+		intentPrefix = "intent"
+		if statePrefix == "" {
+			statePrefix = "state"
 		}
-		intentStore, err := newRefStoreFromBackend(storeConfig.Intent, repoURL, repoPath)
+	} else if storeConfig.Intent.Git != nil {
+		intentPrefix = storeConfig.Intent.Git.PathPrefix
+	}
+
+	stateStore, err := newRefStoreFromBackend(&storeConfig.State, repoURL, repoPath, statePrefix)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to create state store: %w", err)
+	}
+
+	if storeConfig.Intent != nil {
+		intentStore, err := newRefStoreFromBackend(storeConfig.Intent, repoURL, repoPath, intentPrefix)
 		if err != nil {
 			return nil, nil, fmt.Errorf("failed to create intent store: %w", err)
 		}
 		return stateStore, intentStore, nil
 	}
 
-	b, err := newRefStoreFromBackend(&storeConfig.State, repoURL, repoPath)
+	intentStore, err := newRefStoreFromBackend(&storeConfig.State, repoURL, repoPath, intentPrefix)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, fmt.Errorf("failed to create intent store: %w", err)
 	}
-
-	// TODO: Set paths
-	return b, b, nil
+	return stateStore, intentStore, nil
 }
 
 func newRefStoreFromBackend(
 	storeConfig *sdk.StorageBackend,
 	repoURL string,
 	repoPath string,
+	pathPrefix string,
 ) (refstore.Store, error) {
 	var (
 		store refstore.Store
 		err   error
 	)
 	if storeConfig.Fs != nil {
-		statePath := filepath.Join(repoPath, storeConfig.Fs.Path)
+		statePath := filepath.Join(repoPath, storeConfig.Fs.Path, pathPrefix)
 		store, err = refstore.NewFSRefStore(statePath)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create state store: %w", err)
@@ -60,6 +76,7 @@ func newRefStoreFromBackend(
 			filepath.Join(client.HomeDir(), "state", repoURL),
 			storeConfig.Git.RemoteURL,
 			storeConfig.Git.Branch,
+			pathPrefix,
 		)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create state store: %w", err)

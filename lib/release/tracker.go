@@ -522,7 +522,7 @@ func (r *ReleaseTracker) updateIntent(ctx context.Context, taskRef refs.Ref, run
 
 	fn := run.Functions[0]
 
-	intentRef := taskRef.MakeIntent().SetVersion("")
+	intentRef := taskRef.SetRelease("")
 	intentRef = intentRef.SetSubPath(path.Dir(intentRef.SubPath))
 	intent := models.Intent{
 		Type:    run.Type,
@@ -760,7 +760,7 @@ func (r *ReleaseTracker) saveRunState(ctx context.Context, runRef refs.Ref, run 
 	if err != nil {
 		return fmt.Errorf("failed to parse task ref: %w", err)
 	}
-	latestReleaseTaskRef := taskRefParsed.MakeRelease().SetVersion("")
+	latestReleaseTaskRef := taskRefParsed.SetRelease("")
 	if run.Type == models.RunTypeDown {
 		if err := r.stateStore.Store.Unlink(ctx, latestReleaseTaskRef.String()); err != nil {
 			return fmt.Errorf("failed to unlink task: %w", err)
@@ -787,11 +787,11 @@ func (r *ReleaseTracker) GetTags(ctx context.Context) ([]string, error) {
 		if err != nil {
 			return nil, err
 		}
-		shouldMatch := tp.SetVersion(r.ReleaseRef.ReleaseOrIntent.Value)
+		shouldMatch := tp.SetRelease(string(r.ReleaseRef.Release))
 		if shouldMatch.String() != r.ReleaseRef.String() {
 			continue
 		}
-		tags = append(tags, tp.ReleaseOrIntent.Value)
+		tags = append(tags, string(tp.Release))
 	}
 	return tags, nil
 }

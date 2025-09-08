@@ -51,12 +51,12 @@ templ RefHeader(props RefPageProps) {
                 fmt.Sprintf("/match/%s/-/%s/@*", rp.Repo, rp.Filename),
             )
         }
-        if rp.ReleaseOrIntent.Value != "" {
+        if rp.Release != "" {
             @HeaderLink(
                 props.Ref, 
                 release.GlobRelease, 
-                fmt.Sprintf("Release %s", rp.ReleaseOrIntent.Value), 
-                fmt.Sprintf("/ref/%s/-/%s/@%s", rp.Repo, rp.Filename, rp.ReleaseOrIntent.Value),
+                fmt.Sprintf("Release %s", rp.Release), 
+                fmt.Sprintf("/ref/%s/-/%s/@%s", rp.Repo, rp.Filename, rp.Release),
             )
         }
         if rp.SubPathType == refs.SubPathTypeTask {
@@ -64,30 +64,30 @@ templ RefHeader(props RefPageProps) {
                 props.Ref, 
                 release.GlobTask, 
                 fmt.Sprintf("Task '%s'", strings.Split(rp.SubPath, "/")[0]), 
-                fmt.Sprintf("/ref/%s/-/%s/@%s/task/%s", rp.Repo, rp.Filename, rp.ReleaseOrIntent.Value, strings.Split(rp.SubPath, "/")[0]),
+                fmt.Sprintf("/ref/%s/-/%s/@%s/task/%s", rp.Repo, rp.Filename, rp.Release, strings.Split(rp.SubPath, "/")[0]),
             )
             if len(strings.Split(rp.SubPath, "/")) > 1 {
                 @HeaderLink(
                     props.Ref, 
                     release.GlobRun, 
                     fmt.Sprintf("Run %s", strings.Split(rp.SubPath, "/")[1]), 
-                    fmt.Sprintf("/ref/%s/-/%s/@%s/task/%s/%s", rp.Repo, rp.Filename, rp.ReleaseOrIntent.Value, strings.Split(rp.SubPath, "/")[0], strings.Split(rp.SubPath, "/")[1]),
+                    fmt.Sprintf("/ref/%s/-/%s/@%s/task/%s/%s", rp.Repo, rp.Filename, rp.Release, strings.Split(rp.SubPath, "/")[0], strings.Split(rp.SubPath, "/")[1]),
                 )
             }
         }
         if rp.SubPathType == refs.SubPathTypeDeploy {
             @HeaderLink(
                 props.Ref, 
-                release.GlobDeploymentState, 
+                release.GlobDeployment, 
                 fmt.Sprintf("Deploy to %s", strings.Split(rp.SubPath, "/")[0]), 
-                fmt.Sprintf("/ref/%s/-/%s/@%s/deploy/%s", rp.Repo, rp.Filename, rp.ReleaseOrIntent.Value, rp.SubPath),
+                fmt.Sprintf("/ref/%s/-/%s/@%s/deploy/%s", rp.Repo, rp.Filename, rp.Release, rp.SubPath),
             )
             if len(strings.Split(rp.SubPath, "/")) > 1 {
                 @HeaderLink(
                     props.Ref, 
                     release.GlobRun, 
                     fmt.Sprintf("Run %s", strings.Split(rp.SubPath, "/")[1]), 
-                    fmt.Sprintf("/ref/%s/-/%s/@%s/deploy/%s/%s", rp.Repo, rp.Filename, rp.ReleaseOrIntent.Value, strings.Split(rp.SubPath, "/")[0], strings.Split(rp.SubPath, "/")[1]),
+                    fmt.Sprintf("/ref/%s/-/%s/@%s/deploy/%s/%s", rp.Repo, rp.Filename, rp.Release, strings.Split(rp.SubPath, "/")[0], strings.Split(rp.SubPath, "/")[1]),
                 )
             }
         }

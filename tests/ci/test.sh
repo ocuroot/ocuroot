@@ -169,7 +169,7 @@ test_intent_change() {
     assert_deployed "release.ocu.star" "staging"
     assert_ref_equals "./-/release.ocu.star/@/deploy/staging#output/foo" "bar"
 
-    ocuroot state set "+/custom/foo" "baz"
+    ocuroot state set "@/custom/foo" "baz"
     assert_equal "0" "$?" "Failed to update state"
 
     JOB_ID=$(schedule_job "$TEST_REPO_DIR/repo.git" "$DEFAULT_BRANCH_NAME" "./intent.sh $TESTDATA/ocuroot_home/2")
