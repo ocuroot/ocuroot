@@ -142,7 +142,7 @@ func MakeServePreview(tc release.TrackerConfig) func(w http.ResponseWriter, r *h
 	return func(w http.ResponseWriter, r *http.Request) {
 		backend, _ := local.NewBackend(tc.Ref)
 		backend.Environments = &release.EnvironmentBackend{
-			Store: tc.Store,
+			State: tc.State,
 		}
 		config, err := local.ExecutePackage(r.Context(), tc.RepoPath, tc.Ref, backend)
 		if err != nil {

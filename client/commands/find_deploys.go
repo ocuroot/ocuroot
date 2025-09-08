@@ -57,18 +57,18 @@ Example:
 		releaseToDeployment := make(map[string]librelease.ReleaseInfo)
 		commitToRef := make(map[string]string)
 		// Find all deploys from this repo
-		reploymentRefs, err := tc.Store.Match(ctx, fmt.Sprintf("%v/-/**/@/deploy/*", tc.Ref.Repo))
+		reploymentRefs, err := tc.State.Match(ctx, fmt.Sprintf("%v/-/**/@/deploy/*", tc.Ref.Repo))
 		if err != nil {
 			return fmt.Errorf("failed to match refs: %w", err)
 		}
 		for _, ref := range reploymentRefs {
-			resolvedRef, err := tc.Store.ResolveLink(ctx, ref)
+			resolvedRef, err := tc.State.ResolveLink(ctx, ref)
 			if err != nil {
 				return fmt.Errorf("failed to resolve ref: %w", err)
 			}
 
 			var run models.Run
-			if err := tc.Store.Get(ctx, resolvedRef, &run); err != nil {
+			if err := tc.State.Get(ctx, resolvedRef, &run); err != nil {
 				return fmt.Errorf("failed to get run: %w", err)
 			}
 			refsToDeployment[ref] = run
@@ -79,7 +79,7 @@ Example:
 			}
 			releaseRef := pr.SetSubPathType(refs.SubPathTypeNone).SetSubPath("").SetFragment("")
 			var releaseInfo librelease.ReleaseInfo
-			if err := tc.Store.Get(ctx, releaseRef.String(), &releaseInfo); err != nil {
+			if err := tc.State.Get(ctx, releaseRef.String(), &releaseInfo); err != nil {
 				return fmt.Errorf("failed to get release info (%v): %w", releaseRef.String(), err)
 			}
 			releaseToDeployment[releaseRef.String()] = releaseInfo

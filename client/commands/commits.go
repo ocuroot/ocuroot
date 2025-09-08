@@ -15,14 +15,14 @@ type RepoCommitTuple struct {
 	Commit string
 }
 
-func releasesForCommit(ctx context.Context, store refstore.Store, repo string, commit string) ([]refs.Ref, error) {
+func releasesForCommit(ctx context.Context, state refstore.Store, repo string, commit string) ([]refs.Ref, error) {
 	// Match releases for this repo/commit and find outstanding runs for them
 	mr := fmt.Sprintf(
 		"%v/-/**/@*/commit/%v",
 		repo,
 		commit,
 	)
-	releasesForCommit, err := store.Match(ctx, mr)
+	releasesForCommit, err := state.Match(ctx, mr)
 	if err != nil {
 		return nil, fmt.Errorf("failed to match refs: %w", err)
 	}
@@ -42,7 +42,7 @@ func releasesForCommit(ctx context.Context, store refstore.Store, repo string, c
 	return out, nil
 }
 
-func getRepoAndCommitForRelease(ctx context.Context, ref string, store refstore.Store) (RepoCommitTuple, error) {
+func getRepoAndCommitForRelease(ctx context.Context, ref string, state refstore.Store) (RepoCommitTuple, error) {
 	pr, err := refs.Parse(ref)
 	if err != nil {
 		return RepoCommitTuple{}, fmt.Errorf("failed to parse ref: %w", err)
@@ -60,7 +60,7 @@ func getRepoAndCommitForRelease(ctx context.Context, ref string, store refstore.
 
 	// Use the commit marker to identify the commit
 	commitGlob := fmt.Sprintf("%v/commit/*", pr.SetSubPathType(refs.SubPathTypeNone).SetSubPath("").SetFragment(""))
-	commits, err := store.Match(ctx, commitGlob)
+	commits, err := state.Match(ctx, commitGlob)
 	if err != nil {
 		return RepoCommitTuple{}, fmt.Errorf("failed to match commits: %w", err)
 	}

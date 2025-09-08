@@ -10,8 +10,8 @@ import (
 )
 
 // Sync identifies all diffs and applies them
-func Sync(ctx context.Context, store refstore.Store) error {
-	diffs, err := Diff(ctx, store)
+func Sync(ctx context.Context, state, intent refstore.Store) error {
+	diffs, err := Diff(ctx, state, intent)
 	if err != nil {
 		return fmt.Errorf("failed to get diffs: %w", err)
 	}
@@ -23,7 +23,7 @@ func Sync(ctx context.Context, store refstore.Store) error {
 		if err != nil {
 			return fmt.Errorf("failed to parse diff ref: %w", err)
 		}
-		if err := ApplyIntent(ctx, diffRef, store); err != nil {
+		if err := ApplyIntent(ctx, diffRef, state, intent); err != nil {
 			return fmt.Errorf("failed to apply intent (%s): %w", diffRef.String(), err)
 		}
 	}

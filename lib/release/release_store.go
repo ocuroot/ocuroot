@@ -159,21 +159,21 @@ func (w *releaseStore) InitDeploymentDown(ctx context.Context, env string) error
 	return nil
 }
 
-func JobIsReady(ctx context.Context, store refstore.Store, ref string) (bool, error) {
+func RunIsReady(ctx context.Context, state refstore.Store, ref string) (bool, error) {
 	runRef, err := refs.Reduce(ref, GlobRun)
 	if err != nil {
 		return false, fmt.Errorf("failed to reduce ref: %w", err)
 	}
 
 	var run models.Run
-	if err := store.Get(ctx, runRef, &run); err != nil {
+	if err := state.Get(ctx, runRef, &run); err != nil {
 		return false, fmt.Errorf("failed to get function state at %s: %w", runRef, err)
 	}
 	if len(run.Functions) == 0 {
 		return false, fmt.Errorf("no functions in run")
 	}
 	lastFunction := run.Functions[len(run.Functions)-1]
-	dependenciesSatisfied, err := CheckDependencies(ctx, store, lastFunction)
+	dependenciesSatisfied, err := CheckDependencies(ctx, state, lastFunction)
 	if err != nil {
 		return false, fmt.Errorf("failed to check dependencies: %w", err)
 	}
@@ -182,7 +182,7 @@ func JobIsReady(ctx context.Context, store refstore.Store, ref string) (bool, er
 		return false, nil
 	}
 
-	inputs, err := PopulateInputs(ctx, store, lastFunction.Inputs)
+	inputs, err := PopulateInputs(ctx, state, lastFunction.Inputs)
 	if err != nil {
 		return false, fmt.Errorf("failed to populate inputs: %w", err)
 	}
@@ -305,10 +305,7 @@ func (w *releaseStore) AddTags(ctx context.Context, tags []string) error {
 			return fmt.Errorf("tags must not be in the release format (r<number>): %s", tag)
 		}
 		tagRef := w.ReleaseRef
-		tagRef.ReleaseOrIntent = refs.ReleaseOrIntent{
-			Type:  refs.Release,
-			Value: tag,
-		}
+		tagRef = tagRef.MakeRelease().SetVersion(tag)
 		if err := w.Store.Link(ctx, tagRef.String(), w.ReleaseRef.String()); err != nil {
 			return err
 		}

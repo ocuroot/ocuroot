@@ -11,13 +11,13 @@ import (
 	"github.com/ocuroot/ocuroot/store/models"
 )
 
-func Diff(ctx context.Context, store refstore.Store) ([]string, error) {
-	stateRefs, err := store.Match(ctx, "**/@/{deploy}/*", "**/@*/custom/*", "@/{custom,environment}/*")
+func Diff(ctx context.Context, state, intent refstore.Store) ([]string, error) {
+	stateRefs, err := state.Match(ctx, "**/@/{deploy}/*", "**/@*/custom/*", "@/{custom,environment}/*")
 	if err != nil {
 		return nil, fmt.Errorf("failed to match state refs: %w", err)
 	}
 
-	intentRefs, err := store.Match(ctx, "**/+/{deploy}/*", "**/+*/custom/*", "+/{custom,environment}/*")
+	intentRefs, err := intent.Match(ctx, "**/+/{deploy}/*", "**/+*/custom/*", "+/{custom,environment}/*")
 	if err != nil {
 		return nil, fmt.Errorf("failed to match intent refs: %w", err)
 	}
@@ -45,7 +45,7 @@ func Diff(ctx context.Context, store refstore.Store) ([]string, error) {
 			return nil, fmt.Errorf("failed to parse intent ref: %w", err)
 		}
 		ir = ir.MakeRelease()
-		resolvedRef, err := store.ResolveLink(ctx, ir.String())
+		resolvedRef, err := state.ResolveLink(ctx, ir.String())
 		if err != nil {
 			return nil, fmt.Errorf("failed to resolve intent ref: %w", err)
 		}
@@ -71,7 +71,7 @@ func Diff(ctx context.Context, store refstore.Store) ([]string, error) {
 		if err != nil {
 			return nil, fmt.Errorf("failed to parse state ref: %w", err)
 		}
-		match, err := compareIntent(ctx, store, ir, sr)
+		match, err := compareIntent(ctx, state, intent, ir, sr)
 		if err != nil {
 			return nil, fmt.Errorf("failed to compare intent: %w", err)
 		}
@@ -85,17 +85,17 @@ func Diff(ctx context.Context, store refstore.Store) ([]string, error) {
 
 func compareIntent(
 	ctx context.Context,
-	store refstore.Store,
+	state, intent refstore.Store,
 	intentRef refs.Ref,
 	stateRef refs.Ref,
 ) (bool, error) {
 	switch intentRef.SubPathType {
 	case refs.SubPathTypeCustom:
-		return compareExplicitIntent(ctx, store, intentRef, stateRef)
+		return compareExplicitIntent(ctx, state, intent, intentRef, stateRef)
 	case refs.SubPathTypeDeploy:
-		return compareDeployIntent(ctx, store, intentRef, stateRef)
+		return compareDeployIntent(ctx, state, intent, intentRef, stateRef)
 	case refs.SubPathTypeEnvironment:
-		return compareExplicitIntent(ctx, store, intentRef, stateRef)
+		return compareExplicitIntent(ctx, state, intent, intentRef, stateRef)
 	}
 	return false, fmt.Errorf("unsupported subpath type: %s", intentRef.SubPathType)
 }
@@ -104,19 +104,19 @@ func compareIntent(
 // This is used for state that should match exactly between intent and state.
 func compareExplicitIntent(
 	ctx context.Context,
-	store refstore.Store,
+	state, intent refstore.Store,
 	intentRef refs.Ref,
 	stateRef refs.Ref,
 ) (bool, error) {
 	var intentContent, stateContent any
-	if err := store.Get(ctx, intentRef.String(), &intentContent); err != nil {
+	if err := intent.Get(ctx, intentRef.String(), &intentContent); err != nil {
 		if err == refstore.ErrRefNotFound {
 			// It's ok if the state exists but the intent doesn't
 			return false, nil
 		}
 		return false, fmt.Errorf("failed to get intent content: %w", err)
 	}
-	if err := store.Get(ctx, stateRef.String(), &stateContent); err != nil {
+	if err := state.Get(ctx, stateRef.String(), &stateContent); err != nil {
 		if err == refstore.ErrRefNotFound {
 			return false, nil
 		}
@@ -132,7 +132,7 @@ func compareExplicitIntent(
 
 func compareDeployIntent(
 	ctx context.Context,
-	store refstore.Store,
+	state, intent refstore.Store,
 	intentRef refs.Ref,
 	stateRef refs.Ref,
 ) (bool, error) {
@@ -140,13 +140,13 @@ func compareDeployIntent(
 		intentContent models.Intent
 		stateContent  models.Intent
 	)
-	if err := store.Get(ctx, intentRef.String(), &intentContent); err != nil {
+	if err := intent.Get(ctx, intentRef.String(), &intentContent); err != nil {
 		if err == refstore.ErrRefNotFound {
 			return false, nil
 		}
 		return false, fmt.Errorf("failed to get intent content: %w", err)
 	}
-	if err := store.Get(ctx, stateRef.String(), &stateContent); err != nil {
+	if err := state.Get(ctx, stateRef.String(), &stateContent); err != nil {
 		if err == refstore.ErrRefNotFound {
 			return false, nil
 		}

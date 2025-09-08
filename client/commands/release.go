@@ -68,7 +68,7 @@ var NewReleaseCmd = &cobra.Command{
 		workTui := tui.StartWorkTui()
 		defer workTui.Cleanup()
 
-		tc.Store = tuiwork.WatchForJobUpdates(ctx, tc.Store, workTui)
+		tc.State = tuiwork.WatchForJobUpdates(ctx, tc.State, workTui)
 
 		tracker, environments, err := release.TrackerForNewRelease(ctx, tc)
 		if err != nil {
@@ -80,7 +80,7 @@ var NewReleaseCmd = &cobra.Command{
 			for _, env := range environments {
 				// Establishing intent for environment
 				intentRef := "+/environment/" + string(env.Name)
-				if err := tc.Store.Set(ctx, intentRef, env); err != nil {
+				if err := tc.Intent.Set(ctx, intentRef, env); err != nil {
 					return err
 				}
 
@@ -90,7 +90,7 @@ var NewReleaseCmd = &cobra.Command{
 					return err
 				}
 
-				if err := state.ApplyIntent(ctx, tc2.Ref, tc2.Store); err != nil {
+				if err := state.ApplyIntent(ctx, tc2.Ref, tc2.State, tc2.Intent); err != nil {
 					return err
 				}
 
@@ -139,7 +139,7 @@ var ContinueReleaseCmd = &cobra.Command{
 		workTui := tui.StartWorkTui()
 		defer workTui.Cleanup()
 
-		tc.Store = tuiwork.WatchForJobUpdates(ctx, tc.Store, workTui)
+		tc.State = tuiwork.WatchForJobUpdates(ctx, tc.State, workTui)
 
 		tracker, err := release.TrackerForExistingRelease(ctx, tc)
 		if err != nil {
@@ -177,7 +177,7 @@ var RetryReleaseCmd = &cobra.Command{
 		}
 
 		if tc.Ref.ReleaseOrIntent.Type != refs.Release {
-			releasesForCommit, err := releasesForCommit(ctx, tc.Store, tc.Ref.Repo, tc.Commit)
+			releasesForCommit, err := releasesForCommit(ctx, tc.State, tc.Ref.Repo, tc.Commit)
 			if err != nil {
 				return fmt.Errorf("failed to get releases for commit: %w", err)
 			}
@@ -199,7 +199,7 @@ var RetryReleaseCmd = &cobra.Command{
 		workTui := tui.StartWorkTui()
 		defer workTui.Cleanup()
 
-		tc.Store = tuiwork.WatchForJobUpdates(ctx, tc.Store, workTui)
+		tc.State = tuiwork.WatchForJobUpdates(ctx, tc.State, workTui)
 
 		tracker, err := release.TrackerForExistingRelease(ctx, tc)
 		if err != nil {

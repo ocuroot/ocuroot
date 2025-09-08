@@ -33,26 +33,26 @@ func NewBackend(tc TrackerConfig) (sdk.Backend, *local.BackendOutputs) {
 		Store:                    &local.StoreBackend{Outputs: be},
 		Debug:                    &local.DebugBackend{},
 		Refs:                     sdk.NewRefBackend(tc.Ref),
-		Environments:             &EnvironmentBackend{Store: tc.Store, Outputs: be},
+		Environments:             &EnvironmentBackend{State: tc.State, Outputs: be},
 		Repo:                     &local.RepoBackend{Outputs: be},
 		Print:                    &local.PrintBackend{Secrets: sb},
 	}, be
 }
 
 type EnvironmentBackend struct {
-	Store   refstore.Store
+	State   refstore.Store
 	Outputs *local.BackendOutputs
 }
 
 func (e *EnvironmentBackend) All(ctx context.Context) ([]sdk.Environment, error) {
-	environmentRefs, err := e.Store.Match(ctx, "@/environment/*")
+	environmentRefs, err := e.State.Match(ctx, "@/environment/*")
 	if err != nil {
 		return nil, err
 	}
 	var environments []sdk.Environment
 	for _, ref := range environmentRefs {
 		var environment sdk.Environment
-		err := e.Store.Get(ctx, ref, &environment)
+		err := e.State.Get(ctx, ref, &environment)
 		if err != nil {
 			return nil, err
 		}

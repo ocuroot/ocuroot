@@ -12,10 +12,13 @@ import (
 )
 
 type TrackerConfig struct {
-	Commit      string
-	RepoPath    string
-	Ref         refs.Ref
-	Store       refstore.Store
+	Commit   string
+	RepoPath string
+	Ref      refs.Ref
+
+	Intent refstore.Store
+	State  refstore.Store
+
 	StoreConfig *sdk.Store
 }
 
@@ -26,7 +29,7 @@ func TrackerForNewRelease(ctx context.Context, tc TrackerConfig) (*release.Relea
 		return nil, nil, fmt.Errorf("release should not be specified")
 	}
 
-	tc.Ref, err = NextReleaseID(ctx, tc.Store, tc.Ref)
+	tc.Ref, err = NextReleaseID(ctx, tc.State, tc.Ref)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to get next release ID: %w", err)
 	}
@@ -48,7 +51,7 @@ func TrackerForNewRelease(ctx context.Context, tc TrackerConfig) (*release.Relea
 		return nil, nil, fmt.Errorf("package not found")
 	}
 
-	tracker, err := release.NewReleaseTracker(ctx, config, config.Package, tc.Ref, tc.Store)
+	tracker, err := release.NewReleaseTracker(ctx, config, config.Package, tc.Ref, tc.Intent, tc.State)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to create release tracker: %w", err)
 	}
@@ -76,7 +79,7 @@ func TrackerForExistingRelease(ctx context.Context, tc TrackerConfig) (*release.
 		return nil, fmt.Errorf("package not found")
 	}
 
-	tracker, err := release.NewReleaseTracker(ctx, config, config.Package, tc.Ref, tc.Store)
+	tracker, err := release.NewReleaseTracker(ctx, config, config.Package, tc.Ref, tc.Intent, tc.State)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create release tracker: %w", err)
 	}
@@ -101,7 +104,7 @@ func GetExistingReleases(ctx context.Context, tc TrackerConfig) ([]string, error
 		tc.Ref.Filename,
 		tc.Commit,
 	)
-	releasesForCommit, err := tc.Store.Match(ctx, mr)
+	releasesForCommit, err := tc.State.Match(ctx, mr)
 	if err != nil {
 		return nil, fmt.Errorf("failed to match refs: %w", err)
 	}
