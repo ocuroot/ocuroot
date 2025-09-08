@@ -417,6 +417,7 @@ func TestRefNormalization(t *testing.T) {
 		"github.com/example/example/-/path/to/package/@/task/build#output/output1/": "github.com/example/example/-/path/to/package/@/task/build#output/output1",
 		"github.com/example/example/-/path/to/package/@/task/build/":                "github.com/example/example/-/path/to/package/@/task/build",
 		"github.com/example/example/-/path/to/package/@/call/build/":                "github.com/example/example/-/path/to/package/@/task/build",
+		"github.com/example/example/-/path/to/package/+/task/build/":                "github.com/example/example/-/path/to/package/@/task/build",
 	}
 	for ref, expected := range refsToNormalized {
 		t.Run(ref, func(t *testing.T) {

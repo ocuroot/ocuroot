@@ -73,10 +73,11 @@ const (
 )
 
 const (
-	hash          = "#"
-	slash         = "/"
-	releasePrefix = "@"
-	repoSeparator = "-"
+	hash             = "#"
+	slash            = "/"
+	releasePrefix    = "@"
+	releasePrefixAlt = "+" // Backwards compatibility for old intent model
+	repoSeparator    = "-"
 )
 
 const eof = -1
@@ -143,10 +144,10 @@ func lexStart(l *lexer) stateFn {
 	}
 
 	if strings.HasPrefix(l.input[l.pos:], "./") {
-		if strings.HasPrefix(l.input[l.pos:], "./@") {
+		if strings.HasPrefix(l.input[l.pos:], "./"+releasePrefix) || strings.HasPrefix(l.input[l.pos:], "./"+releasePrefixAlt) {
 			l.pos += len(".")
 			l.emit(itemPackage)
-			if strings.HasPrefix(l.input[l.pos:], slash+releasePrefix) {
+			if strings.HasPrefix(l.input[l.pos:], slash+releasePrefix) || strings.HasPrefix(l.input[l.pos:], slash+releasePrefixAlt) {
 				l.pos += len(slash)
 				l.ignore()
 				return lexRelease
@@ -161,7 +162,7 @@ func lexStart(l *lexer) stateFn {
 			return lexSubpathType
 		}
 	}
-	if strings.HasPrefix(l.input[l.pos:], releasePrefix) {
+	if strings.HasPrefix(l.input[l.pos:], releasePrefix) || strings.HasPrefix(l.input[l.pos:], releasePrefixAlt) {
 		l.emit(itemGlobal)
 		return lexRelease
 	}
@@ -188,7 +189,7 @@ func lexPath(l *lexer) stateFn {
 			}
 		}
 
-		if strings.HasPrefix(l.input[l.pos:], slash+releasePrefix) {
+		if strings.HasPrefix(l.input[l.pos:], slash+releasePrefix) || strings.HasPrefix(l.input[l.pos:], slash+releasePrefixAlt) {
 			l.emit(itemPackage)
 			_ = l.next()
 			return lexRelease // Next state.
