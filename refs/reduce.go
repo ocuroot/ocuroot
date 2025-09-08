@@ -14,7 +14,7 @@ func Reduce(ref string, glob libglob.Glob) (string, error) {
 			return "", errors.New("no match")
 		}
 
-		if strings.Contains(ref, "@") || strings.Contains(ref, "+") {
+		if strings.Contains(ref, "@") {
 			pr, err := Parse(ref)
 			if err != nil {
 				return "", err
@@ -23,7 +23,7 @@ func Reduce(ref string, glob libglob.Glob) (string, error) {
 				return pr.String(), nil
 			}
 
-			noVersion := pr.SetVersion("")
+			noVersion := pr.SetRelease("")
 			if glob.Match(noVersion.String()) {
 				return noVersion.String(), nil
 			}

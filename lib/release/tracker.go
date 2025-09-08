@@ -18,8 +18,15 @@ import (
 	"go.opentelemetry.io/otel/trace"
 )
 
-func NewReleaseTracker(ctx context.Context, config *sdk.Config, pkg *sdk.Package, releaseRef refs.Ref, store refstore.Store) (*ReleaseTracker, error) {
-	resolvedReleaseRefString, err := store.ResolveLink(ctx, releaseRef.String())
+func NewReleaseTracker(
+	ctx context.Context,
+	config *sdk.Config,
+	pkg *sdk.Package,
+	releaseRef refs.Ref,
+	intent refstore.Store,
+	state refstore.Store,
+) (*ReleaseTracker, error) {
+	resolvedReleaseRefString, err := state.ResolveLink(ctx, releaseRef.String())
 	if err != nil {
 		return nil, err
 	}
@@ -29,7 +36,7 @@ func NewReleaseTracker(ctx context.Context, config *sdk.Config, pkg *sdk.Package
 		return nil, err
 	}
 
-	stateStore, err := ReleaseStore(ctx, resolvedReleaseRef.String(), store)
+	stateStore, err := ReleaseStore(ctx, resolvedReleaseRef.String(), state)
 	if err != nil {
 		return nil, err
 	}
@@ -37,6 +44,7 @@ func NewReleaseTracker(ctx context.Context, config *sdk.Config, pkg *sdk.Package
 	return &ReleaseTracker{
 		config:     config,
 		pkg:        pkg,
+		intent:     intent,
 		stateStore: stateStore,
 		ReleaseRef: resolvedReleaseRef,
 	}, nil
@@ -45,6 +53,7 @@ func NewReleaseTracker(ctx context.Context, config *sdk.Config, pkg *sdk.Package
 type ReleaseTracker struct {
 	config     *sdk.Config
 	pkg        *sdk.Package
+	intent     refstore.Store
 	stateStore *releaseStore
 	ReleaseRef refs.Ref
 }
@@ -513,7 +522,7 @@ func (r *ReleaseTracker) updateIntent(ctx context.Context, taskRef refs.Ref, run
 
 	fn := run.Functions[0]
 
-	intentRef := taskRef.MakeIntent().SetVersion("")
+	intentRef := taskRef.SetRelease("")
 	intentRef = intentRef.SetSubPath(path.Dir(intentRef.SubPath))
 	intent := models.Intent{
 		Type:    run.Type,
@@ -521,7 +530,7 @@ func (r *ReleaseTracker) updateIntent(ctx context.Context, taskRef refs.Ref, run
 		Inputs:  fn.Inputs,
 	}
 
-	if err := r.stateStore.Store.Set(ctx, intentRef.String(), intent); err != nil {
+	if err := r.intent.Set(ctx, intentRef.String(), intent); err != nil {
 		return fmt.Errorf("failed to set intent state: %w", err)
 	}
 
@@ -751,7 +760,7 @@ func (r *ReleaseTracker) saveRunState(ctx context.Context, runRef refs.Ref, run 
 	if err != nil {
 		return fmt.Errorf("failed to parse task ref: %w", err)
 	}
-	latestReleaseTaskRef := taskRefParsed.MakeRelease().SetVersion("")
+	latestReleaseTaskRef := taskRefParsed.SetRelease("")
 	if run.Type == models.RunTypeDown {
 		if err := r.stateStore.Store.Unlink(ctx, latestReleaseTaskRef.String()); err != nil {
 			return fmt.Errorf("failed to unlink task: %w", err)
@@ -778,11 +787,11 @@ func (r *ReleaseTracker) GetTags(ctx context.Context) ([]string, error) {
 		if err != nil {
 			return nil, err
 		}
-		shouldMatch := tp.SetVersion(r.ReleaseRef.ReleaseOrIntent.Value)
+		shouldMatch := tp.SetRelease(string(r.ReleaseRef.Release))
 		if shouldMatch.String() != r.ReleaseRef.String() {
 			continue
 		}
-		tags = append(tags, tp.ReleaseOrIntent.Value)
+		tags = append(tags, string(tp.Release))
 	}
 	return tags, nil
 }

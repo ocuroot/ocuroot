@@ -16,6 +16,56 @@ import (
 	"go.opentelemetry.io/otel/trace"
 )
 
+func NewGitRefStore(
+	baseDir string,
+	remote string,
+	branch string,
+	pathPrefix string,
+) (*GitRefStore, error) {
+	// Create a branch-specific path to avoid FSRefStore collision
+	branchSpecificPath := filepath.Join(baseDir, "branches", branch)
+
+	r, err := NewGitRepoForRemote(branchSpecificPath, remote, branch)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create git ref store: %w", err)
+	}
+	r = GitRepoWithOtel(r)
+
+	var addInfoFile bool
+	storeInfoFile := filepath.Join(pathPrefix, storeInfoFile)
+	infoFilePath := filepath.Join(r.RepoPath(), storeInfoFile)
+	if _, err = os.Stat(infoFilePath); err != nil {
+		if os.IsNotExist(err) {
+			addInfoFile = true
+		} else {
+			return nil, fmt.Errorf("failed to check for store info file: %w", err)
+		}
+	}
+
+	fsStore, err := NewFSRefStore(
+		filepath.Join(r.RepoPath(), pathPrefix),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create state store: %w", err)
+	}
+
+	g := &GitRefStore{
+		s:          fsStore,
+		g:          r,
+		pathPrefix: pathPrefix,
+		lastPull:   time.Now(),
+	}
+
+	if addInfoFile {
+		err = g.applyFilesAsNeeded(context.Background(), []string{storeInfoFile}, "add store info file")
+		if err != nil {
+			return nil, fmt.Errorf("failed to add store info file: %w", err)
+		}
+	}
+
+	return g, nil
+}
+
 // CheckedStagedFiles uses `git add .` to validate that we have the correct set of staged files
 // for each commit.
 // Enabling this will make commits slower, but may be useful for debugging status problems.
@@ -29,8 +79,9 @@ type GitSupportFileWriter interface {
 }
 
 type GitRefStore struct {
-	s *FSStateStore
-	g GitRepo
+	s          *FSStateStore
+	g          GitRepo
+	pathPrefix string
 
 	lastPull           time.Time
 	transactionMessage string
@@ -41,53 +92,6 @@ type GitRefStore struct {
 
 var _ GitSupportFileWriter = (*GitRefStore)(nil)
 var _ Store = (*GitRefStore)(nil)
-
-func NewGitRefStore(
-	baseDir string,
-	remote string,
-	branch string,
-) (*GitRefStore, error) {
-	// Create a branch-specific path to avoid FSRefStore collision
-	branchSpecificPath := filepath.Join(baseDir, "branches", branch)
-
-	r, err := NewGitRepoForRemote(branchSpecificPath, remote, branch)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create git ref store: %w", err)
-	}
-	r = GitRepoWithOtel(r)
-
-	var addInfoFile bool
-	if _, err = os.Stat(filepath.Join(r.RepoPath(), storeInfoFile)); err != nil {
-		if os.IsNotExist(err) {
-			addInfoFile = true
-		} else {
-			return nil, fmt.Errorf("failed to check for store info file: %w", err)
-		}
-	}
-
-	fsStore, err := NewFSRefStore(
-		r.RepoPath(),
-	)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create state store: %w", err)
-	}
-
-	g := &GitRefStore{
-		s: fsStore,
-		g: r,
-
-		lastPull: time.Now(),
-	}
-
-	if addInfoFile {
-		err = g.applyFilesAsNeeded(context.Background(), []string{storeInfoFile}, "add store info file")
-		if err != nil {
-			return nil, fmt.Errorf("failed to add store info file: %w", err)
-		}
-	}
-
-	return g, nil
-}
 
 func getStatePath(baseDir, remote string) (string, error) {
 	remoteURL, err := url.Parse(remote)
@@ -139,7 +143,7 @@ func (g *GitRefStore) applyAsNeeded(ctx context.Context, refs []string, message 
 		if err != nil {
 			return err
 		}
-		paths = append(paths, path)
+		paths = append(paths, filepath.Join(g.pathPrefix, path))
 	}
 
 	return g.applyFilesAsNeeded(ctx, paths, message)
@@ -231,8 +235,6 @@ func (g *GitRefStore) Link(ctx context.Context, ref string, target string) error
 		return err
 	}
 	refResolvedFile := g.s.pathToRef(refParsedResolved)
-	refFile := g.s.pathToRef(refParsed)
-
 	err = g.s.Link(ctx, ref, target)
 	if err != nil {
 		return err
@@ -247,6 +249,9 @@ func (g *GitRefStore) Link(ctx context.Context, ref string, target string) error
 		return err
 	}
 	targetFile := g.s.pathToRef(targetParsed)
+
+	refFile := g.s.pathToRef(refParsed)
+	refFile = filepath.Join(g.pathPrefix, refFile)
 
 	return g.applyFilesAsNeeded(ctx, []string{refFile, refResolvedFile, targetFile}, "link "+ref+" to "+target)
 }

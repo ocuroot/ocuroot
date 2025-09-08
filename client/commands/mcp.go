@@ -116,7 +116,7 @@ func previewHandler(ctx context.Context, request mcp.CallToolRequest) (*mcp.Call
 
 	backend, _ := local.NewBackend(ref)
 	backend.Environments = &release.EnvironmentBackend{
-		Store: tc.Store,
+		State: tc.State,
 	}
 
 	config, err := local.ExecutePackage(ctx, repoRootPath, ref, backend)

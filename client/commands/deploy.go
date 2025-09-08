@@ -70,7 +70,7 @@ Example:
 		workTui := tui.StartWorkTui()
 		defer workTui.Cleanup()
 
-		tc.Store = tuiwork.WatchForJobUpdates(ctx, tc.Store, workTui)
+		tc.State = tuiwork.WatchForJobUpdates(ctx, tc.State, workTui)
 
 		tracker, err := release.TrackerForExistingRelease(ctx, tc)
 		if err != nil {
@@ -79,7 +79,7 @@ Example:
 
 		envName := tc.Ref.SubPath
 
-		releaseStore, err := librelease.ReleaseStore(ctx, tc.Ref.String(), tc.Store)
+		releaseStore, err := librelease.ReleaseStore(ctx, tc.Ref.String(), tc.State)
 		if err != nil {
 			return err
 		}

@@ -30,10 +30,7 @@ func GetRef(cmd *cobra.Command, args []string) (refs.Ref, error) {
 		out.Filename, _ = cmd.Flags().GetString("package")
 		releaseName, _ := cmd.Flags().GetString("release")
 		if releaseName != "" {
-			out.ReleaseOrIntent = refs.ReleaseOrIntent{
-				Type:  refs.Release,
-				Value: releaseName,
-			}
+			out = out.SetRelease(releaseName)
 		}
 	}
 
@@ -61,30 +58,32 @@ func storeFromRepoOrStateRoot(ctx context.Context) (store refstore.Store, isRepo
 		return nil, false, err
 	}
 
+	// Get a read only store from the state root
+	stateRootPath, err := client.FindStateStoreRoot(wd)
+	if err == nil {
+		fs, err := refstore.NewFSRefStore(stateRootPath)
+		if err != nil {
+			return nil, false, fmt.Errorf("failed to create fs ref store: %w", err)
+		}
+		return fs, false, nil
+	}
+
+	log.Info("No state root found, using repo root", "wd", wd)
+
 	// Get a read only store from the repo root if available
 	repoRootPath, err := client.FindRepoRoot(wd)
 	if err != nil && !errors.Is(err, client.ErrRootNotFound) {
 		return nil, false, fmt.Errorf("failed to find repo root: %w", err)
 	}
-	if err == nil {
-		s, err := loadStoreFromRepoRoot(ctx, repoRootPath)
-		if err != nil {
-			return nil, false, fmt.Errorf("failed to load store from repo root: %w", err)
-		}
-		return s, true, nil
+	if err != nil {
+		return nil, false, fmt.Errorf("failed to find repo root: %w", err)
 	}
 
-	// Get a read only store from the state root
-	stateRootPath, err := client.FindStateStoreRoot(wd)
+	s, _, err := loadStoreFromRepoRoot(ctx, repoRootPath)
 	if err != nil {
-		return nil, false, fmt.Errorf("failed to find state store root: %w", err)
+		return nil, false, fmt.Errorf("failed to load store from repo root: %w", err)
 	}
-
-	fs, err := refstore.NewFSRefStore(stateRootPath)
-	if err != nil {
-		return nil, false, fmt.Errorf("failed to create fs ref store: %w", err)
-	}
-	return fs, false, nil
+	return s, true, nil
 }
 
 // Get a read/write store by loading repo config
@@ -96,7 +95,7 @@ func getReadOnlyStore(ctx context.Context) (refstore.Store, error) {
 	return refstore.NewReadOnlyStore(store), nil
 }
 
-func loadStoreFromRepoRoot(ctx context.Context, repoRootPath string) (refstore.Store, error) {
+func loadStoreFromRepoRoot(ctx context.Context, repoRootPath string) (refstore.Store, refstore.Store, error) {
 	// Create a backend that is just enough for loading repo config
 	backend, be := local.BackendForRepo()
 
@@ -110,7 +109,7 @@ func loadStoreFromRepoRoot(ctx context.Context, repoRootPath string) (refstore.S
 		},
 	)
 	if err != nil {
-		return nil, fmt.Errorf("failed to load repo: %w", err)
+		return nil, nil, fmt.Errorf("failed to load repo: %w", err)
 	}
 
 	var repoURL string = be.RepoAlias
@@ -118,20 +117,20 @@ func loadStoreFromRepoRoot(ctx context.Context, repoRootPath string) (refstore.S
 		var err error
 		repoURL, err = client.GetRepoURL(repoRootPath)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 	}
 
-	s, err := release.NewRefStore(
+	state, intent, err := release.NewRefStore(
 		be.Store,
 		repoURL,
 		repoRootPath,
 	)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create ref store: %w", err)
+		return nil, nil, fmt.Errorf("failed to create ref store: %w", err)
 	}
 
-	return s, nil
+	return state, intent, nil
 }
 
 func getTrackerConfig(ctx context.Context, cmd *cobra.Command, args []string) (release.TrackerConfig, error) {
@@ -190,7 +189,7 @@ func getTrackerConfig(ctx context.Context, cmd *cobra.Command, args []string) (r
 		}
 	}
 
-	s, err := release.NewRefStore(
+	state, intent, err := release.NewRefStore(
 		be.Store,
 		ref.Repo,
 		repoRootPath,
@@ -208,7 +207,8 @@ func getTrackerConfig(ctx context.Context, cmd *cobra.Command, args []string) (r
 		Commit:      commit,
 		RepoPath:    repoRootPath,
 		Ref:         ref,
-		Store:       s,
+		State:       state,
+		Intent:      intent,
 		StoreConfig: be.Store,
 	}
 
@@ -222,57 +222,68 @@ func getTrackerConfig(ctx context.Context, cmd *cobra.Command, args []string) (r
 
 func saveRepoConfig(ctx context.Context, tc release.TrackerConfig, data []byte) (err error) {
 	// Write the repo file to the state stores for later use
-	repoRef := tc.Ref
-	repoRef.Filename = "repo.ocu.star"
-	repoRef.ReleaseOrIntent.Type = refs.Release
-	repoRef.ReleaseOrIntent.Value = tc.Commit
-	repoRef.SubPathType = refs.SubPathTypeNone
-	repoRef.SubPath = ""
-	repoRef.Fragment = ""
+	repoRef := tc.Ref.
+		SetFilename("repo.ocu.star").
+		SetRelease(tc.Commit).
+		SetSubPathType(refs.SubPathTypeNone).
+		SetSubPath("").
+		SetFragment("")
 
 	repoConfig := models.RepoConfig{
 		Source: data,
 	}
 
-	err = tc.Store.StartTransaction(ctx, "Save repo config")
+	err = tc.State.StartTransaction(ctx, "Save repo config")
 	if err != nil {
 		return fmt.Errorf("failed to start transaction: %w", err)
 	}
+	err = tc.Intent.StartTransaction(ctx, "Save repo config")
+	if err != nil {
+		return fmt.Errorf("failed to start transaction: %w", err)
+	}
+
 	defer func() {
 		// TODO: We need a way to revert a transaction
 		if err == nil {
-			err = tc.Store.CommitTransaction(ctx)
+			stateErr := tc.State.CommitTransaction(ctx)
+			intentErr := tc.Intent.CommitTransaction(ctx)
+			if stateErr != nil && intentErr != nil {
+				err = fmt.Errorf("failed to commit transaction: %w, %w", stateErr, intentErr)
+			} else if stateErr != nil {
+				err = fmt.Errorf("failed to commit transaction: %w", stateErr)
+			} else if intentErr != nil {
+				err = fmt.Errorf("failed to commit transaction: %w", intentErr)
+			}
 		}
 	}()
 
-	if err := tc.Store.Get(ctx, repoRef.String(), &models.RepoConfig{}); err == refstore.ErrRefNotFound {
-		if err = tc.Store.Set(ctx, repoRef.String(), repoConfig); err != nil {
+	if err := tc.State.Get(ctx, repoRef.String(), &models.RepoConfig{}); err == refstore.ErrRefNotFound {
+		if err = tc.State.Set(ctx, repoRef.String(), repoConfig); err != nil {
 			return fmt.Errorf("failed to set ref store: %w", err)
 		}
-		if err = tc.Store.Link(ctx, repoRef.SetVersion("").String(), repoRef.String()); err != nil {
+		if err = tc.State.Link(ctx, repoRef.SetRelease("").String(), repoRef.String()); err != nil {
 			return fmt.Errorf("failed to link ref store: %w", err)
 		}
 
 		// Add support files if this is the first time we've seen this commit
-		if gitSupportFilesBackend, ok := tc.Store.(refstore.GitSupportFileWriter); ok && tc.StoreConfig != nil && tc.StoreConfig.State.Git != nil {
+		if gitSupportFilesBackend, ok := tc.State.(refstore.GitSupportFileWriter); ok && tc.StoreConfig != nil && tc.StoreConfig.State.Git != nil {
 			if err := gitSupportFilesBackend.AddSupportFiles(ctx, tc.StoreConfig.State.Git.SupportFiles); err != nil {
 				return fmt.Errorf("failed to add support files: %w", err)
 			}
 		}
 	}
 
-	repoRef = repoRef.MakeIntent()
-	if err := tc.Store.Get(ctx, repoRef.String(), &models.RepoConfig{}); err == refstore.ErrRefNotFound {
-		if err := tc.Store.Set(ctx, repoRef.String(), repoConfig); err != nil {
+	if err := tc.Intent.Get(ctx, repoRef.String(), &models.RepoConfig{}); err == refstore.ErrRefNotFound {
+		if err := tc.Intent.Set(ctx, repoRef.String(), repoConfig); err != nil {
 			return fmt.Errorf("failed to set ref store: %w", err)
 		}
-		if err := tc.Store.Link(ctx, repoRef.SetVersion("").String(), repoRef.String()); err != nil {
+		if err := tc.Intent.Link(ctx, repoRef.SetRelease("").String(), repoRef.String()); err != nil {
 			return fmt.Errorf("failed to link ref store: %w", err)
 		}
 
 		// Add support files if this is the first time we've seen this commit
-		if combinedSupportFilesBackend, ok := tc.Store.(release.CombinedSupportFilesBackend); ok && tc.StoreConfig != nil {
-			if err := combinedSupportFilesBackend.IntentAddSupportFiles(ctx, tc.StoreConfig); err != nil {
+		if gitSupportFilesBackend, ok := tc.Intent.(refstore.GitSupportFileWriter); ok && tc.StoreConfig != nil && tc.StoreConfig.Intent.Git != nil {
+			if err := gitSupportFilesBackend.AddSupportFiles(ctx, tc.StoreConfig.Intent.Git.SupportFiles); err != nil {
 				return fmt.Errorf("failed to add support files: %w", err)
 			}
 		}

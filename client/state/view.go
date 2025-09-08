@@ -18,7 +18,8 @@ import (
 	"github.com/ocuroot/ui/js"
 )
 
-func View(ctx context.Context, store refstore.Store) error {
+func View(ctx context.Context, store, intent refstore.Store) error {
+	// TODO: Handle intent in the server
 	return StartViewServer(ctx, store, 0)
 }
 

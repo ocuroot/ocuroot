@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp/cmpopts"
 )
 
 // TestValidNormalizedRefs confirms that a set of normalized refs can be parsed and printed
@@ -21,14 +22,12 @@ func TestValidNormalizedRefs(t *testing.T) {
 		"./-/path/to/package/@/deploy/prod#output/host",
 		"./@/task/build#output/output1",
 
-		"github.com/ocu-project/ocu/-/package.ocu.star/+/deploy/staging", // Intent
 		"github.com/ocu-project/ocu/-/package.ocu.star/@ABC123/deploy/staging/ABC123/logs",
 		"github.com/ocu-project/ocu/-/package.ocu.star/@ABC123/deploy/staging/ABC123/outputs",
 		"github.com/org/repo/-/package.ocu.star/@v1/deploy/prod#output/host",
 
 		// Global values, can be used for environments
 		"@/environment/production",
-		"+/environment/production",
 		// Global custom value in a repository
 		"@/environment/staging#attributes/type",
 	}
@@ -72,11 +71,6 @@ func TestRelativeTo(t *testing.T) {
 			ref:        "github.com/org/repo2/-/path/to/package2/@/deploy/prod#output/host",
 			relativeTo: "github.com/org/repo/-/path/to/package/@abc123",
 			expected:   "github.com/org/repo2/-/path/to/package2/@/deploy/prod#output/host",
-		},
-		{
-			ref:        "+/environment/production",
-			relativeTo: "github.com/org/repo/-/path/to/package/@abc123",
-			expected:   "+/environment/production",
 		},
 		{
 			ref:        "@/environment/production",
@@ -129,22 +123,22 @@ func TestRefStructure(t *testing.T) {
 		{
 			ref: "github.com/org/repo/-/path/to/package/@/deploy/prod#output/host",
 			expected: Ref{
-				Repo:            "github.com/org/repo",
-				Filename:        "path/to/package",
-				SubPathType:     "deploy",
-				SubPath:         "prod",
-				Fragment:        "output/host",
-				ReleaseOrIntent: CurrentRelease,
+				Repo:        "github.com/org/repo",
+				Filename:    "path/to/package",
+				SubPathType: "deploy",
+				SubPath:     "prod",
+				Fragment:    "output/host",
+				Release:     CurrentRelease,
 			},
 		},
 		{
 			ref: "github.com/org/repo/-/path/to/package/@/deploy/prod/ABCDEF/logs",
 			expected: Ref{
-				Repo:            "github.com/org/repo",
-				Filename:        "path/to/package",
-				ReleaseOrIntent: CurrentRelease,
-				SubPathType:     "deploy",
-				SubPath:         "prod/ABCDEF/logs",
+				Repo:        "github.com/org/repo",
+				Filename:    "path/to/package",
+				Release:     CurrentRelease,
+				SubPathType: "deploy",
+				SubPath:     "prod/ABCDEF/logs",
 			},
 		},
 		{
@@ -163,45 +157,42 @@ func TestRefStructure(t *testing.T) {
 		{
 			ref: "./-/path/to/package/@/deploy/prod#output/host",
 			expected: Ref{
-				Repo:            ".",
-				Filename:        "path/to/package",
-				SubPathType:     "deploy",
-				SubPath:         "prod",
-				Fragment:        "output/host",
-				ReleaseOrIntent: CurrentRelease,
+				Repo:        ".",
+				Filename:    "path/to/package",
+				SubPathType: "deploy",
+				SubPath:     "prod",
+				Fragment:    "output/host",
+				Release:     CurrentRelease,
 			},
 		},
 		{
 			ref: "./-/path/to/package/@/deploy/prod#output/host",
 			expected: Ref{
-				Repo:            ".",
-				Filename:        "path/to/package",
-				SubPathType:     "deploy",
-				SubPath:         "prod",
-				Fragment:        "output/host",
-				ReleaseOrIntent: CurrentRelease,
+				Repo:        ".",
+				Filename:    "path/to/package",
+				SubPathType: "deploy",
+				SubPath:     "prod",
+				Fragment:    "output/host",
+				Release:     CurrentRelease,
 			},
 		},
 		{
 			ref: "./-/path/to/package/@/task/build#output/output1",
 			expected: Ref{
-				Repo:            ".",
-				Filename:        "path/to/package",
-				SubPathType:     "task",
-				SubPath:         "build",
-				Fragment:        "output/output1",
-				ReleaseOrIntent: CurrentRelease,
+				Repo:        ".",
+				Filename:    "path/to/package",
+				SubPathType: "task",
+				SubPath:     "build",
+				Fragment:    "output/output1",
+				Release:     CurrentRelease,
 			},
 		},
 		{
 			ref: "github.com/org/repo/-/path/to/package/@v1/deploy/prod#output/host",
 			expected: Ref{
-				Repo:     "github.com/org/repo",
-				Filename: "path/to/package",
-				ReleaseOrIntent: ReleaseOrIntent{
-					Type:  Release,
-					Value: "v1",
-				},
+				Repo:        "github.com/org/repo",
+				Filename:    "path/to/package",
+				Release:     Release("v1"),
 				SubPathType: "deploy",
 				SubPath:     "prod",
 				Fragment:    "output/host",
@@ -212,10 +203,7 @@ func TestRefStructure(t *testing.T) {
 			expected: Ref{
 				Repo:     "github.com/org/repo",
 				Filename: "path/to/package",
-				ReleaseOrIntent: ReleaseOrIntent{
-					Type:  Release,
-					Value: "v1",
-				},
+				Release:  Release("v1"),
 			},
 		},
 		{
@@ -223,10 +211,7 @@ func TestRefStructure(t *testing.T) {
 			expected: Ref{
 				Repo:     "github.com/org/repo",
 				Filename: "",
-				ReleaseOrIntent: ReleaseOrIntent{
-					Type:  Release,
-					Value: "v1",
-				},
+				Release:  Release("v1"),
 			},
 		},
 		{
@@ -241,73 +226,61 @@ func TestRefStructure(t *testing.T) {
 			expected: Ref{
 				Repo:     "github.com/org/repo",
 				Filename: "",
-				ReleaseOrIntent: ReleaseOrIntent{
-					Type:  Release,
-					Value: "abc",
-				},
+				Release:  Release("abc"),
 			},
 		},
 		{
 			ref: "frontend/@",
 			expected: Ref{
-				Filename:        "frontend",
-				ReleaseOrIntent: CurrentRelease,
+				Filename: "frontend",
+				Release:  CurrentRelease,
 			},
 		},
 		{
-			ref: "github.com/ocu-project/ocu/-/+/deploy/staging",
+			ref: "github.com/ocu-project/ocu/-/@/deploy/staging",
 			expected: Ref{
 				Repo:        "github.com/ocu-project/ocu",
 				Filename:    "",
 				SubPathType: "deploy",
 				SubPath:     "staging",
-				ReleaseOrIntent: ReleaseOrIntent{
-					Type:  Intent,
-					Value: "",
-				},
+				Release:     Release(""),
 			},
 		},
 		{
-			ref: "github.com/ocu-project/ocu/-/+/deploy/staging",
+			ref: "github.com/ocu-project/ocu/-/@/deploy/staging",
 			expected: Ref{
 				Repo:        "github.com/ocu-project/ocu",
 				Filename:    "",
 				SubPathType: "deploy",
 				SubPath:     "staging",
-				ReleaseOrIntent: ReleaseOrIntent{
-					Type:  Intent,
-					Value: "",
-				},
+				Release:     Release(""),
 			},
 		},
 		{
 			ref: "./@/task/build#output/output1",
 			expected: Ref{
-				Repo:            "",
-				Filename:        ".",
-				SubPathType:     "task",
-				SubPath:         "build",
-				Fragment:        "output/output1",
-				ReleaseOrIntent: CurrentRelease,
+				Repo:        "",
+				Filename:    ".",
+				SubPathType: "task",
+				SubPath:     "build",
+				Fragment:    "output/output1",
+				Release:     CurrentRelease,
 			},
 		},
 		{
 			ref: "@/environment/production",
 			expected: Ref{
-				Global:          true,
-				ReleaseOrIntent: CurrentRelease,
-				SubPathType:     SubPathTypeEnvironment,
-				SubPath:         "production",
+				Global:      true,
+				Release:     CurrentRelease,
+				SubPathType: SubPathTypeEnvironment,
+				SubPath:     "production",
 			},
 		},
 		{
-			ref: "+/environment/production",
+			ref: "@/environment/production",
 			expected: Ref{
-				Global: true,
-				ReleaseOrIntent: ReleaseOrIntent{
-					Type:  Intent,
-					Value: "",
-				},
+				Global:      true,
+				Release:     Release(""),
 				SubPathType: SubPathTypeEnvironment,
 				SubPath:     "production",
 			},
@@ -315,11 +288,11 @@ func TestRefStructure(t *testing.T) {
 		{
 			ref: "@/environment/staging#attributes/type",
 			expected: Ref{
-				Global:          true,
-				ReleaseOrIntent: CurrentRelease,
-				SubPathType:     SubPathTypeEnvironment,
-				SubPath:         "staging",
-				Fragment:        "attributes/type",
+				Global:      true,
+				Release:     CurrentRelease,
+				SubPathType: SubPathTypeEnvironment,
+				SubPath:     "staging",
+				Fragment:    "attributes/type",
 			},
 		},
 		{
@@ -337,34 +310,25 @@ func TestRefStructure(t *testing.T) {
 				SubPathType: "task",
 				SubPath:     "build",
 				Fragment:    "output/output1",
-				ReleaseOrIntent: ReleaseOrIntent{
-					Type:  Unknown,
-					Value: "",
-				},
+				Release:     Release(""),
 			},
 		},
 		{
-			ref: "minimal/repo/-/package.ocu.star/+commitid.01JY1YT9R0EDV5EKQH5FVZF64B/custom/approval",
+			ref: "minimal/repo/-/package.ocu.star/@commitid.01JY1YT9R0EDV5EKQH5FVZF64B/custom/approval",
 			expected: Ref{
-				Repo:     "minimal/repo",
-				Filename: "package.ocu.star",
-				ReleaseOrIntent: ReleaseOrIntent{
-					Type:  Intent,
-					Value: "commitid.01JY1YT9R0EDV5EKQH5FVZF64B",
-				},
+				Repo:        "minimal/repo",
+				Filename:    "package.ocu.star",
+				Release:     Release("commitid.01JY1YT9R0EDV5EKQH5FVZF64B"),
 				SubPathType: "custom",
 				SubPath:     "approval",
 			},
 		},
 		{
-			ref: "//package.ocu.star/+r5/custom/approval",
+			ref: "//package.ocu.star/@r5/custom/approval",
 			expected: Ref{
-				Repo:     ".",
-				Filename: "package.ocu.star",
-				ReleaseOrIntent: ReleaseOrIntent{
-					Type:  Intent,
-					Value: "r5",
-				},
+				Repo:        ".",
+				Filename:    "package.ocu.star",
+				Release:     Release("r5"),
 				SubPathType: "custom",
 				SubPath:     "approval",
 			},
@@ -377,7 +341,7 @@ func TestRefStructure(t *testing.T) {
 				t.Errorf("Parse(%q) returned error: %v", ref.ref, err)
 				return
 			}
-			if !cmp.Equal(out, ref.expected) {
+			if !cmp.Equal(out, ref.expected, cmpopts.IgnoreUnexported(Ref{})) {
 				t.Errorf("Parse(%q): %v", ref.ref, cmp.Diff(out, ref.expected))
 				return
 			}
@@ -453,6 +417,7 @@ func TestRefNormalization(t *testing.T) {
 		"github.com/example/example/-/path/to/package/@/task/build#output/output1/": "github.com/example/example/-/path/to/package/@/task/build#output/output1",
 		"github.com/example/example/-/path/to/package/@/task/build/":                "github.com/example/example/-/path/to/package/@/task/build",
 		"github.com/example/example/-/path/to/package/@/call/build/":                "github.com/example/example/-/path/to/package/@/task/build",
+		"github.com/example/example/-/path/to/package/+/task/build/":                "github.com/example/example/-/path/to/package/@/task/build",
 	}
 	for ref, expected := range refsToNormalized {
 		t.Run(ref, func(t *testing.T) {
@@ -469,7 +434,4 @@ func TestRefNormalization(t *testing.T) {
 	}
 }
 
-var CurrentRelease = ReleaseOrIntent{
-	Type:  Release,
-	Value: "",
-}
+var CurrentRelease = Release("")

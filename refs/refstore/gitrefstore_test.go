@@ -26,7 +26,7 @@ func TestGitRefStore(t *testing.T) {
 
 	localPath := filepath.Join(tempDir, "local_repo")
 
-	store, err := NewGitRefStore(localPath, remotePath, "master")
+	store, err := NewGitRefStore(localPath, remotePath, "master", "subpath")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -58,7 +58,7 @@ func TestGitRefStoreWithTransaction(t *testing.T) {
 
 	localPath := filepath.Join(tempDir, "local_repo")
 
-	store, err := NewGitRefStore(localPath, remotePath, "master")
+	store, err := NewGitRefStore(localPath, remotePath, "master", "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -94,7 +94,7 @@ func TestGitRefStoreTransaction(t *testing.T) {
 
 	localPath := filepath.Join(tempDir, "local_repo")
 
-	store, err := NewGitRefStore(localPath, remotePath, "master")
+	store, err := NewGitRefStore(localPath, remotePath, "master", "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -151,7 +151,7 @@ func TestGitRefStoreAddSupportFiles(t *testing.T) {
 
 	localPath := filepath.Join(tempDir, "local_repo")
 
-	store, err := NewGitRefStore(localPath, remotePath, "master")
+	store, err := NewGitRefStore(localPath, remotePath, "master", "")
 	if err != nil {
 		t.Fatal(err)
 	}

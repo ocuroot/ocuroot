@@ -22,9 +22,9 @@ create_environment() {
     check_ref_exists "package1.ocu.star/@/deploy/production2"
     check_ref_exists "package2.ocu.star/@/deploy/production2"
 
-    ocuroot state set -f=json "+/environment/production3" '{"attributes": {"type": "prod"},"name": "production3"}'
+    ocuroot state set -f=json "@/environment/production3" '{"attributes": {"type": "prod"},"name": "production3"}'
     assert_equal "0" "$?" "Failed to set environment"
-    ocuroot state apply "+/environment/production3"
+    ocuroot state apply "@/environment/production3"
     assert_equal "0" "$?" "Failed to apply environment"
 
     check_ref_exists "package1.ocu.star/@r1/op/check_envs"
@@ -61,7 +61,7 @@ create_environment_omnibus() {
     check_ref_exists "package1.ocu.star/@/deploy/production2"
     check_ref_exists "package2.ocu.star/@/deploy/production2"
 
-    ocuroot state set -f=json "+/environment/production3" '{"attributes": {"type": "prod"},"name": "production3"}'
+    ocuroot state set -f=json "@/environment/production3" '{"attributes": {"type": "prod"},"name": "production3"}'
     assert_equal "0" "$?" "Failed to set environment"
 
     ocuroot work any
@@ -97,8 +97,8 @@ delete_environment() {
     check_file_exists "./.deploys/production2/package1.txt"
     check_file_exists "./.deploys/production2/package2.txt"
 
-    ocuroot state delete "+/environment/production2"
-    ocuroot state apply "+/environment/production2"
+    ocuroot state delete "@/environment/production2"
+    ocuroot state apply "@/environment/production2"
 
     check_ref_does_not_exist "@/environment/production2"    
 
@@ -143,7 +143,7 @@ delete_environment_omnibus() {
     check_file_exists "./.deploys/production2/package2.txt"
 
     echo "=== Deleting environment ==="
-    ocuroot state delete "+/environment/production2"
+    ocuroot state delete "@/environment/production2"
 
     echo "=== Running work any ==="
     ocuroot work any

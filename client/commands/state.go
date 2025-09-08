@@ -31,12 +31,12 @@ var StateGetCmd = &cobra.Command{
 			return fmt.Errorf("failed to get tracker config: %w", err)
 		}
 		ref := tc.Ref
-		store := tc.Store
+		state := tc.State
 
 		cmd.SilenceUsage = true
 
 		var v any
-		err = store.Get(cmd.Context(), ref.String(), &v)
+		err = state.Get(cmd.Context(), ref.String(), &v)
 		if err != nil {
 			return fmt.Errorf("failed to get state: %w", err)
 		}
@@ -62,7 +62,7 @@ var StateMatchCmd = &cobra.Command{
 		if err != nil {
 			return fmt.Errorf("failed to get tracker config: %w", err)
 		}
-		store := tc.Store
+		state := tc.State
 
 		glob := ""
 		if len(args) > 0 {
@@ -76,7 +76,7 @@ var StateMatchCmd = &cobra.Command{
 
 		cmd.SilenceUsage = true
 
-		refs, err := store.MatchOptions(cmd.Context(), refstore.MatchOptions{
+		refs, err := state.MatchOptions(cmd.Context(), refstore.MatchOptions{
 			NoLinks: noLinks,
 		}, glob)
 		if err != nil {
@@ -104,7 +104,7 @@ var StateDiffCmd = &cobra.Command{
 
 		cmd.SilenceUsage = true
 
-		diffs, err := state.Diff(ctx, tc.Store)
+		diffs, err := state.Diff(ctx, tc.State, tc.Intent)
 		if err != nil {
 			return fmt.Errorf("failed to diff: %w", err)
 		}
@@ -129,11 +129,11 @@ var StateDeleteIntentCmd = &cobra.Command{
 			return fmt.Errorf("failed to get tracker config: %w", err)
 		}
 		ref := tc.Ref
-		store := tc.Store
+		intent := tc.Intent
 
 		cmd.SilenceUsage = true
 
-		if err := store.Delete(ctx, ref.String()); err != nil {
+		if err := intent.Delete(ctx, ref.String()); err != nil {
 			return fmt.Errorf("failed to delete intent: %w", err)
 		}
 
@@ -167,11 +167,7 @@ Set value to '-' to pass the value from stdin.
 			return fmt.Errorf("failed to get tracker config: %w", err)
 		}
 		ref := tc.Ref
-		store := tc.Store
-
-		if ref.ReleaseOrIntent.Type != refs.Intent {
-			return fmt.Errorf("only intent may be set")
-		}
+		intent := tc.Intent
 
 		// Subsequent failures should not output usage information.
 		cmd.SilenceUsage = true
@@ -199,7 +195,7 @@ Set value to '-' to pass the value from stdin.
 			}
 		}
 
-		if err := store.Set(ctx, ref.String(), value); err != nil {
+		if err := intent.Set(ctx, ref.String(), value); err != nil {
 			return fmt.Errorf("failed to set intent: %w", err)
 		}
 
@@ -228,7 +224,7 @@ var StateApplyIntentCmd = &cobra.Command{
 
 		cmd.SilenceUsage = true
 
-		if err := state.ApplyIntent(ctx, tc.Ref, tc.Store); err != nil {
+		if err := state.ApplyIntent(ctx, tc.Ref, tc.State, tc.Intent); err != nil {
 			return fmt.Errorf("failed to apply intent: %w", err)
 		}
 
@@ -249,7 +245,7 @@ var StateViewCmd = &cobra.Command{
 		}
 		cmd.SilenceUsage = true
 
-		if err := state.View(cmd.Context(), tc.Store); err != nil {
+		if err := state.View(cmd.Context(), tc.State, tc.Intent); err != nil {
 			return fmt.Errorf("failed to view state: %w", err)
 		}
 		return nil

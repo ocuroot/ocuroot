@@ -15,26 +15,22 @@ import (
 	"github.com/ocuroot/ocuroot/store/models"
 )
 
-func ApplyIntent(ctx context.Context, ref refs.Ref, store refstore.Store) error {
+func ApplyIntent(ctx context.Context, ref refs.Ref, state, intent refstore.Store) error {
 	log.Info("Applying intent", "ref", ref.String())
-
-	if ref.ReleaseOrIntent.Type == refs.Release {
-		return fmt.Errorf("ref is not an intent")
-	}
 
 	switch ref.SubPathType {
 	case refs.SubPathTypeCustom:
-		err := applyCustomIntent(ctx, ref, store)
+		err := applyCustomIntent(ctx, ref, state, intent)
 		if err != nil {
 			return fmt.Errorf("custom intent: %w", err)
 		}
 	case refs.SubPathTypeEnvironment:
-		err := applyEnvironmentIntent(ctx, ref, store)
+		err := applyEnvironmentIntent(ctx, ref, state, intent)
 		if err != nil {
 			return fmt.Errorf("environment intent: %w", err)
 		}
 	case refs.SubPathTypeDeploy:
-		err := applyDeployIntent(ctx, ref, store)
+		err := applyDeployIntent(ctx, ref, state, intent)
 		if err != nil {
 			return fmt.Errorf("deploy intent: %w", err)
 		}
@@ -45,25 +41,25 @@ func ApplyIntent(ctx context.Context, ref refs.Ref, store refstore.Store) error 
 	return nil
 }
 
-func applyEnvironmentIntent(ctx context.Context, ref refs.Ref, store refstore.Store) error {
+func applyEnvironmentIntent(ctx context.Context, ref refs.Ref, state, intent refstore.Store) error {
 	log.Info("Applying environment intent", "ref", ref.String())
 
-	err := store.StartTransaction(ctx, "apply environment intent")
+	err := state.StartTransaction(ctx, "apply environment intent")
 	if err != nil {
 		return fmt.Errorf("failed to start transaction: %w", err)
 	}
 
 	defer func() {
-		commitErr := store.CommitTransaction(ctx)
+		commitErr := state.CommitTransaction(ctx)
 		if commitErr != nil {
 			log.Error("failed to commit transaction", "error", commitErr)
 		}
 	}()
 
 	var content sdk.Environment
-	if err := store.Get(ctx, ref.String(), &content); err != nil {
+	if err := intent.Get(ctx, ref.String(), &content); err != nil {
 		if err == refstore.ErrRefNotFound {
-			return applyDeletedEnvironmentIntent(ctx, ref, store)
+			return applyDeletedEnvironmentIntent(ctx, ref, state, intent)
 		}
 		return fmt.Errorf("failed to get environment intent: %w", err)
 	}
@@ -75,18 +71,17 @@ func applyEnvironmentIntent(ctx context.Context, ref refs.Ref, store refstore.St
 		return fmt.Errorf("environment name (%q) must match subpath (%q)", content.Name, ref.SubPath)
 	}
 
-	stateRef := ref.MakeRelease()
-	if err := store.Set(ctx, stateRef.String(), content); err != nil {
+	if err := state.Set(ctx, ref.String(), content); err != nil {
 		return fmt.Errorf("failed to set state: %w", err)
 	}
 
 	// Add an operation to all deployed releases
-	deployments, err := store.Match(ctx, "**/@/deploy/*")
+	deployments, err := state.Match(ctx, "**/@/deploy/*")
 	if err != nil {
 		return fmt.Errorf("failed to match deployments: %w", err)
 	}
 	for _, deployment := range deployments {
-		resolvedDeployment, err := store.ResolveLink(ctx, deployment)
+		resolvedDeployment, err := state.ResolveLink(ctx, deployment)
 		if err != nil {
 			return fmt.Errorf("failed to resolve deployment: %w", err)
 		}
@@ -96,7 +91,7 @@ func applyEnvironmentIntent(ctx context.Context, ref refs.Ref, store refstore.St
 		}
 		parsedDeployment = parsedDeployment.SetSubPathType(refs.SubPathTypeOp).SetSubPath("check_envs")
 
-		if err := store.Set(ctx, parsedDeployment.String(), models.NewMarker()); err != nil {
+		if err := state.Set(ctx, parsedDeployment.String(), models.NewMarker()); err != nil {
 			return fmt.Errorf("failed to set operation: %w", err)
 		}
 	}
@@ -104,11 +99,9 @@ func applyEnvironmentIntent(ctx context.Context, ref refs.Ref, store refstore.St
 	return nil
 }
 
-func applyDeletedEnvironmentIntent(ctx context.Context, ref refs.Ref, store refstore.Store) error {
-	stateRef := ref.MakeRelease()
-
+func applyDeletedEnvironmentIntent(ctx context.Context, ref refs.Ref, state, intent refstore.Store) error {
 	// Undeploy everything in this environment
-	deployments, err := store.Match(ctx, fmt.Sprintf("**/@/deploy/%v", ref.SubPath))
+	deployments, err := state.Match(ctx, fmt.Sprintf("**/@/deploy/%v", ref.SubPath))
 	if err != nil {
 		return fmt.Errorf("failed to match deployments: %w", err)
 	}
@@ -117,52 +110,51 @@ func applyDeletedEnvironmentIntent(ctx context.Context, ref refs.Ref, store refs
 		if err != nil {
 			return fmt.Errorf("failed to parse deployment: %w", err)
 		}
-		dp = dp.MakeIntent()
-		if err := store.Delete(ctx, dp.String()); err != nil {
+		if err := intent.Delete(ctx, dp.String()); err != nil {
 			return fmt.Errorf("failed to delete deployment: %w", err)
 		}
 
-		err = applyDeletedDeployIntent(ctx, dp, store)
+		err = applyDeletedDeployIntent(ctx, dp, state, intent)
 		if err != nil {
 			return fmt.Errorf("failed to apply deleted deploy intent: %w", err)
 		}
 	}
 
 	// Finally, delete the actual environment
-	if err := store.Delete(ctx, stateRef.String()); err != nil {
+	if err := state.Delete(ctx, ref.String()); err != nil {
 		return fmt.Errorf("failed to delete state: %w", err)
 	}
 
 	return nil
 }
 
-func applyCustomIntent(ctx context.Context, ref refs.Ref, store refstore.Store) error {
+func applyCustomIntent(ctx context.Context, ref refs.Ref, state, intent refstore.Store) error {
 	log.Info("Applying custom intent", "ref", ref.String())
+
 	var content any
-	if err := store.Get(ctx, ref.String(), &content); err != nil {
-		return fmt.Errorf("failed to get intent: %w", err)
+	if err := intent.Get(ctx, ref.String(), &content); err != nil {
+		return fmt.Errorf("failed to get intent at %s: %w", ref.String(), err)
 	}
 
-	stateRef := ref.MakeRelease().SetVersion(ref.ReleaseOrIntent.Value)
-	if err := store.Set(ctx, stateRef.String(), content); err != nil {
-		return fmt.Errorf("failed to set state: %w", err)
+	if err := state.Set(ctx, ref.String(), content); err != nil {
+		return fmt.Errorf("failed to set state at %s: %w", ref.String(), err)
 	}
 
 	return nil
 }
 
-func applyDeployIntent(ctx context.Context, ref refs.Ref, store refstore.Store) error {
+func applyDeployIntent(ctx context.Context, ref refs.Ref, state, intent refstore.Store) error {
 	log.Info("Applying deploy intent", "ref", ref.String())
 	var intentContent models.Intent
-	if err := store.Get(ctx, ref.String(), &intentContent); err != nil {
+	if err := intent.Get(ctx, ref.String(), &intentContent); err != nil {
 		if err == refstore.ErrRefNotFound {
-			return applyDeletedDeployIntent(ctx, ref, store)
+			return applyDeletedDeployIntent(ctx, ref, state, intent)
 		}
 		return fmt.Errorf("failed to get intent: %w", err)
 	}
 
 	var releaseInfo librelease.ReleaseInfo
-	if err := store.Get(ctx, intentContent.Release.String(), &releaseInfo); err != nil {
+	if err := state.Get(ctx, intentContent.Release.String(), &releaseInfo); err != nil {
 		return fmt.Errorf("failed to get release info: %w", err)
 	}
 
@@ -190,7 +182,7 @@ func applyDeployIntent(ctx context.Context, ref refs.Ref, store refstore.Store) 
 		)
 
 	// Check that there is a change to apply
-	match, err := compareDeployIntent(ctx, store, ref, deployRef)
+	match, err := compareDeployIntent(ctx, state, intent, ref, deployRef)
 	if err != nil {
 		return fmt.Errorf("failed to compare deploy intent: %w", err)
 	}
@@ -201,7 +193,7 @@ func applyDeployIntent(ctx context.Context, ref refs.Ref, store refstore.Store) 
 
 	// Check that there isn't already a deployment pending or in progress to apply this config
 	matchStr := deployRef.String() + "/*/status/{pending,paused,running}"
-	existingDeployments, err := store.Match(ctx, matchStr)
+	existingDeployments, err := state.Match(ctx, matchStr)
 	if err != nil {
 		return fmt.Errorf("failed to match pending deployments: %w", err)
 	}
@@ -217,7 +209,7 @@ func applyDeployIntent(ctx context.Context, ref refs.Ref, store refstore.Store) 
 				return fmt.Errorf("failed to parse existing deployment: %w", err)
 			}
 
-			match, err := compareDeployIntent(ctx, store, ref, existingDeploymentRef)
+			match, err := compareDeployIntent(ctx, state, intent, ref, existingDeploymentRef)
 			if err != nil {
 				return fmt.Errorf("failed to compare deploy intent: %w", err)
 			}
@@ -228,12 +220,12 @@ func applyDeployIntent(ctx context.Context, ref refs.Ref, store refstore.Store) 
 		}
 	}
 
-	rs, err := librelease.ReleaseStore(ctx, intentContent.Release.String(), store)
+	rs, err := librelease.ReleaseStore(ctx, intentContent.Release.String(), state)
 	if err != nil {
 		return fmt.Errorf("failed to initialize release store: %w", err)
 	}
 
-	runRefString, err := refstore.IncrementPath(ctx, store, fmt.Sprintf("%s/", deployRef.String()))
+	runRefString, err := refstore.IncrementPath(ctx, state, fmt.Sprintf("%s/", deployRef.String()))
 	if err != nil {
 		return fmt.Errorf("failed to increment path: %w", err)
 	}
@@ -259,10 +251,9 @@ func applyDeployIntent(ctx context.Context, ref refs.Ref, store refstore.Store) 
 	return nil
 }
 
-func applyDeletedDeployIntent(ctx context.Context, ref refs.Ref, store refstore.Store) error {
+func applyDeletedDeployIntent(ctx context.Context, ref refs.Ref, state, intent refstore.Store) error {
 	log.Info("Ref was deleted", "ref", ref)
 
-	ref = ref.MakeRelease()
 	if ref.SubPathType != refs.SubPathTypeDeploy {
 		return fmt.Errorf("deployment ID must be a deployment ref")
 	}
@@ -272,7 +263,7 @@ func applyDeletedDeployIntent(ctx context.Context, ref refs.Ref, store refstore.
 
 	envName := ref.SubPath
 
-	releaseStore, err := librelease.ReleaseStore(ctx, ref.String(), store)
+	releaseStore, err := librelease.ReleaseStore(ctx, ref.String(), state)
 	if err != nil {
 		return fmt.Errorf("failed to get release store: %w", err)
 	}

@@ -146,6 +146,7 @@ type StorageBackend struct {
 		RemoteURL    string            `json:"remote_url"`
 		Branch       string            `json:"branch"`
 		SupportFiles map[string]string `json:"support_files,omitempty"`
+		PathPrefix   string            `json:"path_prefix,omitempty"`
 	} `json:"git,omitempty"`
 	Fs *struct {
 		Path string `json:"path"`

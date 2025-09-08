@@ -15,9 +15,9 @@ export OCU_REPO_COMMIT_OVERRIDE=commit1
 echo "== release 0.1.0-1 =="
 ocuroot release new release.ocu.star
 echo "== create promotion intent =="
-ocuroot state set "versioning/-/release.ocu.star/+0.1.0-1/custom/promote" 1
+ocuroot state set "versioning/-/release.ocu.star/@0.1.0-1/custom/promote" 1
 echo "== apply promotion intent =="
-ocuroot state apply "versioning/-/release.ocu.star/+0.1.0-1/custom/promote"
+ocuroot state apply "versioning/-/release.ocu.star/@0.1.0-1/custom/promote"
 echo "== continue release =="
 ocuroot release continue versioning/-/release.ocu.star/@0.1.0-1
 
@@ -30,14 +30,17 @@ export OCU_REPO_COMMIT_OVERRIDE=commit3
 echo "== release 0.1.1-2 =="
 ocuroot release new release.ocu.star
 echo "== create promotion intent =="
-ocuroot state set "versioning/-/release.ocu.star/+0.1.1-2/custom/promote" 1
+ocuroot state set "versioning/-/release.ocu.star/@0.1.1-2/custom/promote" 1
 echo "== apply promotion intent =="
-ocuroot state apply "versioning/-/release.ocu.star/+0.1.1-2/custom/promote"
+ocuroot state apply "versioning/-/release.ocu.star/@0.1.1-2/custom/promote"
 echo "== continue release =="
 ocuroot release continue versioning/-/release.ocu.star/@0.1.1-2
 
 export OCU_REPO_COMMIT_OVERRIDE=commit4
 echo "== release 0.1.2-1 =="
 ocuroot release new release.ocu.star
+
+echo "Test succeeded"
+echo ""
 
 popd > /dev/null

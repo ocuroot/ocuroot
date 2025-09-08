@@ -70,7 +70,7 @@ finally it will trigger work for other commits ('ocuroot work trigger').
 		cmd.SilenceUsage = true
 
 		log.Info("Starting state sync")
-		if err := state.Sync(ctx, tc.Store); err != nil {
+		if err := state.Sync(ctx, tc.State, tc.Intent); err != nil {
 			return err
 		}
 
@@ -85,7 +85,7 @@ finally it will trigger work for other commits ('ocuroot work trigger').
 		}
 
 		log.Info("Starting trigger work")
-		if err := doTriggerWork(ctx, tc.Store, false); err != nil {
+		if err := doTriggerWork(ctx, tc.State, tc.Intent, false); err != nil {
 			return err
 		}
 
@@ -95,7 +95,7 @@ finally it will trigger work for other commits ('ocuroot work trigger').
 
 func doRunsForCommit(ctx context.Context, tc release.TrackerConfig) error {
 	// Update inputs for existing deployments
-	if err := reconcileAllDeploymentsAtCommit(ctx, tc.Store, tc.Ref.Repo, tc.Commit); err != nil {
+	if err := reconcileAllDeploymentsAtCommit(ctx, tc.State, tc.Ref.Repo, tc.Commit); err != nil {
 		return fmt.Errorf("failed to reconcile deployments: %w", err)
 	}
 
@@ -110,7 +110,7 @@ func doRunsForCommit(ctx context.Context, tc release.TrackerConfig) error {
 		tc.Ref.Repo,
 		tc.Commit,
 	)
-	outstanding, err := tc.Store.Match(
+	outstanding, err := tc.State.Match(
 		ctx,
 		mrPending,
 		mrPaused,
@@ -119,13 +119,13 @@ func doRunsForCommit(ctx context.Context, tc release.TrackerConfig) error {
 		return fmt.Errorf("failed to match refs: %w", err)
 	}
 
-	releasesForCommit, err := releasesForCommit(ctx, tc.Store, tc.Ref.Repo, tc.Commit)
+	releasesForCommit, err := releasesForCommit(ctx, tc.State, tc.Ref.Repo, tc.Commit)
 	if err != nil {
 		return fmt.Errorf("failed to get releases for commit: %w", err)
 	}
 	for _, ref := range releasesForCommit {
 		log.Info("Found release for commit", "ref", ref)
-		outstandingRuns, err := tc.Store.Match(
+		outstandingRuns, err := tc.State.Match(
 			ctx,
 			fmt.Sprintf("%v/{deploy,task}/*/*/status/pending", ref.String()),
 			fmt.Sprintf("%v/{deploy,task}/*/*/status/paused", ref.String()))
@@ -180,8 +180,9 @@ var WorkTriggerCommand = &cobra.Command{
 		dryRun := cmd.Flag("dryrun").Changed
 		intent := cmd.Flag("intent").Changed
 		if intent {
+			log.Info("Triggering in intent mode")
 			// Match repo config files to identify unique repos
-			mr := "**/-/repo.ocu.star/+"
+			mr := "**/-/repo.ocu.star/{+,@}"
 			repo, err := store.Match(
 				ctx,
 				mr)
@@ -190,30 +191,26 @@ var WorkTriggerCommand = &cobra.Command{
 				return nil
 			}
 
-			for _, ref := range repo {
-				resolved, err := store.ResolveLink(ctx, ref)
-				if err != nil {
-					fmt.Println("Failed to resolve link: " + err.Error())
-					continue
-				}
+			log.Info("Repo matches", "count", len(repo), "repo", repo)
 
-				if err := triggerWork(ctx, store, resolved, dryRun); err != nil {
-					fmt.Println("Failed to trigger run against " + resolved + ": " + err.Error())
+			for _, ref := range repo {
+				if err := triggerWork(ctx, store, ref, dryRun); err != nil {
+					fmt.Println("Failed to trigger run against " + ref + ": " + err.Error())
 				}
 			}
 
 			return nil
 		}
 
-		return doTriggerWork(ctx, store, dryRun)
+		return doTriggerWork(ctx, store, store, dryRun)
 	},
 }
 
-func doTriggerWork(ctx context.Context, store refstore.Store, dryRun bool) error {
+func doTriggerWork(ctx context.Context, state, intent refstore.Store, dryRun bool) error {
 	repos := make(map[RepoCommitTuple]struct{})
 
 	// Match any outstanding runs in the state repo
-	outstanding, err := store.Match(
+	outstanding, err := state.Match(
 		ctx,
 		"**/@*/{deploy,task}/*/*/status/pending",
 		"**/@*/{deploy,task}/*/*/status/paused",
@@ -223,7 +220,7 @@ func doTriggerWork(ctx context.Context, store refstore.Store, dryRun bool) error
 	}
 
 	for _, ref := range outstanding {
-		funcReady, err := librelease.JobIsReady(ctx, store, ref)
+		funcReady, err := librelease.RunIsReady(ctx, state, ref)
 		if err != nil {
 			return fmt.Errorf("failed to check run: %w", err)
 		}
@@ -235,7 +232,7 @@ func doTriggerWork(ctx context.Context, store refstore.Store, dryRun bool) error
 			fmt.Println("Outstanding ref: " + ref)
 		}
 
-		repoCommit, err := getRepoAndCommitForRelease(ctx, ref, store)
+		repoCommit, err := getRepoAndCommitForRelease(ctx, ref, state)
 		if err != nil {
 			return fmt.Errorf("failed to get repo and commit for release: %w", err)
 		}
@@ -243,7 +240,7 @@ func doTriggerWork(ctx context.Context, store refstore.Store, dryRun bool) error
 	}
 
 	// Identify any reconcilable deployments (where inputs have changed)
-	reconcilable, err := getReconcilableDeployments(ctx, store)
+	reconcilable, err := getReconcilableDeployments(ctx, state)
 	if err != nil {
 		return fmt.Errorf("failed to get reconcilable deployments: %w", err)
 	}
@@ -252,7 +249,7 @@ func doTriggerWork(ctx context.Context, store refstore.Store, dryRun bool) error
 		if dryRun {
 			fmt.Println("Reconcilable ref: " + ref.String())
 		}
-		repoCommit, err := getRepoAndCommitForRelease(ctx, ref.String(), store)
+		repoCommit, err := getRepoAndCommitForRelease(ctx, ref.String(), state)
 		if err != nil {
 			return fmt.Errorf("failed to get repo and commit for release: %w", err)
 		}
@@ -260,7 +257,7 @@ func doTriggerWork(ctx context.Context, store refstore.Store, dryRun bool) error
 	}
 
 	// Identify any ops
-	outstanding, err = store.Match(
+	outstanding, err = state.Match(
 		ctx,
 		"**/@*/op/*",
 	)
@@ -273,7 +270,7 @@ func doTriggerWork(ctx context.Context, store refstore.Store, dryRun bool) error
 		if dryRun {
 			fmt.Println("Outstanding ref: " + ref)
 		}
-		repoCommit, err := getRepoAndCommitForRelease(ctx, ref, store)
+		repoCommit, err := getRepoAndCommitForRelease(ctx, ref, state)
 		if err != nil {
 			return fmt.Errorf("failed to get repo and commit for release: %w", err)
 		}
@@ -282,7 +279,7 @@ func doTriggerWork(ctx context.Context, store refstore.Store, dryRun bool) error
 
 	for repoCommit := range repos {
 		configRef := repoCommit.Repo + "/-/repo.ocu.star/@" + repoCommit.Commit
-		if err := triggerWork(ctx, store, configRef, dryRun); err != nil {
+		if err := triggerWork(ctx, state, configRef, dryRun); err != nil {
 			fmt.Println("Failed to trigger run: " + err.Error())
 		}
 	}
@@ -311,7 +308,7 @@ var WorkOpsCmd = &cobra.Command{
 }
 
 func doOps(ctx context.Context, tc release.TrackerConfig) error {
-	releasesForCommit, err := releasesForCommit(ctx, tc.Store, tc.Ref.Repo, tc.Commit)
+	releasesForCommit, err := releasesForCommit(ctx, tc.State, tc.Ref.Repo, tc.Commit)
 	if err != nil {
 		return fmt.Errorf("failed to get releases for commit: %w", err)
 	}
@@ -320,7 +317,7 @@ func doOps(ctx context.Context, tc release.TrackerConfig) error {
 	for _, ref := range releasesForCommit {
 		mr := fmt.Sprintf("%v/op/*", ref.String())
 		log.Info("Checking for ops", "glob", mr)
-		matchedOps, err := tc.Store.Match(ctx, mr)
+		matchedOps, err := tc.State.Match(ctx, mr)
 		if err != nil {
 			return fmt.Errorf("failed to match refs: %w", err)
 		}
@@ -368,7 +365,7 @@ func continueRelease(ctx context.Context, tc release.TrackerConfig) error {
 	workTui := tui.StartWorkTui()
 	defer workTui.Cleanup()
 
-	tc.Store = tuiwork.WatchForJobUpdates(ctx, tc.Store, workTui)
+	tc.State = tuiwork.WatchForJobUpdates(ctx, tc.State, workTui)
 
 	tracker, err := release.TrackerForExistingRelease(ctx, tc)
 	if err != nil {
@@ -395,15 +392,20 @@ func triggerWork(ctx context.Context, readOnlyStore refstore.Store, configRef st
 		return nil
 	}
 
-	log.Info("Triggering work for repo", "ref", configRef)
+	configWithCommit, err := readOnlyStore.ResolveLink(ctx, configRef)
+	if err != nil {
+		return fmt.Errorf("failed to resolve config ref (%v): %w", configRef, err)
+	}
+
+	log.Info("Triggering work for repo", "ref", configWithCommit)
 	var repoConfig models.RepoConfig
-	if err := readOnlyStore.Get(ctx, configRef, &repoConfig); err != nil {
-		return fmt.Errorf("failed to get repo config (%v): %w", configRef, err)
+	if err := readOnlyStore.Get(ctx, configWithCommit, &repoConfig); err != nil {
+		return fmt.Errorf("failed to get repo config (%v): %w", configWithCommit, err)
 	}
 
 	backend, be := local.BackendForRepo()
 
-	_, err := sdk.LoadRepoFromBytes(
+	_, err = sdk.LoadRepoFromBytes(
 		ctx,
 		sdk.NewNullResolver(),
 		"repo.ocu.star",
@@ -416,22 +418,27 @@ func triggerWork(ctx context.Context, readOnlyStore refstore.Store, configRef st
 	}
 
 	if be.RepoTrigger != nil {
+		log.Info("Executing repo trigger", "ref", configWithCommit)
+
 		thread := &starlark.Thread{
 			Name: "repo-trigger",
 			Print: func(thread *starlark.Thread, msg string) {
+				log.Info("Repo trigger", "msg", msg)
 				fmt.Println(msg)
 			},
 		}
-		pr, err := refs.Parse(configRef)
+		pr, err := refs.Parse(configWithCommit)
 		if err != nil {
 			return fmt.Errorf("failed to parse ref: %w", err)
 		}
-		commit := pr.ReleaseOrIntent.Value
+		commit := pr.Release
 
 		_, err = starlark.Call(thread, be.RepoTrigger, starlark.Tuple{starlark.String(commit)}, nil)
 		if err != nil {
 			return fmt.Errorf("failed to call repo trigger: %w", err)
 		}
+	} else {
+		log.Info("No repo trigger found")
 	}
 
 	return nil
@@ -544,26 +551,26 @@ func isForSameJob(ref1, ref2 refs.Ref) bool {
 
 // reconcileAllDeployments attempts to resolve the inputs for all deployments
 // Any inputs that changed will result in a redeployment with the updated value
-func reconcileAllDeploymentsAtCommit(ctx context.Context, store refstore.Store, repo, commit string) error {
+func reconcileAllDeploymentsAtCommit(ctx context.Context, state refstore.Store, repo, commit string) error {
 	log.Info("Reconciling all deployments")
-	allDeployments, err := store.Match(ctx, fmt.Sprintf("%v/-/**/@/deploy/*", repo))
+	allDeployments, err := state.Match(ctx, fmt.Sprintf("%v/-/**/@/deploy/*", repo))
 	if err != nil {
 		return fmt.Errorf("failed to match deployments: %w", err)
 	}
 
 	for _, ref := range allDeployments {
 		var deployment models.Task
-		if err := store.Get(ctx, ref, &deployment); err != nil {
+		if err := state.Get(ctx, ref, &deployment); err != nil {
 			log.Error("Failed to get deployment", "ref", ref, "error", err)
 			continue
 		}
 		var run models.Run
-		if err := store.Get(ctx, deployment.RunRef.String(), &run); err != nil {
+		if err := state.Get(ctx, deployment.RunRef.String(), &run); err != nil {
 			log.Error("Failed to get run", "ref", deployment.RunRef.String(), "error", err)
 			continue
 		}
 
-		resolvedDeployment, err := store.ResolveLink(ctx, ref)
+		resolvedDeployment, err := state.ResolveLink(ctx, ref)
 		if err != nil {
 			log.Error("Failed to resolve inputs", "ref", ref, "error", err)
 			continue
@@ -575,7 +582,7 @@ func reconcileAllDeploymentsAtCommit(ctx context.Context, store refstore.Store, 
 		}
 
 		var release librelease.ReleaseInfo
-		if err := store.Get(ctx, parsedResolvedTask.SetSubPathType(refs.SubPathTypeNone).SetSubPath("").SetFragment("").String(), &release); err != nil {
+		if err := state.Get(ctx, parsedResolvedTask.SetSubPathType(refs.SubPathTypeNone).SetSubPath("").SetFragment("").String(), &release); err != nil {
 			log.Error("Failed to get release", "ref", ref, "error", err)
 			continue
 		}
@@ -586,7 +593,7 @@ func reconcileAllDeploymentsAtCommit(ctx context.Context, store refstore.Store, 
 		}
 
 		entryFunctionInputs := deployment.Inputs
-		inputs, err := librelease.PopulateInputs(ctx, store, entryFunctionInputs)
+		inputs, err := librelease.PopulateInputs(ctx, state, entryFunctionInputs)
 		if err != nil {
 			continue
 		}
@@ -615,7 +622,7 @@ func reconcileAllDeploymentsAtCommit(ctx context.Context, store refstore.Store, 
 			log.Error("Failed to parse resolved deployment", "ref", ref, "error", err)
 			continue
 		}
-		newRunRefString, err := refstore.IncrementPath(ctx, store, fmt.Sprintf("%s/", parsedResolvedTask.String()))
+		newRunRefString, err := refstore.IncrementPath(ctx, state, fmt.Sprintf("%s/", parsedResolvedTask.String()))
 		if err != nil {
 			log.Error("Failed to increment path", "ref", ref, "error", err)
 			continue
@@ -626,7 +633,7 @@ func reconcileAllDeploymentsAtCommit(ctx context.Context, store refstore.Store, 
 			log.Error("Failed to parse path", "ref", ref, "error", err)
 			continue
 		}
-		err = librelease.InitializeRun(ctx, store, newRunRef, &models.Function{
+		err = librelease.InitializeRun(ctx, state, newRunRef, &models.Function{
 			Fn:     run.Functions[0].Fn,
 			Inputs: inputs,
 		})

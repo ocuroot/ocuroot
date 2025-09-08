@@ -16,45 +16,6 @@ import (
 	"github.com/ocuroot/ocuroot/refs"
 )
 
-const (
-	stateVersion  = 1
-	storeInfoFile = ".ocuroot-store"
-	// Prefix files with @ to avoid conflicts with valid refs
-	contentFile     = "@object.json"
-	refMarkerFile   = "@ref.txt"
-	dependenciesDir = "dependencies"
-	dependantsDir   = "dependants"
-	refsDir         = "refs"
-)
-
-var _ Store = (*FSStateStore)(nil)
-var _ PathResolver = (*FSStateStore)(nil)
-
-type PathResolver interface {
-	ActualPath(ref string) (string, error)
-	ActualDependencyPaths(ctx context.Context, ref string, dependency string) (string, string)
-}
-
-type StoreInfo struct {
-	Version int `json:"version"`
-}
-
-type StorageKind string
-
-const (
-	StorageKindRef  StorageKind = "ref"
-	StorageKindLink StorageKind = "link"
-)
-
-type StorageObject struct {
-	Kind        StorageKind     `json:"kind"`
-	BodyType    string          `json:"body_type,omitempty"`
-	CreateStack []string        `json:"create_stack,omitempty"`
-	SetStack    []string        `json:"set_stack,omitempty"`
-	Links       []string        `json:"links,omitempty"`
-	Body        json.RawMessage `json:"body"`
-}
-
 func NewFSRefStore(basePath string) (*FSStateStore, error) {
 	f := &FSStateStore{
 		BasePath: basePath,
@@ -90,6 +51,45 @@ func NewFSRefStore(basePath string) (*FSStateStore, error) {
 	}
 
 	return f, nil
+}
+
+const (
+	stateVersion  = 2
+	storeInfoFile = ".ocuroot-store"
+	// Prefix files with @ to avoid conflicts with valid refs
+	contentFile     = "@object.json"
+	refMarkerFile   = "@ref.txt"
+	dependenciesDir = "dependencies"
+	dependantsDir   = "dependants"
+	refsDir         = "refs"
+)
+
+var _ Store = (*FSStateStore)(nil)
+var _ PathResolver = (*FSStateStore)(nil)
+
+type PathResolver interface {
+	ActualPath(ref string) (string, error)
+	ActualDependencyPaths(ctx context.Context, ref string, dependency string) (string, string)
+}
+
+type StoreInfo struct {
+	Version int `json:"version"`
+}
+
+type StorageKind string
+
+const (
+	StorageKindRef  StorageKind = "ref"
+	StorageKindLink StorageKind = "link"
+)
+
+type StorageObject struct {
+	Kind        StorageKind     `json:"kind"`
+	BodyType    string          `json:"body_type,omitempty"`
+	CreateStack []string        `json:"create_stack,omitempty"`
+	SetStack    []string        `json:"set_stack,omitempty"`
+	Links       []string        `json:"links,omitempty"`
+	Body        json.RawMessage `json:"body"`
 }
 
 type FSStateStore struct {
