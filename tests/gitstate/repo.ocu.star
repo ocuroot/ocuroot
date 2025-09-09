@@ -5,8 +5,16 @@ repo_alias("gitstate/repo")
 env_vars = host.env()
 
 store.set(
-    store.git(env_vars["STATE_REMOTE"], support_files={"support.txt": "state"}),
-    intent=store.git(env_vars["INTENT_REMOTE"], support_files={"support.txt": "intent"}),
+    store.git(
+        env_vars["STATE_REMOTE"],
+        branch="state",
+        support_files={"support.txt": "state"},
+    ),
+    intent=store.git(
+        env_vars["INTENT_REMOTE"], 
+        branch="intent",
+        support_files={"support.txt": "intent"},
+    ),
 )
 
 def do_trigger(commit):

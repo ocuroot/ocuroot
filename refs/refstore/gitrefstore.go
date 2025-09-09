@@ -21,11 +21,12 @@ func NewGitRefStore(
 	remote string,
 	branch string,
 	pathPrefix string,
+	create_branch bool, // Create the branch if it doesn't exist
 ) (*GitRefStore, error) {
 	// Create a branch-specific path to avoid FSRefStore collision
 	branchSpecificPath := filepath.Join(baseDir, "branches", branch)
 
-	r, err := NewGitRepoForRemote(branchSpecificPath, remote, branch)
+	r, err := NewGitRepoForRemote(branchSpecificPath, remote, branch, create_branch)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create git ref store: %w", err)
 	}

@@ -147,6 +147,7 @@ type StorageBackend struct {
 		Branch       string            `json:"branch"`
 		SupportFiles map[string]string `json:"support_files,omitempty"`
 		PathPrefix   string            `json:"path_prefix,omitempty"`
+		CreateBranch bool              `json:"create_branch,omitempty"`
 	} `json:"git,omitempty"`
 	Fs *struct {
 		Path string `json:"path"`
