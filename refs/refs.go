@@ -122,7 +122,7 @@ func (r Release) CurrentRelease() bool {
 }
 
 func (r Release) String() string {
-	return "@" + string(r)
+	return string(r)
 }
 
 func (r Ref) CurrentRelease() bool {
@@ -199,7 +199,7 @@ func (r Ref) String() string {
 	}
 
 	if r.hasRelease {
-		segments = append(segments, r.Release.String())
+		segments = append(segments, fmt.Sprintf("@%s", r.Release.String()))
 	}
 
 	if r.SubPathType != "" || r.SubPath != "" {
