@@ -153,10 +153,15 @@ func doRunsForCommit(ctx context.Context, tc release.TrackerConfig) error {
 		return nil
 	}
 
+	workTui := tui.StartWorkTui()
+	defer workTui.Cleanup()
+
+	tc.State = tuiwork.WatchForJobUpdates(ctx, tc.State, workTui)
+
 	for releaseRef := range releases {
 		tc.Ref = releaseRef
 
-		if err := continueRelease(ctx, tc); err != nil {
+		if err := continueRelease(ctx, tc, workTui); err != nil {
 			return err
 		}
 	}
@@ -361,12 +366,7 @@ func runOp(ctx context.Context, tc release.TrackerConfig, ref string) error {
 	return nil
 }
 
-func continueRelease(ctx context.Context, tc release.TrackerConfig) error {
-	workTui := tui.StartWorkTui()
-	defer workTui.Cleanup()
-
-	tc.State = tuiwork.WatchForJobUpdates(ctx, tc.State, workTui)
-
+func continueRelease(ctx context.Context, tc release.TrackerConfig, workTui tui.Tui) error {
 	tracker, err := release.TrackerForExistingRelease(ctx, tc)
 	if err != nil {
 		if errors.Is(err, refstore.ErrRefNotFound) {
