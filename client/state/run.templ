@@ -15,13 +15,14 @@ templ RunView(props RefPageProps) {
 	@RunContent(props.Content.(models.Run), props.ChildRefs)
 }
 
-templ RunContent(run models.Run, children []string) {
-	<div class="functionheader">
-		<div>&nbsp;</div>
-		<div class="functionstatus">
-			@StatusBadge(StatusFromChildren(children))
-		</div>
+templ RunSummary(props RefPageProps, run models.Run) {
+	<div class="functionstatus">
+		@StatusBadge(StatusFromChildren(props.ChildRefs))
 	</div>
+	<div>Type: { run.Type }</div>
+}
+
+templ RunContent(run models.Run, children []string) {
 	@layout.Row() {
 		@Column40() {
 			for _, fn := range run.Functions {

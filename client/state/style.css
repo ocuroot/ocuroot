@@ -41,23 +41,6 @@
     width: 60%;
 }
 
-.functionheader {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding-bottom: 0.5rem;
-}
-
-.functionheader h2 {
-    margin: 0;
-}
-
-.functionstatus {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-}
-
 .logview {
     height: 70vh;
 }
@@ -80,19 +63,46 @@
     margin-bottom: 0.5rem;
 }
 
+.view-header {
+    display: flex;
+    flex-wrap: wrap;
+}
 
-.ref-header {
+.functionstatus span {
+    margin-inline-end: 0;
+}
+
+@media (min-width: 768px) {
+    .view-header > div {
+        flex: 1;
+    }
+
+    .ref-summary {
+        display: flex;
+        flex-direction: column;
+        justify-content: flex-start;
+    }
+    
+    .ref-summary > div {
+        text-align: right;
+        margin-top: 0.25rem;
+        margin-bottom: 0.25rem;
+    }
+}
+@media (max-width: 767px) {
+    .ref-links, .ref-summary {
+        width: 100%;
+    }
+}
+
+.ref-links {
     padding-bottom: 0.5rem;
     border-bottom: 1px solid var(--border-color);
-    margin-bottom: 0.5rem;
 }
 
-.ref-header headeritem {
-    align-items: center;
-}
-
-.ref-header h2 {
-    margin: 0;
+.ref-summary {
+    padding-bottom: 0.5rem;
+    border-bottom: 1px solid var(--border-color);
 }
 
 pre.text_value, pre.json_value {

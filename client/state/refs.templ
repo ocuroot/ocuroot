@@ -33,80 +33,87 @@ templ HeaderLink(ref string, glob glob.Glob, text string, url string) {
 }
 
 templ RefHeader(props RefPageProps) {
-    <div class="ref-header">
-    if rp, err := refs.Parse(props.Ref); err == nil {
-        if rp.Repo != "" {
-            @HeaderLink(
-                props.Ref, 
-                release.GlobRepoConfig, 
-                rp.Repo, 
-                fmt.Sprintf("/match/%s/-/**/@*", rp.Repo),
-            )
-        } 
-        if rp.Filename != "" {
-            @HeaderLink(
-                props.Ref, 
-                release.GlobPackage, 
-                rp.Filename, 
-                fmt.Sprintf("/match/%s/-/%s/@*", rp.Repo, rp.Filename),
-            )
-        }
-        if rp.Release != "" {
-            @HeaderLink(
-                props.Ref, 
-                release.GlobRelease, 
-                fmt.Sprintf("Release %s", rp.Release), 
-                fmt.Sprintf("/ref/%s/-/%s/@%s", rp.Repo, rp.Filename, rp.Release),
-            )
-        }
-        if rp.SubPathType == refs.SubPathTypeTask {
-            @HeaderLink(
-                props.Ref, 
-                release.GlobTask, 
-                fmt.Sprintf("Task '%s'", strings.Split(rp.SubPath, "/")[0]), 
-                fmt.Sprintf("/ref/%s/-/%s/@%s/task/%s", rp.Repo, rp.Filename, rp.Release, strings.Split(rp.SubPath, "/")[0]),
-            )
-            if len(strings.Split(rp.SubPath, "/")) > 1 {
-                @HeaderLink(
-                    props.Ref, 
-                    release.GlobRun, 
-                    fmt.Sprintf("Run %s", strings.Split(rp.SubPath, "/")[1]), 
-                    fmt.Sprintf("/ref/%s/-/%s/@%s/task/%s/%s", rp.Repo, rp.Filename, rp.Release, strings.Split(rp.SubPath, "/")[0], strings.Split(rp.SubPath, "/")[1]),
-                )
-            }
-        }
-        if rp.SubPathType == refs.SubPathTypeDeploy {
-            @HeaderLink(
-                props.Ref, 
-                release.GlobDeployment, 
-                fmt.Sprintf("Deploy to %s", strings.Split(rp.SubPath, "/")[0]), 
-                fmt.Sprintf("/ref/%s/-/%s/@%s/deploy/%s", rp.Repo, rp.Filename, rp.Release, rp.SubPath),
-            )
-            if len(strings.Split(rp.SubPath, "/")) > 1 {
-                @HeaderLink(
-                    props.Ref, 
-                    release.GlobRun, 
-                    fmt.Sprintf("Run %s", strings.Split(rp.SubPath, "/")[1]), 
-                    fmt.Sprintf("/ref/%s/-/%s/@%s/deploy/%s/%s", rp.Repo, rp.Filename, rp.Release, strings.Split(rp.SubPath, "/")[0], strings.Split(rp.SubPath, "/")[1]),
-                )
-            }
-        }
-        if rp.SubPathType == refs.SubPathTypeEnvironment {
-            <a href={ fmt.Sprintf("/match/%s", GlobEnvironments) }>Environments</a>
-            <h1>{ rp.SubPath }</h1>
-        }
-        if rp.SubPathType == refs.SubPathTypeCustom {
+    <div class="view-header">
+        <div class="ref-links">
+        if rp, err := refs.Parse(props.Ref); err == nil {
             if rp.Repo != "" {
-                <h1>Custom: '{rp.SubPath}'</h1>
-            } else {
-                <a href={ fmt.Sprintf("/match/%s", GlobCustomState) }>Custom state</a>
+                @HeaderLink(
+                    props.Ref, 
+                    release.GlobRepoConfig, 
+                    rp.Repo, 
+                    fmt.Sprintf("/match/%s/-/**/@*", rp.Repo),
+                )
+            } 
+            if rp.Filename != "" {
+                @HeaderLink(
+                    props.Ref, 
+                    release.GlobPackage, 
+                    rp.Filename, 
+                    fmt.Sprintf("/match/%s/-/%s/@*", rp.Repo, rp.Filename),
+                )
+            }
+            if rp.Release != "" {
+                @HeaderLink(
+                    props.Ref, 
+                    release.GlobRelease, 
+                    fmt.Sprintf("Release %s", rp.Release), 
+                    fmt.Sprintf("/ref/%s/-/%s/@%s", rp.Repo, rp.Filename, rp.Release),
+                )
+            }
+            if rp.SubPathType == refs.SubPathTypeTask {
+                @HeaderLink(
+                    props.Ref, 
+                    release.GlobTask, 
+                    fmt.Sprintf("Task '%s'", strings.Split(rp.SubPath, "/")[0]), 
+                    fmt.Sprintf("/ref/%s/-/%s/@%s/task/%s", rp.Repo, rp.Filename, rp.Release, strings.Split(rp.SubPath, "/")[0]),
+                )
+                if len(strings.Split(rp.SubPath, "/")) > 1 {
+                    @HeaderLink(
+                        props.Ref, 
+                        release.GlobRun, 
+                        fmt.Sprintf("Run %s", strings.Split(rp.SubPath, "/")[1]), 
+                        fmt.Sprintf("/ref/%s/-/%s/@%s/task/%s/%s", rp.Repo, rp.Filename, rp.Release, strings.Split(rp.SubPath, "/")[0], strings.Split(rp.SubPath, "/")[1]),
+                    )
+                }
+            }
+            if rp.SubPathType == refs.SubPathTypeDeploy {
+                @HeaderLink(
+                    props.Ref, 
+                    release.GlobDeployment, 
+                    fmt.Sprintf("Deploy to %s", strings.Split(rp.SubPath, "/")[0]), 
+                    fmt.Sprintf("/ref/%s/-/%s/@%s/deploy/%s", rp.Repo, rp.Filename, rp.Release, rp.SubPath),
+                )
+                if len(strings.Split(rp.SubPath, "/")) > 1 {
+                    @HeaderLink(
+                        props.Ref, 
+                        release.GlobRun, 
+                        fmt.Sprintf("Run %s", strings.Split(rp.SubPath, "/")[1]), 
+                        fmt.Sprintf("/ref/%s/-/%s/@%s/deploy/%s/%s", rp.Repo, rp.Filename, rp.Release, strings.Split(rp.SubPath, "/")[0], strings.Split(rp.SubPath, "/")[1]),
+                    )
+                }
+            }
+            if rp.SubPathType == refs.SubPathTypeEnvironment {
+                <a href={ fmt.Sprintf("/match/%s", GlobEnvironments) }>Environments</a>
                 <h1>{ rp.SubPath }</h1>
             }
+            if rp.SubPathType == refs.SubPathTypeCustom {
+                if rp.Repo != "" {
+                    <h1>Custom: '{rp.SubPath}'</h1>
+                } else {
+                    <a href={ fmt.Sprintf("/match/%s", GlobCustomState) }>Custom state</a>
+                    <h1>{ rp.SubPath }</h1>
+                }
+            }
+        } else {
+            <div>
+                <p>Invalid ref: { props.ResolvedRef }</p>
+                <p>{ err.Error() }</p>
+            </div>
         }
-    } else if err != nil {
-        <p>Invalid ref: { props.ResolvedRef }</p>
-        <p>{ err.Error() }</p>
-    }
+        </div>
+        <div class="ref-summary">
+            @StateSummary(props)
+        </div>
     </div>
 }
 
@@ -128,6 +135,16 @@ templ RefPage(props RefPageProps) {
 templ StateContentWithHeader(props RefPageProps) {
     @RefHeader(props)
     @StateContent(props)
+}
+
+templ StateSummary(props RefPageProps) {
+    switch c := props.Content.(type) {
+        case release.ReleaseInfo:
+            @ReleaseSummary(props, c)
+        case models.Run:
+            @RunSummary(props, c)
+        default:
+    }
 }
 
 templ StateContent(props RefPageProps) {

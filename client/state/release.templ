@@ -8,12 +8,15 @@ import (
 )
 
 templ ReleaseCard(props RefPageProps) {
-    <p>Commit: <a href="#">{ props.Content.(release.ReleaseInfo).Commit }</a></p>
     @components.Card() {
         @pipeline.Pipeline(pipeline.PipelineProps{
 			Summary: ReleasePreview(props),
 		})
     }
+}
+
+templ ReleaseSummary(props RefPageProps, release release.ReleaseInfo) {
+    <div>Commit: <a href="#">{ release.Commit }</a></div>
 }
 
 func ReleasePreview(props RefPageProps) *pipeline.ReleaseSummary {
