@@ -80,6 +80,7 @@ func newRefStoreFromBackend(
 			storeConfig.Git.RemoteURL,
 			storeConfig.Git.Branch,
 			pathPrefix,
+			storeConfig.Git.CreateBranch,
 		)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create state store: %w", err)

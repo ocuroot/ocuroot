@@ -8,6 +8,7 @@ init_repos() {
     # Export environment variables for use after function returns - only remotes
     export STATE_REMOTE="$base_dir/state.git"
     export INTENT_REMOTE="$base_dir/intent.git"
+    #export INTENT_REMOTE=$STATE_REMOTE
     
     # Create bare repositories
     git -c init.defaultBranch=main init --bare "$STATE_REMOTE"
@@ -52,12 +53,14 @@ init_working_dir() {
 # Check if a file exists in a remote repo and has specific content
 check_file_in_remote() {
     local remote_url="$1"
-    local file_path="$2"
-    local expected_content="$3"
+    local branch="$2"
+    local file_path="$3"
+    local expected_content="$4"
     
     local tmp_dir=$(mktemp -d)
     trap "rm -rf $tmp_dir" EXIT
     git clone "$remote_url" "$tmp_dir"
+    git -C "$tmp_dir" checkout "$branch"
     local file_content=$(cat "$tmp_dir/$file_path")
     if [ "$file_content" == "$expected_content" ]; then
         return 0

@@ -30,8 +30,8 @@ type GitRepoWrapper struct {
 	branch string
 }
 
-func NewGitRepoForRemote(baseDir, remote, branch string) (GitRepo, error) {
-	g, branch, err := getRepoForRemote(baseDir, remote, branch)
+func NewGitRepoForRemote(baseDir, remote, branch string, createBranch bool) (GitRepo, error) {
+	g, branch, err := getRepoForRemote(baseDir, remote, branch, createBranch)
 	if err != nil {
 		return nil, err
 	}
@@ -41,7 +41,7 @@ func NewGitRepoForRemote(baseDir, remote, branch string) (GitRepo, error) {
 	}, nil
 }
 
-func getRepoForRemote(baseDir, remote, branch string) (*gittools.Repo, string, error) {
+func getRepoForRemote(baseDir, remote, branch string, createBranch bool) (*gittools.Repo, string, error) {
 	statePath, err := getStatePath(baseDir, remote)
 	if err != nil {
 		return nil, "", err
@@ -88,16 +88,49 @@ func getRepoForRemote(baseDir, remote, branch string) (*gittools.Repo, string, e
 		}
 	}
 
+	cb, err := r.CurrentBranch()
+	if err != nil {
+		return nil, "", err
+	}
+
 	// Checkout the appropriate branch
-	if branch != "" {
+	if branch != "" && cb != branch {
+		if _, stderr, err := r.Client.Exec("fetch", "--all"); err != nil {
+			return nil, "", fmt.Errorf("failed to fetch: %w\n%s", err, string(stderr))
+		}
+
+		// Get a list of branches
+		var branchExists bool
+		branchOutput, branchError, err := r.Client.Exec("branch", "-a", "--list")
+		if err != nil {
+			return nil, "", fmt.Errorf("failed to list branches: %w\n%s", err, string(branchError))
+		}
+		branches := strings.Split(strings.TrimSpace(string(branchOutput)), "\n")
+
+		for _, b := range branches {
+			b = strings.TrimPrefix(b, "*")
+			b = strings.TrimSpace(b)
+			b = strings.TrimPrefix(b, "remotes/origin/")
+
+			if b == branch {
+				branchExists = true
+				break
+			}
+		}
+
+		if createBranch && !branchExists {
+			if err := r.CreateBranch(branch); err != nil {
+				return nil, "", err
+			}
+			if err := r.Push("origin", branch); err != nil {
+				return nil, "", err
+			}
+		}
 		if err := r.Checkout(branch); err != nil {
 			return nil, "", err
 		}
 	} else {
-		branch, err = r.CurrentBranch()
-		if err != nil {
-			return nil, "", err
-		}
+		branch = cb
 	}
 
 	return r, branch, nil

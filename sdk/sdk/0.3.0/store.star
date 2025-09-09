@@ -13,13 +13,15 @@ def _set_store(state,intent=None):
     """
     backend.store.set(json.encode({"state": state, "intent": intent}))
 
-def _git_store(remote_url, branch=None, support_files=None):
+def _git_store(remote_url, branch=None, create_branch=True, support_files=None):
     """
     Creates a git store for the given remote URL.
     
     Args:
         remote_url: The remote URL of the git repository
         branch: The branch containing the release state
+        create_branch: If True, the branch will be created if it doesn't already exist. Defaults True.
+        support_files: Files to add to the repository, as a dictionary of path to content, from the repository root
     
     Returns:
         A git store
@@ -28,7 +30,7 @@ def _git_store(remote_url, branch=None, support_files=None):
         "git": {
             "remote_url": remote_url,
             "branch": branch,
-            # TODO: Should this accept a function?
+            "create_branch": create_branch,
             "support_files": support_files,
         }
     }

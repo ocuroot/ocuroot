@@ -34,6 +34,8 @@ test_gitstate() {
 
     echo "== trigger update from intent store =="
     pushd "$INTENT_WORKING" > /dev/null
+    git checkout intent
+    assert_equal "0" "$?" "Failed to checkout intent branch"
 
     # Trigger an intent change
     ocuroot work trigger --intent
@@ -54,10 +56,10 @@ test_gitstate() {
     assert_deployed "basic.ocu.star" "production2"
 
     echo "== check for files in state store =="
-    check_file_in_remote "$STATE_REMOTE" "support.txt" "state"
+    check_file_in_remote "$STATE_REMOTE" "state" "support.txt" "state"
 
     echo "== check for files in intent store =="
-    check_file_in_remote "$INTENT_REMOTE" "support.txt" "intent"
+    check_file_in_remote "$INTENT_REMOTE" "intent" "support.txt" "intent"
 
     echo "Test succeeded"
     echo ""
