@@ -1,5 +1,8 @@
 ocuroot("0.3.0")
 
+initial_prerelease="0.3.11-1"
+initial_version="0.3.10"
+
 load("./versions.ocu.star", "next_prerelease_version")
 
 def unit_test(ctx):
@@ -55,8 +58,8 @@ phase(
         increment_version, 
         name="increment_version", 
         inputs={
-            "prev_prerelease": input(ref="./@/task/increment_version#output/prerelease", default="0.3.4-1"),
-            "prev_version": input(ref="./@/task/release#output/version", default="0.3.4"),
+            "prev_prerelease": input(ref="./@/task/increment_version#output/prerelease", default=initial_prerelease),
+            "prev_version": input(ref="./@/task/release#output/version", default=initial_version),
         },
     )],
 )
