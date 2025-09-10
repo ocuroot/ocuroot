@@ -369,7 +369,7 @@ func (r *ReleaseTracker) Retry(ctx context.Context, logger Logger) error {
 	return r.RunToPause(ctx, logger)
 }
 
-func (r *ReleaseTracker) Task(ctx context.Context, ref string, logger Logger) error {
+func (r *ReleaseTracker) Op(ctx context.Context, ref string, logger Logger) error {
 	err := r.stateStore.Store.StartTransaction(ctx, "running task")
 	if err != nil {
 		return fmt.Errorf("failed to start transaction: %w", err)

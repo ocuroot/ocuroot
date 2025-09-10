@@ -14,6 +14,7 @@ import (
 	"github.com/ocuroot/ocuroot/client/state"
 	"github.com/ocuroot/ocuroot/client/tui"
 	"github.com/ocuroot/ocuroot/client/tui/tuiwork"
+	"github.com/ocuroot/ocuroot/client/work"
 	librelease "github.com/ocuroot/ocuroot/lib/release"
 	"github.com/ocuroot/ocuroot/refs"
 	"github.com/ocuroot/ocuroot/refs/refstore"
@@ -68,9 +69,30 @@ finally it will trigger work for other commits ('ocuroot work trigger').
 		}
 
 		cmd.SilenceUsage = true
+		dryRun := cmd.Flag("dryrun").Changed
+
+		worker := &work.Worker{
+			Tracker: tc,
+		}
+
+		todo, err := worker.IdentifyWork(ctx, work.IndentifyWorkRequest{
+			GitFilter: work.GitFilterCurrentCommitOnly,
+		})
+		if err != nil {
+			return fmt.Errorf("failed to identify work: %w", err)
+		}
+
+		if dryRun {
+			todoJSON, err := json.MarshalIndent(todo, "", "  ")
+			if err != nil {
+				return fmt.Errorf("failed to marshal todo: %w", err)
+			}
+			fmt.Println(string(todoJSON))
+			return nil
+		}
 
 		log.Info("Starting state sync")
-		if err := state.Sync(ctx, tc.State, tc.Intent); err != nil {
+		if err := state.Sync(ctx, tc); err != nil {
 			return err
 		}
 
@@ -358,7 +380,7 @@ func runOp(ctx context.Context, tc release.TrackerConfig, ref string) error {
 		return fmt.Errorf("failed to get tracker: %w", err)
 	}
 
-	err = tracker.Task(ctx, ref, nil)
+	err = tracker.Op(ctx, ref, nil)
 	if err != nil {
 		return fmt.Errorf("running task in tracker: %w", err)
 	}
@@ -494,8 +516,12 @@ func reconcileDeployment(ctx context.Context, store refstore.Store, ref string) 
 		return nil, fmt.Errorf("failed to parse resolved deployment at %s: %w", ref, err)
 	}
 
-	var release librelease.ReleaseInfo
-	if err := store.Get(ctx, parsedResolvedDeployment.SetSubPathType(refs.SubPathTypeNone).SetSubPath("").SetFragment("").String(), &release); err != nil {
+	var ri librelease.ReleaseInfo
+	releaseRef, err := refs.Reduce(parsedResolvedDeployment.String(), librelease.GlobRelease)
+	if err != nil {
+		return nil, fmt.Errorf("failed to reduce ref: %w", err)
+	}
+	if err := store.Get(ctx, releaseRef, &ri); err != nil {
 		return nil, fmt.Errorf("failed to get release: %w", err)
 	}
 
@@ -658,5 +684,7 @@ func init() {
 	WorkCmd.AddCommand(WorkTriggerCommand)
 
 	WorkCmd.AddCommand(WorkOpsCmd)
+
+	WorkAnyCommand.Flags().BoolP("dryrun", "d", false, "List refs for work that would be triggered")
 	WorkCmd.AddCommand(WorkAnyCommand)
 }
