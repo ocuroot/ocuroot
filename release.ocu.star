@@ -39,7 +39,7 @@ def increment_version(ctx):
 
 def create_draft_release(previous_version, version):
     # Generate release notes from the git log
-    commit_summaries = host.shell("git log {}..$(git rev-parse HEAD) --pretty='%h %s'".format(previous_version)).stdout
+    commit_summaries = host.shell("git log v{}..$(git rev-parse HEAD) --pretty='%h %s'".format(previous_version)).stdout
     release_notes = "## Commit summaries\n\n{commit_summaries}".format(
         commit_summaries=commit_summaries,
     )
