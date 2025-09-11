@@ -64,7 +64,7 @@ test_two_releases() {
     echo "== create approval2 intent =="
     ocuroot state set "minimal/repo/-/approvals.ocu.star/@r1/custom/approval2" 1
     assert_equal "0" "$?" "Failed to create approval2 intent"
-    echo "== apply approval intent and continue work =="
+    echo "== apply approval2 intent and continue work =="
     ocuroot work any
     assert_equal "0" "$?" "Failed to apply approval intent and continue work"
 
