@@ -82,6 +82,8 @@ finally it will trigger work for other commits ('ocuroot work trigger').
 			return fmt.Errorf("failed to identify work: %w", err)
 		}
 
+		log.Info("Identified work", "todo", toJSON(todo))
+
 		if dryRun {
 			todoJSON, err := json.MarshalIndent(todo, "", "  ")
 			if err != nil {
@@ -91,9 +93,13 @@ finally it will trigger work for other commits ('ocuroot work trigger').
 			return nil
 		}
 
-		log.Info("Starting state sync")
-		if err := state.Sync(ctx, tc); err != nil {
-			return err
+		log.Info("Applying intent diffs")
+		for _, t := range todo {
+			if t.WorkType == work.WorkTypeUpdate || t.WorkType == work.WorkTypeCreate || t.WorkType == work.WorkTypeDelete {
+				if err := state.ApplyIntent(ctx, t.Ref, tc.State, tc.Intent); err != nil {
+					return fmt.Errorf("failed to apply intent (%s): %w", t.Ref.String(), err)
+				}
+			}
 		}
 
 		log.Info("Starting op work")

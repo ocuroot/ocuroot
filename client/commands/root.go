@@ -28,6 +28,7 @@ with the Ocuroot release orchestration platform.`,
 		initLogs(homeDir, os.Args[1:])
 
 		log.Info("Starting ocuroot", "version", about.Version, "args", os.Args[1:], "home", homeDir)
+		fmt.Fprintf(os.Stderr, "Logs at: %v\n", logPath)
 		cleanup = setupTelemetry()
 	},
 	PersistentPostRun: func(cmd *cobra.Command, args []string) {

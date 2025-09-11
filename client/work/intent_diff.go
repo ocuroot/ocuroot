@@ -62,11 +62,12 @@ func (w *Worker) Diff(ctx context.Context, req IndentifyWorkRequest) ([]Work, er
 			})
 		} else {
 			stateToIntentRefSet[resolvedRef] = ref
+			delete(stateRefsMap, resolvedRef)
 		}
 	}
 
 	// Iterate over state again to find any without matching intent
-	for _, ref := range stateRefs {
+	for ref := range stateRefsMap {
 		if _, exists := intentRefsMap[ref]; !exists {
 			ir, err := refs.Parse(ref)
 			if err != nil {
