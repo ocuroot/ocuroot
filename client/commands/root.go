@@ -37,7 +37,6 @@ with the Ocuroot release orchestration platform.`,
 		if logCloser != nil {
 			logCloser.Close()
 			log.SetOutput(os.Stderr)
-			fmt.Fprintf(os.Stderr, "Logs at: %v\n", logPath)
 		}
 	},
 }

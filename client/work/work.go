@@ -16,4 +16,5 @@ const (
 	WorkTypeDelete WorkType = "delete"
 	WorkTypeUpdate WorkType = "update"
 	WorkTypeRun    WorkType = "run"
+	WorkTypeOp     WorkType = "op"
 )

@@ -48,5 +48,11 @@ func (w *Worker) IdentifyWork(ctx context.Context, req IndentifyWorkRequest) ([]
 	}
 	out = append(out, reconcilableDeployments...)
 
+	ops, err := w.Ops(ctx, req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get ops: %w", err)
+	}
+	out = append(out, ops...)
+
 	return out, nil
 }

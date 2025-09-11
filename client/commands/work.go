@@ -103,8 +103,12 @@ finally it will trigger work for other commits ('ocuroot work trigger').
 		}
 
 		log.Info("Starting op work")
-		if err := doOps(ctx, tc); err != nil {
-			return err
+		for _, t := range todo {
+			if t.WorkType == work.WorkTypeOp {
+				if err := runOp(ctx, tc, t.Ref.String()); err != nil {
+					return fmt.Errorf("failed to run op (%s): %w", t.Ref.String(), err)
+				}
+			}
 		}
 
 		log.Info("Starting release work")
@@ -332,38 +336,40 @@ var WorkOpsCmd = &cobra.Command{
 			return fmt.Errorf("failed to get tracker config: %w", err)
 		}
 
-		if err := doOps(ctx, tc); err != nil {
-			return err
+		dryRun := cmd.Flag("dryrun").Changed
+
+		worker := &work.Worker{
+			Tracker: tc,
+		}
+
+		todo, err := worker.Ops(ctx, work.IndentifyWorkRequest{
+			GitFilter: work.GitFilterCurrentCommitOnly,
+		})
+		if err != nil {
+			return fmt.Errorf("failed to identify work: %w", err)
+		}
+
+		log.Info("Identified work", "todo", toJSON(todo))
+
+		if dryRun {
+			todoJSON, err := json.MarshalIndent(todo, "", "  ")
+			if err != nil {
+				return fmt.Errorf("failed to marshal todo: %w", err)
+			}
+			fmt.Println(string(todoJSON))
+			return nil
+		}
+
+		for _, t := range todo {
+			if t.WorkType == work.WorkTypeOp {
+				if err := runOp(ctx, tc, t.Ref.String()); err != nil {
+					return fmt.Errorf("failed to run op (%s): %w", t.Ref.String(), err)
+				}
+			}
 		}
 
 		return nil
 	},
-}
-
-func doOps(ctx context.Context, tc release.TrackerConfig) error {
-	releasesForCommit, err := releasesForCommit(ctx, tc.State, tc.Ref.Repo, tc.Commit)
-	if err != nil {
-		return fmt.Errorf("failed to get releases for commit: %w", err)
-	}
-
-	var ops []string
-	for _, ref := range releasesForCommit {
-		mr := fmt.Sprintf("%v/op/*", ref.String())
-		log.Info("Checking for ops", "glob", mr)
-		matchedOps, err := tc.State.Match(ctx, mr)
-		if err != nil {
-			return fmt.Errorf("failed to match refs: %w", err)
-		}
-		ops = append(ops, matchedOps...)
-	}
-
-	for _, ref := range ops {
-		log.Info("Found outstanding op", "ref", ref)
-		if err := runOp(ctx, tc, ref); err != nil {
-			return fmt.Errorf("failed to run op: %w", err)
-		}
-	}
-	return nil
 }
 
 func runOp(ctx context.Context, tc release.TrackerConfig, ref string) error {
@@ -689,6 +695,7 @@ func init() {
 	WorkTriggerCommand.Flags().BoolP("intent", "i", false, "Trigger intents instead of deployments")
 	WorkCmd.AddCommand(WorkTriggerCommand)
 
+	WorkOpsCmd.Flags().BoolP("dryrun", "d", false, "List refs for work that would be triggered")
 	WorkCmd.AddCommand(WorkOpsCmd)
 
 	WorkAnyCommand.Flags().BoolP("dryrun", "d", false, "List refs for work that would be triggered")

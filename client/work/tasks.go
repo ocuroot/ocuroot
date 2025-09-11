@@ -123,9 +123,11 @@ func (w *Worker) Ops(ctx context.Context, req IndentifyWorkRequest) ([]Work, err
 	if req.GitFilter == GitFilterCurrentRepoOnly || req.GitFilter == GitFilterCurrentCommitOnly {
 		prefix = fmt.Sprintf("%s/-/**", w.Tracker.Ref.Repo)
 	}
+	g := prefix + "/@*/op/*"
+	log.Info("Identifying ops", "glob", g)
 	outstanding, err := state.Match(
 		ctx,
-		prefix+"/@*/op/*",
+		g,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to match refs: %w", err)
@@ -139,7 +141,7 @@ func (w *Worker) Ops(ctx context.Context, req IndentifyWorkRequest) ([]Work, err
 		log.Info("Found outstanding op", "ref", parsedRef.String())
 		out = append(out, Work{
 			Ref:      parsedRef,
-			WorkType: WorkTypeRun,
+			WorkType: WorkTypeOp,
 		})
 	}
 

@@ -210,12 +210,14 @@ wait_for_all_jobs() {
     mkdir -p "$log_dir"
 
     curl -s "http://localhost:$CI_PORT/api/wait"
-    assert_equal "0" "$?" "Failed to wait for all jobs with CURL"
+    local result=$?
 
     for job_id in $(job_ids); do
         echo "Job $job_id logs:" > "$log_dir/$job_id.log"
         job_logs "$job_id" >> "$log_dir/$job_id.log"
     done
+
+    assert_equal "0" "$result" "Failed to wait for all jobs with CURL"
 }
 
 assert_job_success() {
