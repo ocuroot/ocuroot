@@ -17,22 +17,17 @@ import (
 	librelease "github.com/ocuroot/ocuroot/lib/release"
 )
 
-func initEvent(ref refs.Ref, t tui.Tui, store refstore.Store) *TaskEvent {
+func initRunStateEvent(ref refs.Ref, t tui.Tui, store refstore.Store) *RunTaskEvent {
 	ctx := context.TODO()
 	var err error
 
-	// tr, err := librelease.ReduceToTaskRef(ref)
-	// if err != nil {
-	// 	log.Error("failed to get task ref", "error", err)
-	// 	return nil
-	// }
 	runRef := librelease.ReduceToRunRef(ref)
 
-	var out *TaskEvent = &TaskEvent{}
+	var out *RunTaskEvent = &RunTaskEvent{}
 
 	ttr, found := t.GetTaskByID(runRef.String())
 	if found {
-		out.Old, _ = ttr.(*Task)
+		out.Old, _ = ttr.(*RunTask)
 	}
 
 	if out.Old != nil {
@@ -65,7 +60,7 @@ func initEvent(ref refs.Ref, t tui.Tui, store refstore.Store) *TaskEvent {
 		}
 		name += fmt.Sprintf(" [%s]", path.Base(runRef.SubPath))
 
-		out.New = &Task{
+		out.New = &RunTask{
 			RunRef:       runRef,
 			Name:         name,
 			Status:       WorkStatusPending,
@@ -79,7 +74,37 @@ func initEvent(ref refs.Ref, t tui.Tui, store refstore.Store) *TaskEvent {
 	return out
 }
 
-func updateStatus(ctx context.Context, store refstore.Store, ref refs.Ref, ev *TaskEvent) {
+func initCustomStateEvent(ref refs.Ref, t tui.Tui, store refstore.Store) *CustomStateTaskEvent {
+	var out *CustomStateTaskEvent = &CustomStateTaskEvent{}
+
+	ttr, found := t.GetTaskByID(ref.String())
+	if found {
+		out.Old, _ = ttr.(*CustomStateTask)
+	}
+
+	if out.Old != nil {
+		newTask := *out.Old
+		out.New = &newTask
+
+		if store != nil {
+			out.Old.Store = store
+			out.New.Store = store
+		}
+	}
+	if out.New == nil {
+		name := ref.SubPath
+
+		out.New = &CustomStateTask{
+			Ref:   ref,
+			Name:  name,
+			Store: store,
+		}
+	}
+
+	return out
+}
+
+func updateStatus(ctx context.Context, store refstore.Store, ref refs.Ref, ev *RunTaskEvent) {
 	runRef := librelease.ReduceToRunRef(ref)
 	runStatus, err := librelease.GetRunStatus(ctx, store, runRef)
 	if err != nil {
@@ -113,15 +138,15 @@ func TuiLogger(tuiWork tui.Tui) func(fnRef refs.Ref, msg sdk.Log) {
 		}
 		log.Info("function log", "ref", wr.String(), "msg", msg)
 
-		out := initEvent(fnRef, tuiWork, nil)
+		out := initRunStateEvent(fnRef, tuiWork, nil)
 		out.New.Logs = append(out.New.Logs, msg.Message)
 
 		tuiWork.UpdateTask(out)
 	}
 }
 
-func WatchForJobUpdates(ctx context.Context, store refstore.Store, tuiWork tui.Tui) refstore.Store {
-	updater := tuiStateChange(ctx, store, tuiWork)
+func WatchForStateUpdates(ctx context.Context, store refstore.Store, tuiWork tui.Tui) refstore.Store {
+	runUpdater := tuiRunStatusChange(ctx, store, tuiWork)
 
 	store, err := refstore.ListenToStateChanges(
 		func(ctx context.Context, ref string) {
@@ -131,7 +156,7 @@ func WatchForJobUpdates(ctx context.Context, store refstore.Store, tuiWork tui.T
 				return
 			}
 
-			updater(r)
+			runUpdater(r)
 		},
 		store,
 		"**/{task,deploy}/*/*/status/*",
@@ -141,14 +166,42 @@ func WatchForJobUpdates(ctx context.Context, store refstore.Store, tuiWork tui.T
 		return store
 	}
 
+	customUpdater := tuiCustomStateChange(ctx, store, tuiWork)
+	store, err = refstore.ListenToStateChanges(
+		func(ctx context.Context, ref string) {
+			r, err := refs.Parse(ref)
+			if err != nil {
+				log.Error("failed to parse ref", "error", err)
+				return
+			}
+
+			customUpdater(r)
+		},
+		store,
+		"**/@*/custom/*", "@/custom/*", "@/environment/*",
+	)
+	if err != nil {
+		log.Error("failed to listen to state changes", "error", err)
+		return store
+	}
+
 	return store
 }
 
-func tuiStateChange(ctx context.Context, store refstore.Store, tuiWork tui.Tui) func(ref refs.Ref) {
+func tuiCustomStateChange(ctx context.Context, store refstore.Store, tuiWork tui.Tui) func(ref refs.Ref) {
 	return func(ref refs.Ref) {
 		runRef := librelease.ReduceToRunRef(ref)
 
-		out := initEvent(runRef, tuiWork, store)
+		out := initCustomStateEvent(runRef, tuiWork, store)
+		tuiWork.UpdateTask(out)
+	}
+}
+
+func tuiRunStatusChange(ctx context.Context, store refstore.Store, tuiWork tui.Tui) func(ref refs.Ref) {
+	return func(ref refs.Ref) {
+		runRef := librelease.ReduceToRunRef(ref)
+
+		out := initRunStateEvent(runRef, tuiWork, store)
 		updateStatus(ctx, store, runRef, out)
 
 		if out.New.Status == WorkStatusRunning {

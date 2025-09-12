@@ -36,7 +36,7 @@ var WorkContinueCmd = &cobra.Command{
 		workTui := tui.StartWorkTui()
 		defer workTui.Cleanup()
 
-		tc.State = tuiwork.WatchForJobUpdates(ctx, tc.State, workTui)
+		tc.State = tuiwork.WatchForStateUpdates(ctx, tc.State, workTui)
 
 		worker := &work.Worker{
 			Tracker: tc,
@@ -95,7 +95,7 @@ finally it will trigger work for other commits ('ocuroot work trigger').
 		workTui := tui.StartWorkTui()
 		defer workTui.Cleanup()
 
-		tc.State = tuiwork.WatchForJobUpdates(ctx, tc.State, workTui)
+		tc.State = tuiwork.WatchForStateUpdates(ctx, tc.State, workTui)
 
 		worker := &work.Worker{
 			Tracker: tc,
@@ -157,7 +157,7 @@ var WorkTriggerCommand = &cobra.Command{
 		tc := release.TrackerConfig{
 			State: store,
 		}
-		tc.State = tuiwork.WatchForJobUpdates(ctx, tc.State, workTui)
+		tc.State = tuiwork.WatchForStateUpdates(ctx, tc.State, workTui)
 
 		worker := &work.Worker{
 			Tracker: tc,

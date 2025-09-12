@@ -68,7 +68,12 @@ var NewReleaseCmd = &cobra.Command{
 		workTui := tui.StartWorkTui()
 		defer workTui.Cleanup()
 
-		tc.State = tuiwork.WatchForJobUpdates(ctx, tc.State, workTui)
+		tc.State = tuiwork.WatchForStateUpdates(ctx, tc.State, workTui)
+
+		worker := &work.Worker{
+			Tracker: tc,
+			Tui:     workTui,
+		}
 
 		tracker, environments, err := release.TrackerForNewRelease(ctx, tc)
 		if err != nil {
@@ -76,7 +81,6 @@ var NewReleaseCmd = &cobra.Command{
 		}
 
 		if tracker == nil {
-			fmt.Println("Registering environments")
 			for _, env := range environments {
 				// Establishing intent for environment
 				intentRef := "@/environment/" + string(env.Name)
@@ -84,18 +88,12 @@ var NewReleaseCmd = &cobra.Command{
 					return err
 				}
 
-				tc2 := tc
-				tc2.Ref, err = refs.Parse(intentRef)
+				pr, err := refs.Parse(intentRef)
 				if err != nil {
 					return err
 				}
 
-				worker := &work.Worker{
-					Tracker: tc2,
-					Tui:     workTui,
-				}
-
-				if err := worker.ApplyIntent(ctx, tc2.Ref); err != nil {
+				if err := worker.ApplyIntent(ctx, pr); err != nil {
 					return err
 				}
 
@@ -144,7 +142,7 @@ var ContinueReleaseCmd = &cobra.Command{
 		workTui := tui.StartWorkTui()
 		defer workTui.Cleanup()
 
-		tc.State = tuiwork.WatchForJobUpdates(ctx, tc.State, workTui)
+		tc.State = tuiwork.WatchForStateUpdates(ctx, tc.State, workTui)
 
 		tracker, err := release.TrackerForExistingRelease(ctx, tc)
 		if err != nil {
@@ -204,7 +202,7 @@ var RetryReleaseCmd = &cobra.Command{
 		workTui := tui.StartWorkTui()
 		defer workTui.Cleanup()
 
-		tc.State = tuiwork.WatchForJobUpdates(ctx, tc.State, workTui)
+		tc.State = tuiwork.WatchForStateUpdates(ctx, tc.State, workTui)
 
 		tracker, err := release.TrackerForExistingRelease(ctx, tc)
 		if err != nil {

@@ -103,7 +103,7 @@ func (w *Worker) TriggerCommit(ctx context.Context, repo, commit string) error {
 			Name: "repo-trigger",
 			Print: func(thread *starlark.Thread, msg string) {
 				log.Info("Repo trigger", "msg", msg)
-				fmt.Println(msg)
+				// fmt.Println(msg)
 			},
 		}
 		pr, err := refs.Parse(configWithCommit)

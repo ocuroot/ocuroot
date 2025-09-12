@@ -24,18 +24,19 @@ var (
 	checkMark   = lipgloss.NewStyle().Foreground(lipgloss.Color("42")).SetString("✓")
 	errorMark   = lipgloss.NewStyle().Foreground(lipgloss.Color("160")).SetString("✗")
 	pendingMark = lipgloss.NewStyle().Foreground(lipgloss.Color("208")).SetString("›")
+	updateMark  = lipgloss.NewStyle().Foreground(lipgloss.Color("48")).SetString("+")
 )
 
-type TaskEvent struct {
-	Old *Task
-	New *Task
+type RunTaskEvent struct {
+	Old *RunTask
+	New *RunTask
 }
 
-func (e *TaskEvent) Task() tui.Task {
+func (e *RunTaskEvent) Task() tui.Task {
 	return e.New
 }
 
-func (e *TaskEvent) Description() (string, bool) {
+func (e *RunTaskEvent) Description() (string, bool) {
 	if e.Old == nil {
 		return fmt.Sprintf("%v: %v", e.New.Name, e.New.Status), true
 	}
@@ -52,9 +53,9 @@ func (e *TaskEvent) Description() (string, bool) {
 	return "", false
 }
 
-var _ tui.Task = (*Task)(nil)
+var _ tui.Task = (*RunTask)(nil)
 
-type Task struct {
+type RunTask struct {
 	RunRef refs.Ref
 
 	CreationTime time.Time
@@ -70,7 +71,7 @@ type Task struct {
 	JobRef refs.Ref
 }
 
-func (t *Task) SortKey() string {
+func (t *RunTask) SortKey() string {
 	var statusSort = 0
 	switch t.Status {
 	case WorkStatusPending:
@@ -92,18 +93,18 @@ func (t *Task) SortKey() string {
 	return fmt.Sprintf("%d-%s", statusSort, keyTime)
 }
 
-func (t *Task) ID() string {
+func (t *RunTask) ID() string {
 	return t.RunRef.String()
 }
 
-func (t *Task) Hierarchy() []string {
+func (t *RunTask) Hierarchy() []string {
 	return []string{
 		t.RunRef.Repo,
 		t.RunRef.Filename,
 	}
 }
 
-func (task *Task) Render(depth int, spinner spinner.Model, final bool) string {
+func (task *RunTask) Render(depth int, spinner spinner.Model, final bool) string {
 	var s string
 	if task.Status == WorkStatusPending && !final {
 		return ""
@@ -157,7 +158,7 @@ func (task *Task) Render(depth int, spinner spinner.Model, final bool) string {
 	return s
 }
 
-func (t *Task) message() string {
+func (t *RunTask) message() string {
 	ctx := context.TODO()
 
 	var message string
