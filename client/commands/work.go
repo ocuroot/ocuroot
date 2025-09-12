@@ -3,15 +3,12 @@ package commands
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"reflect"
 	"strings"
 
 	"github.com/charmbracelet/log"
 	"github.com/ocuroot/ocuroot/client/local"
-	"github.com/ocuroot/ocuroot/client/release"
-	"github.com/ocuroot/ocuroot/client/state"
 	"github.com/ocuroot/ocuroot/client/tui"
 	"github.com/ocuroot/ocuroot/client/tui/tuiwork"
 	"github.com/ocuroot/ocuroot/client/work"
@@ -75,27 +72,8 @@ var WorkContinueCmd = &cobra.Command{
 			return nil
 		}
 
-		for _, t := range todo {
-			if t.WorkType == work.WorkTypeRun {
-				if t.Ref.SubPathType == refs.SubPathTypeDeploy {
-					if err := addRunForDeployment(ctx, t.Ref.String(), tc.State); err != nil {
-						// If a run is not needed this will error out because the deploy isn't there
-						log.Error("failed to add run for deployment", "ref", t.Ref.String(), "error", err)
-					}
-				}
-				releaseRef, err := refs.Reduce(t.Ref.String(), librelease.GlobRelease)
-				if err != nil {
-					return fmt.Errorf("failed to reduce ref: %w", err)
-				}
-				pr, err := refs.Parse(releaseRef)
-				if err != nil {
-					return fmt.Errorf("failed to parse ref: %w", err)
-				}
-				tc.Ref = pr
-				if err := continueRelease(ctx, tc, workTui); err != nil {
-					return err
-				}
-			}
+		if err := worker.ExecuteWork(ctx, todo); err != nil {
+			return err
 		}
 
 		return nil
@@ -153,46 +131,8 @@ finally it will trigger work for other commits ('ocuroot work trigger').
 			return nil
 		}
 
-		log.Info("Applying intent diffs")
-		for _, t := range todo {
-			if t.WorkType == work.WorkTypeUpdate || t.WorkType == work.WorkTypeCreate || t.WorkType == work.WorkTypeDelete {
-				if err := state.ApplyIntent(ctx, t.Ref, tc.State, tc.Intent); err != nil {
-					return fmt.Errorf("failed to apply intent (%s): %w", t.Ref.String(), err)
-				}
-			}
-		}
-
-		log.Info("Starting op work")
-		for _, t := range todo {
-			if t.WorkType == work.WorkTypeOp {
-				if err := runOp(ctx, tc, t.Ref.String()); err != nil {
-					return fmt.Errorf("failed to run op (%s): %w", t.Ref.String(), err)
-				}
-			}
-		}
-
-		log.Info("Starting release work")
-		for _, t := range todo {
-			if t.WorkType == work.WorkTypeRun {
-				if t.Ref.SubPathType == refs.SubPathTypeDeploy {
-					if err := addRunForDeployment(ctx, t.Ref.String(), tc.State); err != nil {
-						// If a run is not needed this will error out because the deploy isn't there
-						log.Info("failed to add run for deployment", "ref", t.Ref.String(), "error", err)
-					}
-				}
-				releaseRef, err := refs.Reduce(t.Ref.String(), librelease.GlobRelease)
-				if err != nil {
-					return fmt.Errorf("failed to reduce ref: %w", err)
-				}
-				pr, err := refs.Parse(releaseRef)
-				if err != nil {
-					return fmt.Errorf("failed to parse ref: %w", err)
-				}
-				tc.Ref = pr
-				if err := continueRelease(ctx, tc, workTui); err != nil {
-					return err
-				}
-			}
+		if err := worker.ExecuteWork(ctx, todo); err != nil {
+			return err
 		}
 
 		log.Info("Starting trigger work")
@@ -363,65 +303,12 @@ var WorkOpsCmd = &cobra.Command{
 			return nil
 		}
 
-		for _, t := range todo {
-			if t.WorkType == work.WorkTypeOp {
-				if err := runOp(ctx, tc, t.Ref.String()); err != nil {
-					return fmt.Errorf("failed to run op (%s): %w", t.Ref.String(), err)
-				}
-			}
+		if err := worker.ExecuteWork(ctx, todo); err != nil {
+			return fmt.Errorf("failed to execute work: %w", err)
 		}
 
 		return nil
 	},
-}
-
-func runOp(ctx context.Context, tc release.TrackerConfig, ref string) error {
-	var err error
-
-	tc.Ref, err = refs.Parse(ref)
-	if err != nil {
-		return fmt.Errorf("failed to parse ref: %w", err)
-	}
-	tc.Ref.SubPath = ""
-	tc.Ref.SubPathType = refs.SubPathTypeNone
-
-	log.Info("Setting up tracker", "tc", tc)
-	tracker, err := release.TrackerForExistingRelease(ctx, tc)
-	if err != nil {
-		if errors.Is(err, refstore.ErrRefNotFound) {
-			log.Error("The specified release was not found", "ref", tc.Ref.String())
-			return nil
-		}
-		return fmt.Errorf("failed to get tracker: %w", err)
-	}
-
-	err = tracker.Op(ctx, ref, nil)
-	if err != nil {
-		return fmt.Errorf("running task in tracker: %w", err)
-	}
-
-	return nil
-}
-
-func continueRelease(ctx context.Context, tc release.TrackerConfig, workTui tui.Tui) error {
-	tracker, err := release.TrackerForExistingRelease(ctx, tc)
-	if err != nil {
-		if errors.Is(err, refstore.ErrRefNotFound) {
-			log.Error("The specified release was not found", "ref", tc.Ref.String())
-			return nil
-		}
-		return err
-	}
-
-	err = tracker.RunToPause(
-		ctx,
-		tuiwork.TuiLogger(workTui),
-	)
-	if err != nil {
-		return err
-	}
-
-	return nil
 }
 
 func triggerWork(ctx context.Context, readOnlyStore refstore.Store, configRef string, dryRun bool) error {
@@ -588,85 +475,6 @@ func isForSameJob(ref1, ref2 refs.Ref) bool {
 		ref1.Filename == ref2.Filename &&
 		sub1 == sub2 &&
 		ref1.SubPathType == ref2.SubPathType
-}
-
-func addRunForDeployment(ctx context.Context, ref string, state refstore.Store) error {
-	ref, err := refs.Reduce(ref, librelease.GlobDeployment)
-	if err != nil {
-		return fmt.Errorf("failed to reduce ref: %w", err)
-	}
-	log.Info("Adding run for deployment if needed", "ref", ref)
-	var deployment models.Task
-	if err := state.Get(ctx, ref, &deployment); err != nil {
-		return fmt.Errorf("failed to get deployment %q: %w", ref, err)
-	}
-	var run models.Run
-	if err := state.Get(ctx, deployment.RunRef.String(), &run); err != nil {
-		return fmt.Errorf("failed to get run %q: %w", deployment.RunRef.String(), err)
-	}
-
-	resolvedDeployment, err := state.ResolveLink(ctx, ref)
-	if err != nil {
-		return fmt.Errorf("failed to resolve inputs %q: %w", ref, err)
-	}
-	parsedResolvedTask, err := refs.Parse(resolvedDeployment)
-	if err != nil {
-		return fmt.Errorf("failed to parse resolved deployment %q: %w", ref, err)
-	}
-
-	var release librelease.ReleaseInfo
-	if err := state.Get(ctx, parsedResolvedTask.SetSubPathType(refs.SubPathTypeNone).SetSubPath("").SetFragment("").String(), &release); err != nil {
-		return fmt.Errorf("failed to get release %q: %w", ref, err)
-	}
-
-	entryFunctionInputs := deployment.Inputs
-	inputs, err := librelease.PopulateInputs(ctx, state, entryFunctionInputs)
-	if err != nil {
-		return fmt.Errorf("failed to populate inputs %q: %w", ref, err)
-	}
-
-	var changed bool
-	for k, v := range inputs {
-		if !reflect.DeepEqual(entryFunctionInputs[k].Value, v.Value) {
-			// Ensure we don't create loops with the outputs of this job
-			if isForSameJob(*v.Ref, parsedResolvedTask) {
-				continue
-			}
-
-			log.Info("input changed", "key", k, "oldValue", toJSON(entryFunctionInputs[k].Value), "newValue", v.Value, "vRef", v.Ref.String(), "parsedResolvedDeployment", parsedResolvedTask.String())
-			changed = true
-		}
-	}
-
-	// Nothing more to be done if the inputs haven't changed
-	if !changed {
-		return nil
-	}
-
-	log.Info("Duplicating deployment", "ref", resolvedDeployment)
-	parsedResolvedTask, err = refs.Parse(resolvedDeployment)
-	if err != nil {
-		return fmt.Errorf("failed to parse resolved deployment %q: %w", ref, err)
-	}
-	newRunRefString, err := refstore.IncrementPath(ctx, state, fmt.Sprintf("%s/", parsedResolvedTask.String()))
-	if err != nil {
-		return fmt.Errorf("failed to increment path %q: %w", ref, err)
-	}
-	log.Info("Incremented path", "ref", ref, "newRef", newRunRefString)
-	newRunRef, err := refs.Parse(newRunRefString)
-	if err != nil {
-		return fmt.Errorf("failed to parse path %q: %w", ref, err)
-	}
-	err = librelease.InitializeRun(ctx, state, newRunRef, &models.Function{
-		Fn:     run.Functions[0].Fn,
-		Inputs: inputs,
-	})
-	if err != nil {
-		return fmt.Errorf("failed to initialize run %q: %w", ref, err)
-	}
-
-	log.Info("Duplicated deployment", "oldRef", resolvedDeployment, "newRef", newRunRef)
-	return nil
 }
 
 func init() {
