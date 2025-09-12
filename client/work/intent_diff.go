@@ -12,6 +12,11 @@ import (
 )
 
 func (w *Worker) Diff(ctx context.Context, req IndentifyWorkRequest) ([]Work, error) {
+	// Cannot diff without both stores
+	if w.Tracker.Intent == nil {
+		return nil, nil
+	}
+
 	var out []Work
 
 	state, intent := w.Tracker.State, w.Tracker.Intent

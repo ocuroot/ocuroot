@@ -43,7 +43,7 @@ func (w *Worker) ReadyRuns(ctx context.Context, req IndentifyWorkRequest) ([]Wor
 		}
 
 		// Filter by commit as needed
-		valid, err := w.CheckCommit(ctx, runRef, req)
+		commit, valid, err := w.CheckCommit(ctx, runRef, req)
 		if err != nil {
 			return nil, fmt.Errorf("failed to check commit: %w", err)
 		}
@@ -66,6 +66,7 @@ func (w *Worker) ReadyRuns(ctx context.Context, req IndentifyWorkRequest) ([]Wor
 		}
 		out = append(out, Work{
 			Ref:      rp,
+			Commit:   commit,
 			WorkType: WorkTypeRun,
 		})
 	}
@@ -73,41 +74,66 @@ func (w *Worker) ReadyRuns(ctx context.Context, req IndentifyWorkRequest) ([]Wor
 	return out, nil
 }
 
-func (w *Worker) CheckCommit(ctx context.Context, ref string, req IndentifyWorkRequest) (bool, error) {
-	if req.GitFilter != GitFilterCurrentCommitOnly {
-		return true, nil
-	}
-
+func (w *Worker) CheckCommit(ctx context.Context, ref string, req IndentifyWorkRequest) (string, bool, error) {
 	resolvedRef, err := w.Tracker.State.ResolveLink(ctx, ref)
 	if err != nil {
-		return false, fmt.Errorf("failed to resolve ref: %w", err)
+		return "", false, fmt.Errorf("failed to resolve ref: %w", err)
 	}
 
 	releaseRef, err := refs.Reduce(resolvedRef, release.GlobRelease)
 	if err != nil {
-		return false, fmt.Errorf("failed to reduce ref: %w", err)
+		return "", false, fmt.Errorf("failed to reduce ref: %w", err)
 	}
 	var r release.ReleaseInfo
 	if err := w.Tracker.State.Get(ctx, releaseRef, &r); err != nil {
-		return false, fmt.Errorf("failed to get release %q: %w", ref, err)
+		return "", false, fmt.Errorf("failed to get release %q: %w", ref, err)
 	}
-	return r.Commit == w.Tracker.Commit, nil
+
+	var valid bool
+	if req.GitFilter != GitFilterCurrentCommitOnly {
+		valid = true
+	} else {
+		valid = r.Commit == w.Tracker.Commit
+	}
+
+	return r.Commit, valid, nil
 }
 
 func (w *Worker) ReconcilableDeployments(ctx context.Context, req IndentifyWorkRequest) ([]Work, error) {
 	var out []Work
 
-	// Identify any reconcilable deployments (where inputs have changed)
-	reconcilable, err := w.getReconcilableDeployments(ctx, req)
+	log.Info("Getting reconcilable deployments")
+
+	prefix := "**"
+	if req.GitFilter == GitFilterCurrentRepoOnly || req.GitFilter == GitFilterCurrentCommitOnly {
+		prefix = fmt.Sprintf("%s/-/**", w.Tracker.Ref.Repo)
+	}
+	allDeployments, err := w.Tracker.State.Match(ctx, prefix+"/@/deploy/*")
 	if err != nil {
-		return nil, fmt.Errorf("failed to get reconcilable deployments: %w", err)
+		return nil, fmt.Errorf("failed to match deployments: %w", err)
 	}
 
-	for _, ref := range reconcilable {
-		out = append(out, Work{
-			Ref:      ref,
-			WorkType: WorkTypeRun,
-		})
+	for _, ref := range allDeployments {
+		commit, valid, err := w.CheckCommit(ctx, ref, req)
+		if err != nil {
+			return nil, fmt.Errorf("failed to check commit: %w", err)
+		}
+		if !valid {
+			continue
+		}
+
+		resolved, err := reconcileDeployment(ctx, w.Tracker.State, ref)
+		if err != nil {
+			log.Error("Failed to reconcile deployment", "ref", ref, "error", err)
+			continue
+		}
+		if resolved != nil {
+			out = append(out, Work{
+				Ref:      *resolved,
+				Commit:   commit,
+				WorkType: WorkTypeRun,
+			})
+		}
 	}
 
 	return out, nil
@@ -134,6 +160,13 @@ func (w *Worker) Ops(ctx context.Context, req IndentifyWorkRequest) ([]Work, err
 	}
 
 	for _, ref := range outstanding {
+		commit, valid, err := w.CheckCommit(ctx, ref, req)
+		if err != nil {
+			return nil, fmt.Errorf("failed to check commit: %w", err)
+		}
+		if !valid {
+			continue
+		}
 		parsedRef, err := refs.Parse(ref)
 		if err != nil {
 			return nil, fmt.Errorf("failed to parse ref: %w", err)
@@ -141,44 +174,9 @@ func (w *Worker) Ops(ctx context.Context, req IndentifyWorkRequest) ([]Work, err
 		log.Info("Found outstanding op", "ref", parsedRef.String())
 		out = append(out, Work{
 			Ref:      parsedRef,
+			Commit:   commit,
 			WorkType: WorkTypeOp,
 		})
-	}
-
-	return out, nil
-}
-
-func (w *Worker) getReconcilableDeployments(ctx context.Context, req IndentifyWorkRequest) ([]refs.Ref, error) {
-	var out []refs.Ref
-
-	log.Info("Getting reconcilable deployments")
-
-	prefix := "**"
-	if req.GitFilter == GitFilterCurrentRepoOnly || req.GitFilter == GitFilterCurrentCommitOnly {
-		prefix = fmt.Sprintf("%s/-/**", w.Tracker.Ref.Repo)
-	}
-	allDeployments, err := w.Tracker.State.Match(ctx, prefix+"/@/deploy/*")
-	if err != nil {
-		return nil, fmt.Errorf("failed to match deployments: %w", err)
-	}
-
-	for _, ref := range allDeployments {
-		valid, err := w.CheckCommit(ctx, ref, req)
-		if err != nil {
-			return nil, fmt.Errorf("failed to check commit: %w", err)
-		}
-		if !valid {
-			continue
-		}
-
-		resolved, err := reconcileDeployment(ctx, w.Tracker.State, ref)
-		if err != nil {
-			log.Error("Failed to reconcile deployment", "ref", ref, "error", err)
-			continue
-		}
-		if resolved != nil {
-			out = append(out, *resolved)
-		}
 	}
 
 	return out, nil

@@ -28,6 +28,16 @@ func TestReadyRuns(t *testing.T) {
 
 	// Create test data for different scenarios
 	releaseRef := mustParseRef("github.com/example/repo/-/release1")
+	releaseWithCommitRef := mustParseRef("github.com/example/repo/-/release1/@abc123")
+	
+	// Create release information in state store
+	releaseInfo := librelease.ReleaseInfo{
+		Commit: "abc123",
+	}
+	err = stateStore.Set(ctx, releaseWithCommitRef.String(), releaseInfo)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	// Scenario 1: Ready run with pending status and all inputs satisfied
 	readyRunRef := mustParseRef("github.com/example/repo/-/release1/@abc123/deploy/production/1")
@@ -308,6 +318,27 @@ func TestReadyRunsRepoFiltering(t *testing.T) {
 	targetRepo := "github.com/example/repo"
 	otherRepo := "github.com/other/repo"
 	
+	// Create release information for both repos
+	targetReleaseRef := mustParseRef(targetRepo + "/-/release1")
+	targetReleaseWithCommitRef := mustParseRef(targetRepo + "/-/release1/@abc123")
+	targetReleaseInfo := librelease.ReleaseInfo{
+		Commit: "abc123",
+	}
+	err = stateStore.Set(ctx, targetReleaseWithCommitRef.String(), targetReleaseInfo)
+	if err != nil {
+		t.Fatal(err)
+	}
+	
+	otherReleaseRef := mustParseRef(otherRepo + "/-/release1")
+	otherReleaseWithCommitRef := mustParseRef(otherRepo + "/-/release1/@def456")
+	otherReleaseInfo := librelease.ReleaseInfo{
+		Commit: "def456",
+	}
+	err = stateStore.Set(ctx, otherReleaseWithCommitRef.String(), otherReleaseInfo)
+	if err != nil {
+		t.Fatal(err)
+	}
+	
 	// Target repo runs (should be included)
 	targetRun1 := mustParseRef(targetRepo + "/-/release1/@abc123/deploy/production/1")
 	targetRun2 := mustParseRef(targetRepo + "/-/release1/@abc123/task/backup/1")
@@ -328,9 +359,16 @@ func TestReadyRunsRepoFiltering(t *testing.T) {
 	}
 
 	for _, run := range runs {
+		var releaseRef refs.Ref
+		if run.ref.Repo == targetRepo {
+			releaseRef = targetReleaseRef
+		} else {
+			releaseRef = otherReleaseRef
+		}
+		
 		runData := models.Run{
 			Type:    models.RunTypeUp,
-			Release: mustParseRef(run.ref.Repo + "/-/release1"),
+			Release: releaseRef,
 			Functions: []*models.Function{
 				{
 					Fn: sdk.FunctionDef{Name: "test_function"},
