@@ -1,10 +1,9 @@
-package state
+package work
 
 import (
 	"context"
 	"fmt"
 	"path"
-	"reflect"
 	"strings"
 
 	"github.com/charmbracelet/log"
@@ -16,22 +15,22 @@ import (
 	"github.com/ocuroot/ocuroot/store/models"
 )
 
-func ApplyIntent(ctx context.Context, ref refs.Ref, state, intent refstore.Store) error {
+func (w *Worker) ApplyIntent(ctx context.Context, ref refs.Ref) error {
 	log.Info("Applying intent", "ref", ref.String())
 
 	switch ref.SubPathType {
 	case refs.SubPathTypeCustom:
-		err := applyCustomIntent(ctx, ref, state, intent)
+		err := applyCustomIntent(ctx, ref, w.Tracker.State, w.Tracker.Intent)
 		if err != nil {
 			return fmt.Errorf("custom intent: %w", err)
 		}
 	case refs.SubPathTypeEnvironment:
-		err := applyEnvironmentIntent(ctx, ref, state, intent)
+		err := applyEnvironmentIntent(ctx, ref, w.Tracker.State, w.Tracker.Intent)
 		if err != nil {
 			return fmt.Errorf("environment intent: %w", err)
 		}
 	case refs.SubPathTypeDeploy:
-		err := applyDeployIntent(ctx, ref, state, intent)
+		err := applyDeployIntent(ctx, ref, w.Tracker.State, w.Tracker.Intent)
 		if err != nil {
 			return fmt.Errorf("deploy intent: %w", err)
 		}
@@ -276,38 +275,4 @@ func applyDeletedDeployIntent(ctx context.Context, ref refs.Ref, state, intent r
 	}
 
 	return nil
-}
-
-func compareDeployIntent(
-	ctx context.Context,
-	state, intent refstore.Store,
-	intentRef refs.Ref,
-	stateRef refs.Ref,
-) (bool, error) {
-	var (
-		intentContent models.Intent
-		stateContent  models.Intent
-	)
-	if err := intent.Get(ctx, intentRef.String(), &intentContent); err != nil {
-		if err == refstore.ErrRefNotFound {
-			return false, nil
-		}
-		return false, fmt.Errorf("failed to get intent content: %w", err)
-	}
-	if err := state.Get(ctx, stateRef.String(), &stateContent); err != nil {
-		if err == refstore.ErrRefNotFound {
-			return false, nil
-		}
-		return false, fmt.Errorf("failed to get state content: %w", err)
-	}
-
-	log.Debug("Comparing deploy", "intentRef", intentRef.String(), "stateRef", stateRef.String(), "intentContent", intentContent, "stateContent", stateContent)
-
-	if !reflect.DeepEqual(intentContent, stateContent) {
-		log.Debug("Not equal")
-		return false, nil
-	}
-
-	log.Debug("Equal")
-	return true, nil
 }

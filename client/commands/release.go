@@ -10,9 +10,9 @@ import (
 
 	"github.com/charmbracelet/log"
 	"github.com/ocuroot/ocuroot/client/release"
-	"github.com/ocuroot/ocuroot/client/state"
 	"github.com/ocuroot/ocuroot/client/tui"
 	"github.com/ocuroot/ocuroot/client/tui/tuiwork"
+	"github.com/ocuroot/ocuroot/client/work"
 	librelease "github.com/ocuroot/ocuroot/lib/release"
 	"github.com/ocuroot/ocuroot/refs"
 	"github.com/ocuroot/ocuroot/refs/refstore"
@@ -90,7 +90,12 @@ var NewReleaseCmd = &cobra.Command{
 					return err
 				}
 
-				if err := state.ApplyIntent(ctx, tc2.Ref, tc2.State, tc2.Intent); err != nil {
+				worker := &work.Worker{
+					Tracker: tc2,
+					Tui:     workTui,
+				}
+
+				if err := worker.ApplyIntent(ctx, tc2.Ref); err != nil {
 					return err
 				}
 

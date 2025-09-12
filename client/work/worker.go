@@ -8,7 +8,6 @@ import (
 
 	"github.com/charmbracelet/log"
 	"github.com/ocuroot/ocuroot/client/release"
-	"github.com/ocuroot/ocuroot/client/state"
 	"github.com/ocuroot/ocuroot/client/tui"
 	"github.com/ocuroot/ocuroot/client/tui/tuiwork"
 	"github.com/ocuroot/ocuroot/refs"
@@ -68,11 +67,10 @@ func (w *Worker) IdentifyWork(ctx context.Context, req IndentifyWorkRequest) ([]
 }
 
 func (w *Worker) ExecuteWork(ctx context.Context, todos []Work) error {
-	tc := w.Tracker
 	log.Info("Applying intent diffs")
 	for _, t := range todos {
 		if t.WorkType == WorkTypeUpdate || t.WorkType == WorkTypeCreate || t.WorkType == WorkTypeDelete {
-			if err := state.ApplyIntent(ctx, t.Ref, tc.State, tc.Intent); err != nil {
+			if err := w.ApplyIntent(ctx, t.Ref); err != nil {
 				return fmt.Errorf("failed to apply intent (%s): %w", t.Ref.String(), err)
 			}
 		}
