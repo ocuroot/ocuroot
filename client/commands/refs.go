@@ -282,7 +282,10 @@ func saveRepoConfig(ctx context.Context, tc release.TrackerConfig, data []byte) 
 		}
 
 		// Add support files if this is the first time we've seen this commit
-		if gitSupportFilesBackend, ok := tc.Intent.(refstore.GitSupportFileWriter); ok && tc.StoreConfig != nil && tc.StoreConfig.Intent.Git != nil {
+		if gitSupportFilesBackend, ok := tc.Intent.(refstore.GitSupportFileWriter); ok &&
+			tc.StoreConfig != nil &&
+			tc.StoreConfig.Intent != nil &&
+			tc.StoreConfig.Intent.Git != nil {
 			if err := gitSupportFilesBackend.AddSupportFiles(ctx, tc.StoreConfig.Intent.Git.SupportFiles); err != nil {
 				return fmt.Errorf("failed to add support files: %w", err)
 			}
