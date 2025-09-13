@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"path"
 	"sort"
 	"strings"
 	"time"
@@ -26,6 +27,85 @@ var (
 	pendingMark = lipgloss.NewStyle().Foreground(lipgloss.Color("208")).SetString("›")
 	updateMark  = lipgloss.NewStyle().Foreground(lipgloss.Color("48")).SetString("+")
 )
+
+func initRunStateEvent(ref refs.Ref, t tui.Tui, store refstore.Store) *RunTaskEvent {
+	ctx := context.TODO()
+	var err error
+
+	runRef := librelease.ReduceToRunRef(ref)
+
+	var out *RunTaskEvent = &RunTaskEvent{}
+
+	ttr, found := t.GetTaskByID(runRef.String())
+	if found {
+		out.Old, _ = ttr.(*RunTask)
+	}
+
+	if out.Old != nil {
+		newTask := *out.Old
+		out.New = &newTask
+
+		if store != nil {
+			out.Old.Store = store
+			out.New.Store = store
+		}
+	}
+	if out.New == nil {
+		name := strings.Split(runRef.SubPath, "/")[0]
+		if runRef.SubPathType == refs.SubPathTypeDeploy {
+			var run models.Run
+			if store != nil {
+				err = store.Get(ctx, runRef.String(), &run)
+				if err != nil {
+					log.Error("failed to get run", "error", err)
+				} else {
+					if run.Type == models.RunTypeDown {
+						name = fmt.Sprintf("remove from %s", name)
+					} else {
+						name = fmt.Sprintf("deploy to %s", name)
+					}
+				}
+			} else {
+				log.Error("failed to get run", "error", "no store")
+			}
+		}
+		name += fmt.Sprintf(" [%s]", path.Base(runRef.SubPath))
+
+		out.New = &RunTask{
+			RunRef:       runRef,
+			Name:         name,
+			Status:       WorkStatusPending,
+			CreationTime: time.Now(),
+
+			Store:  store,
+			JobRef: runRef,
+		}
+	}
+
+	return out
+}
+
+func tuiRunStatusChange(ctx context.Context, store refstore.Store, tuiWork tui.Tui) func(ref refs.Ref) {
+	return func(ref refs.Ref) {
+		runRef := librelease.ReduceToRunRef(ref)
+
+		out := initRunStateEvent(runRef, tuiWork, store)
+		updateStatus(ctx, store, runRef, out)
+
+		if out.New.Status == WorkStatusRunning {
+			if out.Old == nil || out.Old.Status != WorkStatusRunning {
+				out.New.StartTime = time.Now()
+			}
+		}
+		if out.New.Status == WorkStatusDone || out.New.Status == WorkStatusFailed {
+			if out.Old == nil || (out.Old.Status != WorkStatusDone && out.Old.Status != WorkStatusFailed) {
+				out.New.EndTime = time.Now()
+			}
+		}
+
+		tuiWork.UpdateTask(out)
+	}
+}
 
 type RunTaskEvent struct {
 	Old *RunTask

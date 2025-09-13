@@ -1,14 +1,55 @@
 package tuiwork
 
 import (
+	"context"
 	"fmt"
 	"strings"
 
 	"github.com/charmbracelet/bubbles/spinner"
 	"github.com/ocuroot/ocuroot/client/tui"
+	librelease "github.com/ocuroot/ocuroot/lib/release"
 	"github.com/ocuroot/ocuroot/refs"
 	"github.com/ocuroot/ocuroot/refs/refstore"
 )
+
+func initCustomStateEvent(ref refs.Ref, t tui.Tui, store refstore.Store) *CustomStateTaskEvent {
+	var out *CustomStateTaskEvent = &CustomStateTaskEvent{}
+
+	ttr, found := t.GetTaskByID(ref.String())
+	if found {
+		out.Old, _ = ttr.(*CustomStateTask)
+	}
+
+	if out.Old != nil {
+		newTask := *out.Old
+		out.New = &newTask
+
+		if store != nil {
+			out.Old.Store = store
+			out.New.Store = store
+		}
+	}
+	if out.New == nil {
+		name := ref.SubPath
+
+		out.New = &CustomStateTask{
+			Ref:   ref,
+			Name:  name,
+			Store: store,
+		}
+	}
+
+	return out
+}
+
+func tuiCustomStateChange(ctx context.Context, store refstore.Store, tuiWork tui.Tui) func(ref refs.Ref) {
+	return func(ref refs.Ref) {
+		runRef := librelease.ReduceToRunRef(ref)
+
+		out := initCustomStateEvent(runRef, tuiWork, store)
+		tuiWork.UpdateTask(out)
+	}
+}
 
 type CustomStateTaskEvent struct {
 	Old *CustomStateTask
