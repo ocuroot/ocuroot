@@ -75,8 +75,8 @@ func storeFromRepoOrStateRoot(ctx context.Context) (store refstore.Store, isRepo
 	if err != nil && !errors.Is(err, client.ErrRootNotFound) {
 		return nil, false, fmt.Errorf("failed to find repo root: %w", err)
 	}
-	if err != nil {
-		return nil, false, fmt.Errorf("failed to find repo root: %w", err)
+	if errors.Is(err, client.ErrRootNotFound) {
+		return nil, false, errors.New("a repo.ocu.star file is required in the root of your project")
 	}
 
 	s, _, err := loadStoreFromRepoRoot(ctx, repoRootPath)
@@ -140,8 +140,11 @@ func getTrackerConfig(ctx context.Context, cmd *cobra.Command, args []string) (r
 	}
 
 	repoRootPath, err := client.FindRepoRoot(wd)
-	if err != nil {
+	if err != nil && !errors.Is(err, client.ErrRootNotFound) {
 		return release.TrackerConfig{}, err
+	}
+	if errors.Is(err, client.ErrRootNotFound) {
+		return release.TrackerConfig{}, errors.New("a repo.ocu.star file is required in the root of your project")
 	}
 
 	// Create a backend that is just enough for loading repo config
