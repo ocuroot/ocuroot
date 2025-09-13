@@ -266,7 +266,11 @@ func (f *FSStateStore) Delete(ctx context.Context, ref string) error {
 	}
 
 	rpath := f.pathToRef(parsedRef)
+
 	if err := os.Remove(rpath); err != nil {
+		if errors.Is(err, fs.ErrNotExist) {
+			return ErrRefNotFound
+		}
 		return err
 	}
 	if err := os.Remove(filepath.Dir(rpath)); err != nil && !errors.Is(err, fs.ErrNotExist) {

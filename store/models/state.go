@@ -14,13 +14,13 @@ const (
 )
 
 type Intent struct {
-	Type    RunType                        `json:"type"`
 	Release refs.Ref                       `json:"release"`
 	Inputs  map[string]sdk.InputDescriptor `json:"input"`
 }
 
 type Task struct {
 	RunRef refs.Ref `json:"run_ref"`
+	Type   RunType  `json:"type"`
 	Intent
 	Outputs map[string]any `json:"output"`
 }

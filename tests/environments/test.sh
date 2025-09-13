@@ -78,7 +78,7 @@ create_environment_omnibus() {
 
 delete_environment() {
     echo "delete_environment"
-    echo "--------------------------"
+    echo "------------------"
 
     setup_test
 
@@ -181,6 +181,69 @@ delete_environment_omnibus() {
     echo ""
 }
 
+delete_environment_comprehensive() {
+    echo "delete_environment_comprehensive"
+    echo "--------------------------------"
+
+    setup_test
+
+    echo "=== Releasing environments ==="
+    ocuroot release new environments.ocu.star
+    assert_equal "0" "$?" "Failed to release environments"
+
+    echo "=== Releasing package1 ==="
+    ocuroot release new package1.ocu.star
+    assert_equal "0" "$?" "Failed to release package1"
+
+    echo "=== Releasing package2 ==="
+    ocuroot release new package2.ocu.star
+    assert_equal "0" "$?" "Failed to release package2"
+
+    check_ref_exists "package1.ocu.star/@/deploy/production2"
+    check_ref_exists "package2.ocu.star/@/deploy/production2"
+
+    check_file_exists "./.deploys/production2/package1.txt"
+    check_file_exists "./.deploys/production2/package2.txt"
+
+    echo "=== Deleting environment ==="
+    ocuroot state delete "@/environment/production2"
+
+    echo "=== Running work any ==="
+    ocuroot work any --comprehensive
+
+    check_ref_does_not_exist "@/environment/production2"    
+
+    check_ref_does_not_exist "package1.ocu.star/@/deploy/production2"
+
+    check_file_exists "./.deploys/staging/package1.txt"
+    check_file_exists "./.deploys/staging/package2.txt"
+    check_file_exists "./.deploys/production/package1.txt"
+    check_file_exists "./.deploys/production/package2.txt"
+
+    check_file_does_not_exist "./.deploys/production2/package1.txt"
+    check_file_does_not_exist "./.deploys/production2/package2.txt"
+
+    echo "=== Repeating work any ==="
+
+    # This shouldn't change anything
+    ocuroot work any --comprehensive
+
+    check_ref_does_not_exist "@/environment/production2"    
+
+    check_ref_does_not_exist "package1.ocu.star/@/deploy/production2"
+
+    check_file_exists "./.deploys/staging/package1.txt"
+    check_file_exists "./.deploys/staging/package2.txt"
+    check_file_exists "./.deploys/production/package1.txt"
+    check_file_exists "./.deploys/production/package2.txt"
+
+    check_file_does_not_exist "./.deploys/production2/package1.txt"
+    check_file_does_not_exist "./.deploys/production2/package2.txt"
+
+    echo "Test passed"
+    echo ""
+}
+
 setup_test() {
     rm -rf .store
     rm -rf .ocuroot
@@ -194,4 +257,5 @@ create_environment
 create_environment_omnibus
 delete_environment
 delete_environment_omnibus
+delete_environment_comprehensive
 popd > /dev/null

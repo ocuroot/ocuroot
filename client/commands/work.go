@@ -43,12 +43,19 @@ var WorkContinueCmd = &cobra.Command{
 			Tui:     workTui,
 		}
 
-		todo, err := worker.IdentifyWork(ctx, work.IndentifyWorkRequest{
+		todo, err := worker.ReadyRuns(ctx, work.IndentifyWorkRequest{
 			GitFilter: work.GitFilterCurrentCommitOnly,
 		})
 		if err != nil {
 			return fmt.Errorf("failed to identify work: %w", err)
 		}
+		reconcilableDeployments, err := worker.ReconcilableDeployments(ctx, work.IndentifyWorkRequest{
+			GitFilter: work.GitFilterCurrentCommitOnly,
+		})
+		if err != nil {
+			return fmt.Errorf("failed to get reconcilable deployments: %w", err)
+		}
+		todo = append(todo, reconcilableDeployments...)
 
 		log.Info("Identified work", "todo", toJSON(todo))
 
@@ -84,13 +91,19 @@ finally it will trigger work for other commits ('ocuroot work trigger').
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx := cmd.Context()
 
+		comprehensive := cmd.Flag("comprehensive").Changed
+		dryRun := cmd.Flag("dryrun").Changed
+
+		if comprehensive && dryRun {
+			return fmt.Errorf("--comprehensive and --dryrun are mutually exclusive")
+		}
+
 		tc, err := getTrackerConfig(ctx, cmd, args)
 		if err != nil {
 			return fmt.Errorf("failed to get tracker config: %w", err)
 		}
 
 		cmd.SilenceUsage = true
-		dryRun := cmd.Flag("dryrun").Changed
 
 		workTui := tui.StartWorkTui()
 		defer workTui.Cleanup()
@@ -102,32 +115,41 @@ finally it will trigger work for other commits ('ocuroot work trigger').
 			Tui:     workTui,
 		}
 
-		todo, err := worker.IdentifyWork(ctx, work.IndentifyWorkRequest{
-			GitFilter: work.GitFilterCurrentCommitOnly,
-		})
-		if err != nil {
-			return fmt.Errorf("failed to identify work: %w", err)
-		}
-
-		log.Info("Identified work", "todo", toJSON(todo))
-
-		if dryRun {
-			workTui.Cleanup()
-
-			todoJSON, err := json.MarshalIndent(todo, "", "  ")
+		for {
+			todo, err := worker.IdentifyWork(ctx, work.IndentifyWorkRequest{
+				GitFilter: work.GitFilterCurrentCommitOnly,
+			})
 			if err != nil {
-				return fmt.Errorf("failed to marshal todo: %w", err)
+				return fmt.Errorf("failed to identify work: %w", err)
 			}
-			fmt.Println(string(todoJSON))
-			return nil
-		}
 
-		if err := worker.ExecuteWork(ctx, todo); err != nil {
-			return err
+			log.Info("Identified work", "todo", toJSON(todo))
+			if len(todo) == 0 {
+				return nil
+			}
+
+			if dryRun {
+				workTui.Cleanup()
+
+				todoJSON, err := json.MarshalIndent(todo, "", "  ")
+				if err != nil {
+					return fmt.Errorf("failed to marshal todo: %w", err)
+				}
+				fmt.Println(string(todoJSON))
+				return nil
+			}
+
+			if err := worker.ExecuteWork(ctx, todo); err != nil {
+				return err
+			}
+
+			if !comprehensive {
+				break
+			}
 		}
 
 		log.Info("Starting trigger work")
-		todo, err = worker.IdentifyWork(ctx, work.IndentifyWorkRequest{})
+		todo, err := worker.IdentifyWork(ctx, work.IndentifyWorkRequest{})
 		if err != nil {
 			return fmt.Errorf("failed to identify work: %w", err)
 		}
@@ -259,6 +281,7 @@ func init() {
 	WorkOpsCmd.Flags().BoolP("dryrun", "d", false, "List refs for work that would be triggered")
 	WorkCmd.AddCommand(WorkOpsCmd)
 
-	WorkAnyCommand.Flags().BoolP("dryrun", "d", false, "List refs for work that would be triggered")
+	WorkAnyCommand.Flags().Bool("comprehensive", false, "Run in comprehensive mode, which will continue requesting work until this commit is stable")
+	WorkAnyCommand.Flags().BoolP("dryrun", "d", false, "List refs for work that would be triggered. Will only list the first set of work so is incompatible with --comprehensive")
 	WorkCmd.AddCommand(WorkAnyCommand)
 }

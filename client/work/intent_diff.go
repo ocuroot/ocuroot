@@ -60,14 +60,19 @@ func (w *Worker) Diff(ctx context.Context, req IndentifyWorkRequest) ([]Work, er
 		if err != nil {
 			return nil, fmt.Errorf("failed to resolve intent ref: %w", err)
 		}
-		if _, exists := stateRefsMap[resolvedRef]; !exists {
+		_, existsAsIs := stateRefsMap[ref]
+		_, existsResolved := stateRefsMap[resolvedRef]
+
+		if !existsAsIs && !existsResolved {
 			out = append(out, Work{
 				Ref:      ir,
 				WorkType: WorkTypeCreate,
 			})
-		} else {
+		} else if existsResolved {
 			stateToIntentRefSet[resolvedRef] = ref
 			delete(stateRefsMap, resolvedRef)
+		} else {
+			delete(stateRefsMap, ref)
 		}
 	}
 

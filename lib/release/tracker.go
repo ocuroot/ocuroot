@@ -515,23 +515,31 @@ func (r *ReleaseTracker) updateIntent(ctx context.Context, taskRef refs.Ref, run
 	if taskRef.SubPathType != refs.SubPathTypeDeploy {
 		return nil
 	}
-	// Only update the first time we run a deployment
+	// Only update for the first function in a deployment
 	if len(run.Functions) != 1 {
 		return nil
 	}
 
-	fn := run.Functions[0]
-
 	intentRef := taskRef.SetRelease("")
 	intentRef = intentRef.SetSubPath(path.Dir(intentRef.SubPath))
-	intent := models.Intent{
-		Type:    run.Type,
-		Release: r.stateStore.ReleaseRef,
-		Inputs:  fn.Inputs,
-	}
 
-	if err := r.intent.Set(ctx, intentRef.String(), intent); err != nil {
-		return fmt.Errorf("failed to set intent state: %w", err)
+	if run.Type == models.RunTypeDown {
+		if err := r.intent.Delete(ctx, intentRef.String()); err != nil {
+			if errors.Is(err, refstore.ErrRefNotFound) {
+				return nil
+			}
+			return fmt.Errorf("failed to delete intent state: %w", err)
+		}
+	} else {
+		fn := run.Functions[0]
+		intent := models.Intent{
+			Release: r.stateStore.ReleaseRef,
+			Inputs:  fn.Inputs,
+		}
+
+		if err := r.intent.Set(ctx, intentRef.String(), intent); err != nil {
+			return fmt.Errorf("failed to set intent state: %w", err)
+		}
 	}
 
 	return nil
@@ -743,8 +751,8 @@ func (r *ReleaseTracker) saveRunState(ctx context.Context, runRef refs.Ref, run 
 	log.Info("Setting task", "ref", taskRef)
 	task := models.Task{
 		RunRef: runRef,
+		Type:   run.Type,
 		Intent: models.Intent{
-			Type:    run.Type,
 			Release: run.Release,
 		},
 		Outputs: run.Outputs,
