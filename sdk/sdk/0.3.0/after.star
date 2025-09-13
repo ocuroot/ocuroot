@@ -8,12 +8,12 @@ def after():
     if backend.thread.exists("package"):
         package = backend.thread.get("package")
 
-        # Create phases for remaining registered work        
-        registered_work = backend.thread.get("work", default=[])
-        for w in registered_work:
+        # Create phases for remaining registered tasks    
+        registered_tasks = backend.thread.get("tasks", default=[])
+        for w in registered_tasks:
             package["phases"].append({
                 "name": "",
-                "work": [w],
+                "tasks": [w],
             })
 
         backend.packages.register(json.encode(package))

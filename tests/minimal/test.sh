@@ -197,6 +197,21 @@ test_force_deploy() {
     echo ""
 }
 
+test_task_with_no_phases() {
+    echo "Test: task with no phases"
+    echo ""
+    setup_test
+
+    echo "== release v1 =="
+    ocuroot release new build_only.ocu.star
+    assert_equal "0" "$?" "Failed to release v1"
+
+    check_ref_exists "build_only.ocu.star/@r1/task/build/1/status/complete"
+
+    echo "Test succeeded"
+    echo ""
+}
+
 setup_test() {
     # Clean up any previous runs
     rm -rf .store
@@ -218,4 +233,5 @@ test_two_releases
 test_down
 test_deploy_intent
 test_force_deploy
+test_task_with_no_phases
 popd > /dev/null
