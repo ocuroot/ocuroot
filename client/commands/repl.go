@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/ocuroot/ocuroot/client/release"
+	"github.com/ocuroot/ocuroot/refs"
 	"github.com/ocuroot/ocuroot/sdk"
 	"github.com/spf13/cobra"
 	"go.starlark.net/starlark"
@@ -58,6 +59,12 @@ func runSingleCommand(ctx context.Context, filePath string, command string) erro
 		return fmt.Errorf("failed to get tracker config: %w", err)
 	}
 
+	if filePath != "" {
+		tc.Ref = refs.Ref{
+			Repo:     tc.Ref.Repo,
+			Filename: filePath,
+		}
+	}
 	// Create a backend for SDK operations
 	backend, _ := release.NewBackend(tc)
 
@@ -148,12 +155,15 @@ func runStarlarkReplWithFile(ctx context.Context, filePath string) error {
 		return fmt.Errorf("failed to get tracker config: %w", err)
 	}
 
-	// Create a backend for SDK operations
-	backend, _ := release.NewBackend(tc)
-
 	if filePath == "" {
 		filePath = "repo.ocu.star"
 	}
+	tc.Ref = refs.Ref{
+		Repo:     tc.Ref.Repo,
+		Filename: filePath,
+	}
+	// Create a backend for SDK operations
+	backend, _ := release.NewBackend(tc)
 
 	// Load the .ocu.star file using sdk.LoadConfig to get user-defined functions
 	config, err := sdk.LoadConfig(
