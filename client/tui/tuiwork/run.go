@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"path"
 	"sort"
 	"strings"
 	"time"
@@ -24,18 +25,98 @@ var (
 	checkMark   = lipgloss.NewStyle().Foreground(lipgloss.Color("42")).SetString("✓")
 	errorMark   = lipgloss.NewStyle().Foreground(lipgloss.Color("160")).SetString("✗")
 	pendingMark = lipgloss.NewStyle().Foreground(lipgloss.Color("208")).SetString("›")
+	updateMark  = lipgloss.NewStyle().Foreground(lipgloss.Color("48")).SetString("+")
 )
 
-type TaskEvent struct {
-	Old *Task
-	New *Task
+func initRunStateEvent(ref refs.Ref, t tui.Tui, store refstore.Store) *RunTaskEvent {
+	ctx := context.TODO()
+	var err error
+
+	runRef := librelease.ReduceToRunRef(ref)
+
+	var out *RunTaskEvent = &RunTaskEvent{}
+
+	ttr, found := t.GetTaskByID(runRef.String())
+	if found {
+		out.Old, _ = ttr.(*RunTask)
+	}
+
+	if out.Old != nil {
+		newTask := *out.Old
+		out.New = &newTask
+
+		if store != nil {
+			out.Old.Store = store
+			out.New.Store = store
+		}
+	}
+	if out.New == nil {
+		name := strings.Split(runRef.SubPath, "/")[0]
+		if runRef.SubPathType == refs.SubPathTypeDeploy {
+			var run models.Run
+			if store != nil {
+				err = store.Get(ctx, runRef.String(), &run)
+				if err != nil {
+					log.Error("failed to get run", "error", err)
+				} else {
+					if run.Type == models.RunTypeDown {
+						name = fmt.Sprintf("remove from %s", name)
+					} else {
+						name = fmt.Sprintf("deploy to %s", name)
+					}
+				}
+			} else {
+				log.Error("failed to get run", "error", "no store")
+			}
+		}
+		name += fmt.Sprintf(" [%s]", path.Base(runRef.SubPath))
+
+		out.New = &RunTask{
+			RunRef:       runRef,
+			Name:         name,
+			Status:       WorkStatusPending,
+			CreationTime: time.Now(),
+
+			Store:  store,
+			JobRef: runRef,
+		}
+	}
+
+	return out
 }
 
-func (e *TaskEvent) Task() tui.Task {
+func tuiRunStatusChange(ctx context.Context, store refstore.Store, tuiWork tui.Tui) func(ref refs.Ref) {
+	return func(ref refs.Ref) {
+		runRef := librelease.ReduceToRunRef(ref)
+
+		out := initRunStateEvent(runRef, tuiWork, store)
+		updateStatus(ctx, store, runRef, out)
+
+		if out.New.Status == WorkStatusRunning {
+			if out.Old == nil || out.Old.Status != WorkStatusRunning {
+				out.New.StartTime = time.Now()
+			}
+		}
+		if out.New.Status == WorkStatusDone || out.New.Status == WorkStatusFailed {
+			if out.Old == nil || (out.Old.Status != WorkStatusDone && out.Old.Status != WorkStatusFailed) {
+				out.New.EndTime = time.Now()
+			}
+		}
+
+		tuiWork.UpdateTask(out)
+	}
+}
+
+type RunTaskEvent struct {
+	Old *RunTask
+	New *RunTask
+}
+
+func (e *RunTaskEvent) Task() tui.Task {
 	return e.New
 }
 
-func (e *TaskEvent) Description() (string, bool) {
+func (e *RunTaskEvent) Description() (string, bool) {
 	if e.Old == nil {
 		return fmt.Sprintf("%v: %v", e.New.Name, e.New.Status), true
 	}
@@ -52,9 +133,9 @@ func (e *TaskEvent) Description() (string, bool) {
 	return "", false
 }
 
-var _ tui.Task = (*Task)(nil)
+var _ tui.Task = (*RunTask)(nil)
 
-type Task struct {
+type RunTask struct {
 	RunRef refs.Ref
 
 	CreationTime time.Time
@@ -70,7 +151,7 @@ type Task struct {
 	JobRef refs.Ref
 }
 
-func (t *Task) SortKey() string {
+func (t *RunTask) SortKey() string {
 	var statusSort = 0
 	switch t.Status {
 	case WorkStatusPending:
@@ -92,18 +173,18 @@ func (t *Task) SortKey() string {
 	return fmt.Sprintf("%d-%s", statusSort, keyTime)
 }
 
-func (t *Task) ID() string {
+func (t *RunTask) ID() string {
 	return t.RunRef.String()
 }
 
-func (t *Task) Hierarchy() []string {
+func (t *RunTask) Hierarchy() []string {
 	return []string{
 		t.RunRef.Repo,
 		t.RunRef.Filename,
 	}
 }
 
-func (task *Task) Render(depth int, spinner spinner.Model, final bool) string {
+func (task *RunTask) Render(depth int, spinner spinner.Model, final bool) string {
 	var s string
 	if task.Status == WorkStatusPending && !final {
 		return ""
@@ -157,7 +238,7 @@ func (task *Task) Render(depth int, spinner spinner.Model, final bool) string {
 	return s
 }
 
-func (t *Task) message() string {
+func (t *RunTask) message() string {
 	ctx := context.TODO()
 
 	var message string

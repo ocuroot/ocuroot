@@ -70,7 +70,7 @@ Example:
 		workTui := tui.StartWorkTui()
 		defer workTui.Cleanup()
 
-		tc.State = tuiwork.WatchForJobUpdates(ctx, tc.State, workTui)
+		tc.State = tuiwork.WatchForStateUpdates(ctx, tc.State, workTui)
 
 		tracker, err := release.TrackerForExistingRelease(ctx, tc)
 		if err != nil {

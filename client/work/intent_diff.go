@@ -1,4 +1,4 @@
-package state
+package work
 
 import (
 	"context"
@@ -11,13 +11,27 @@ import (
 	"github.com/ocuroot/ocuroot/store/models"
 )
 
-func Diff(ctx context.Context, state, intent refstore.Store) ([]string, error) {
-	stateRefs, err := state.Match(ctx, "**/@/{deploy}/*", "**/@*/custom/*", "@/{custom,environment}/*")
+func (w *Worker) Diff(ctx context.Context, req IndentifyWorkRequest) ([]Work, error) {
+	// Cannot diff without both stores
+	if w.Tracker.Intent == nil {
+		return nil, nil
+	}
+
+	var out []Work
+
+	state, intent := w.Tracker.State, w.Tracker.Intent
+
+	prefix := "**"
+	if req.GitFilter == GitFilterCurrentRepoOnly {
+		prefix = fmt.Sprintf("%s/-/**", w.Tracker.Ref.Repo)
+	}
+
+	stateRefs, err := state.Match(ctx, prefix+"/@/{deploy}/*", prefix+"/@*/custom/*", "@/{custom,environment}/*")
 	if err != nil {
 		return nil, fmt.Errorf("failed to match state refs: %w", err)
 	}
 
-	intentRefs, err := intent.Match(ctx, "**/@/{deploy}/*", "**/@*/custom/*", "@/{custom,environment}/*")
+	intentRefs, err := intent.Match(ctx, prefix+"/@/{deploy}/*", prefix+"/@*/custom/*", "@/{custom,environment}/*")
 	if err != nil {
 		return nil, fmt.Errorf("failed to match intent refs: %w", err)
 	}
@@ -25,20 +39,19 @@ func Diff(ctx context.Context, state, intent refstore.Store) ([]string, error) {
 	log.Debug("Diffing", "stateRefs", stateRefs, "intentRefs", intentRefs)
 
 	var (
+		stateRefsMap        = make(map[string]struct{})
+		intentRefsMap       = make(map[string]struct{})
 		stateToIntentRefSet = make(map[string]string)
 	)
 
-	var diffs []string
-
 	for _, ref := range stateRefs {
-		pr, err := refs.Parse(ref)
-		if err != nil {
-			return nil, fmt.Errorf("failed to parse state ref: %w", err)
-		}
-		stateToIntentRefSet[ref] = pr.String()
+		stateRefsMap[ref] = struct{}{}
 	}
 
+	// Iterate over intent to find any without matching state,
+	// and map intent refs to resolved state refs for comparison
 	for _, ref := range intentRefs {
+		intentRefsMap[ref] = struct{}{}
 		ir, err := refs.Parse(ref)
 		if err != nil {
 			return nil, fmt.Errorf("failed to parse intent ref: %w", err)
@@ -47,18 +60,32 @@ func Diff(ctx context.Context, state, intent refstore.Store) ([]string, error) {
 		if err != nil {
 			return nil, fmt.Errorf("failed to resolve intent ref: %w", err)
 		}
-
-		if _, exists := stateToIntentRefSet[resolvedRef]; exists {
-			// Update ref to make sure we capture links
+		if _, exists := stateRefsMap[resolvedRef]; !exists {
+			out = append(out, Work{
+				Ref:      ir,
+				WorkType: WorkTypeCreate,
+			})
+		} else {
 			stateToIntentRefSet[resolvedRef] = ref
-			continue
+			delete(stateRefsMap, resolvedRef)
 		}
-
-		// Intent ref doesn't exist, may need to remove
-		diffs = append(diffs, ref)
 	}
 
-	log.Debug("After matching", "stateToIntentRefSet", stateToIntentRefSet, "diffs", diffs)
+	// Iterate over state again to find any without matching intent
+	for ref := range stateRefsMap {
+		if _, exists := intentRefsMap[ref]; !exists {
+			ir, err := refs.Parse(ref)
+			if err != nil {
+				return nil, fmt.Errorf("failed to parse state ref: %w", err)
+			}
+			out = append(out, Work{
+				Ref:      ir,
+				WorkType: WorkTypeDelete,
+			})
+		}
+	}
+
+	log.Debug("After matching", "stateToIntentRefSet", stateToIntentRefSet)
 
 	for stateRef, intentRef := range stateToIntentRefSet {
 		ir, err := refs.Parse(intentRef)
@@ -74,11 +101,14 @@ func Diff(ctx context.Context, state, intent refstore.Store) ([]string, error) {
 			return nil, fmt.Errorf("failed to compare intent: %w", err)
 		}
 		if !match {
-			diffs = append(diffs, intentRef)
+			out = append(out, Work{
+				Ref:      ir,
+				WorkType: WorkTypeUpdate,
+			})
 		}
 	}
 
-	return diffs, nil
+	return out, nil
 }
 
 func compareIntent(

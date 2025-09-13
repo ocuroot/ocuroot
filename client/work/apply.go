@@ -1,4 +1,4 @@
-package state
+package work
 
 import (
 	"context"
@@ -15,22 +15,22 @@ import (
 	"github.com/ocuroot/ocuroot/store/models"
 )
 
-func ApplyIntent(ctx context.Context, ref refs.Ref, state, intent refstore.Store) error {
+func (w *Worker) ApplyIntent(ctx context.Context, ref refs.Ref) error {
 	log.Info("Applying intent", "ref", ref.String())
 
 	switch ref.SubPathType {
 	case refs.SubPathTypeCustom:
-		err := applyCustomIntent(ctx, ref, state, intent)
+		err := applyCustomIntent(ctx, ref, w.Tracker.State, w.Tracker.Intent)
 		if err != nil {
 			return fmt.Errorf("custom intent: %w", err)
 		}
 	case refs.SubPathTypeEnvironment:
-		err := applyEnvironmentIntent(ctx, ref, state, intent)
+		err := applyEnvironmentIntent(ctx, ref, w.Tracker.State, w.Tracker.Intent)
 		if err != nil {
 			return fmt.Errorf("environment intent: %w", err)
 		}
 	case refs.SubPathTypeDeploy:
-		err := applyDeployIntent(ctx, ref, state, intent)
+		err := applyDeployIntent(ctx, ref, w.Tracker.State, w.Tracker.Intent)
 		if err != nil {
 			return fmt.Errorf("deploy intent: %w", err)
 		}

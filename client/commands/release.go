@@ -10,9 +10,9 @@ import (
 
 	"github.com/charmbracelet/log"
 	"github.com/ocuroot/ocuroot/client/release"
-	"github.com/ocuroot/ocuroot/client/state"
 	"github.com/ocuroot/ocuroot/client/tui"
 	"github.com/ocuroot/ocuroot/client/tui/tuiwork"
+	"github.com/ocuroot/ocuroot/client/work"
 	librelease "github.com/ocuroot/ocuroot/lib/release"
 	"github.com/ocuroot/ocuroot/refs"
 	"github.com/ocuroot/ocuroot/refs/refstore"
@@ -68,7 +68,12 @@ var NewReleaseCmd = &cobra.Command{
 		workTui := tui.StartWorkTui()
 		defer workTui.Cleanup()
 
-		tc.State = tuiwork.WatchForJobUpdates(ctx, tc.State, workTui)
+		tc.State = tuiwork.WatchForStateUpdates(ctx, tc.State, workTui)
+
+		worker := &work.Worker{
+			Tracker: tc,
+			Tui:     workTui,
+		}
 
 		tracker, environments, err := release.TrackerForNewRelease(ctx, tc)
 		if err != nil {
@@ -76,7 +81,6 @@ var NewReleaseCmd = &cobra.Command{
 		}
 
 		if tracker == nil {
-			fmt.Println("Registering environments")
 			for _, env := range environments {
 				// Establishing intent for environment
 				intentRef := "@/environment/" + string(env.Name)
@@ -84,13 +88,12 @@ var NewReleaseCmd = &cobra.Command{
 					return err
 				}
 
-				tc2 := tc
-				tc2.Ref, err = refs.Parse(intentRef)
+				pr, err := refs.Parse(intentRef)
 				if err != nil {
 					return err
 				}
 
-				if err := state.ApplyIntent(ctx, tc2.Ref, tc2.State, tc2.Intent); err != nil {
+				if err := worker.ApplyIntent(ctx, pr); err != nil {
 					return err
 				}
 
@@ -139,7 +142,7 @@ var ContinueReleaseCmd = &cobra.Command{
 		workTui := tui.StartWorkTui()
 		defer workTui.Cleanup()
 
-		tc.State = tuiwork.WatchForJobUpdates(ctx, tc.State, workTui)
+		tc.State = tuiwork.WatchForStateUpdates(ctx, tc.State, workTui)
 
 		tracker, err := release.TrackerForExistingRelease(ctx, tc)
 		if err != nil {
@@ -199,7 +202,7 @@ var RetryReleaseCmd = &cobra.Command{
 		workTui := tui.StartWorkTui()
 		defer workTui.Cleanup()
 
-		tc.State = tuiwork.WatchForJobUpdates(ctx, tc.State, workTui)
+		tc.State = tuiwork.WatchForStateUpdates(ctx, tc.State, workTui)
 
 		tracker, err := release.TrackerForExistingRelease(ctx, tc)
 		if err != nil {

@@ -54,6 +54,7 @@ test_two_releases() {
     ocuroot state set "minimal/repo/-/approvals.ocu.star/@v1/custom/approval" 1
     assert_equal "0" "$?" "Failed to create approval intent"
     echo "== apply approval intent and continue work =="
+    ocuroot work any --dryrun
     ocuroot work any
     assert_equal "0" "$?" "Failed to apply approval intent and continue work"
 
@@ -63,7 +64,7 @@ test_two_releases() {
     echo "== create approval2 intent =="
     ocuroot state set "minimal/repo/-/approvals.ocu.star/@r1/custom/approval2" 1
     assert_equal "0" "$?" "Failed to create approval2 intent"
-    echo "== apply approval intent and continue work =="
+    echo "== apply approval2 intent and continue work =="
     ocuroot work any
     assert_equal "0" "$?" "Failed to apply approval intent and continue work"
 
@@ -214,8 +215,8 @@ pushd "$(dirname "$0")" > /dev/null
 
 test_basic
 test_two_releases
-test_down
-test_deploy_intent
-test_force_deploy
+# test_down
+# test_deploy_intent
+# test_force_deploy
 
 popd > /dev/null

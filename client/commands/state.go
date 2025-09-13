@@ -7,6 +7,9 @@ import (
 
 	"github.com/ocuroot/ocuroot/client/release"
 	"github.com/ocuroot/ocuroot/client/state"
+	"github.com/ocuroot/ocuroot/client/tui"
+	"github.com/ocuroot/ocuroot/client/tui/tuiwork"
+	"github.com/ocuroot/ocuroot/client/work"
 	"github.com/ocuroot/ocuroot/refs"
 	"github.com/ocuroot/ocuroot/refs/refstore"
 	"github.com/ocuroot/ocuroot/sdk"
@@ -104,13 +107,19 @@ var StateDiffCmd = &cobra.Command{
 
 		cmd.SilenceUsage = true
 
-		diffs, err := state.Diff(ctx, tc.State, tc.Intent)
+		worker := &work.Worker{
+			Tracker: tc,
+		}
+
+		diffs, err := worker.Diff(ctx, work.IndentifyWorkRequest{
+			GitFilter: work.GitFilterCurrentCommitOnly,
+		})
 		if err != nil {
 			return fmt.Errorf("failed to diff: %w", err)
 		}
 
 		for _, diff := range diffs {
-			fmt.Println(diff)
+			fmt.Println(diff.Ref.String())
 		}
 
 		return nil
@@ -224,7 +233,17 @@ var StateApplyIntentCmd = &cobra.Command{
 
 		cmd.SilenceUsage = true
 
-		if err := state.ApplyIntent(ctx, tc.Ref, tc.State, tc.Intent); err != nil {
+		workTui := tui.StartWorkTui()
+		defer workTui.Cleanup()
+
+		tc.State = tuiwork.WatchForStateUpdates(ctx, tc.State, workTui)
+
+		worker := &work.Worker{
+			Tracker: tc,
+			Tui:     workTui,
+		}
+
+		if err := worker.ApplyIntent(ctx, tc.Ref); err != nil {
 			return fmt.Errorf("failed to apply intent: %w", err)
 		}
 
