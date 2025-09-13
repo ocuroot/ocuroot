@@ -110,9 +110,6 @@ func applyDeletedEnvironmentIntent(ctx context.Context, ref refs.Ref, state, int
 		if err != nil {
 			return fmt.Errorf("failed to parse deployment: %w", err)
 		}
-		if err := intent.Delete(ctx, dp.String()); err != nil {
-			return fmt.Errorf("failed to delete deployment: %w", err)
-		}
 
 		err = applyDeletedDeployIntent(ctx, dp, state, intent)
 		if err != nil {

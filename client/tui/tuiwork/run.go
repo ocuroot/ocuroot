@@ -117,18 +117,19 @@ func (e *RunTaskEvent) Task() tui.Task {
 }
 
 func (e *RunTaskEvent) Description() (string, bool) {
+	fullName := fmt.Sprintf("%v > %v", strings.Join(e.New.Hierarchy(), " > "), e.New.Name)
 	if e.Old == nil {
-		return fmt.Sprintf("%v: %v", e.New.Name, e.New.Status), true
+		return fmt.Sprintf("%v: %v", fullName, e.New.Status), true
 	}
 	if e.New.Status != e.Old.Status {
 		if e.New.Status == WorkStatusDone {
-			return fmt.Sprintf("%v> %v -> %v (%v)", e.New.Name, e.Old.Status, e.New.Status, e.New.EndTime.Sub(e.New.StartTime)), true
+			return fmt.Sprintf("%v> %v -> %v (%v)", fullName, e.Old.Status, e.New.Status, e.New.EndTime.Sub(e.New.StartTime)), true
 		} else {
-			return fmt.Sprintf("%v: %v -> %v", e.New.Name, e.Old.Status, e.New.Status), true
+			return fmt.Sprintf("%v> %v -> %v", fullName, e.Old.Status, e.New.Status), true
 		}
 	}
 	if len(e.New.Logs) > len(e.Old.Logs) {
-		return fmt.Sprintf("%v> %v", e.New.Name, e.New.Logs[len(e.New.Logs)-1]), true
+		return fmt.Sprintf("%v> %v", fullName, e.New.Logs[len(e.New.Logs)-1]), true
 	}
 	return "", false
 }

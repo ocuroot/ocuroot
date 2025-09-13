@@ -7,6 +7,9 @@ def up(ctx):
 
 def down(ctx):
     print("package1 down")
+    content = read("./.deploys/{}/package1.txt".format(ctx.inputs.environment["name"]))
+    if content != str(ctx):
+        return fail("content does not match")
     shell("rm -f ./.deploys/{}/package1.txt".format(ctx.inputs.environment["name"]))
     return done()
 
