@@ -12,6 +12,7 @@ import (
 	"github.com/fsnotify/fsnotify"
 	"github.com/ocuroot/ocuroot/client/local"
 	"github.com/ocuroot/ocuroot/client/release"
+	"github.com/ocuroot/ocuroot/sdk"
 	"github.com/ocuroot/ocuroot/store/models"
 	"github.com/ocuroot/ocuroot/ui/components/pipeline"
 	"github.com/ocuroot/ui/assets"
@@ -153,12 +154,16 @@ func MakeServePreview(tc release.TrackerConfig) func(w http.ResponseWriter, r *h
 			return
 		}
 
+		var pkg sdk.Package
+		if config != nil && config.Package != nil {
+			pkg = *config.Package
+		}
 		summary := pipeline.SDKPackageToReleaseSummary(
 			models.ReleaseID("preview"),
 			"preview",
-			config.Package,
+			&pkg,
 		)
-		comp := PreviewPage(summary, tc.Ref.Filename, *config.Package)
+		comp := PreviewPage(summary, tc.Ref.Filename, pkg)
 		err = comp.Render(r.Context(), w)
 		if err != nil {
 			log.Error("Failed to render preview", "error", err)

@@ -215,8 +215,7 @@ pushd "$(dirname "$0")" > /dev/null
 
 test_basic
 test_two_releases
-# test_down
-# test_deploy_intent
-# test_force_deploy
-
+test_down
+test_deploy_intent
+test_force_deploy
 popd > /dev/null

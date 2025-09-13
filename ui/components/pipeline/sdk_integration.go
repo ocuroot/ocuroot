@@ -21,6 +21,10 @@ func SDKPackageToReleaseSummary(
 		Commit: commit,
 	}
 
+	if pkg == nil {
+		return summary
+	}
+
 	for _, phase := range pkg.Phases {
 		p := PhaseSummary{
 			ID:   models.NewID[models.PhaseID](),
