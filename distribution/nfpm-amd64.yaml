@@ -1,0 +1,21 @@
+# nfpm configuration for AMD64 architecture
+# yaml-language-server: $schema=https://nfpm.goreleaser.com/static/schema.json
+
+name: "ocuroot"
+arch: "amd64"
+platform: "linux"
+version: "1.0.0"
+section: "default"
+maintainer: "Tom Elliott <tom.w.elliott@gmail.com>"
+description: |
+  Ocuroot is the Ocuroot CLI tool.
+  Release orchestration for mid-sized organizations.
+vendor: "Ocuroot"
+homepage: "https://www.ocuroot.com"
+license: "Apache 2.0"
+
+contents:
+  - src: ../.build/linux-amd64/ocuroot
+    dst: /usr/bin/ocuroot
+    file_info:
+      mode: 0755

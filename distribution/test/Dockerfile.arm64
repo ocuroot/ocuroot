@@ -1,0 +1,45 @@
+# Test Dockerfile for ARM64 package verification
+ARG TARGETPLATFORM=linux/arm64
+FROM ubuntu:latest
+
+# Update package list and install dependencies
+RUN apt-get update && apt-get install -y \
+    curl \
+    wget \
+    file \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy the ARM64 .deb package into the container
+COPY .build/packages/ocuroot_1.0.0_arm64.deb /tmp/ocuroot.deb
+
+# Install the package
+RUN dpkg -i /tmp/ocuroot.deb || (apt-get update && apt-get install -f -y && dpkg -i /tmp/ocuroot.deb)
+
+# Verify installation and run tests
+RUN set -e && \
+    echo "=== Package Installation Tests ===" && \
+    dpkg -l | grep ocuroot && \
+    echo "✓ Package is installed" && \
+    \
+    echo "=== Binary Tests ===" && \
+    ls -la /usr/bin/ocuroot && \
+    file /usr/bin/ocuroot && \
+    echo "✓ Binary exists and is executable" && \
+    \
+    echo "=== Architecture Tests ===" && \
+    file /usr/bin/ocuroot | grep "aarch64" && \
+    echo "✓ Binary is correct architecture (aarch64)" && \
+    \
+    echo "=== Functionality Tests ===" && \
+    ocuroot --help > /dev/null && \
+    echo "✓ Help command works" && \
+    ocuroot version && \
+    echo "✓ Version command works" && \
+    \
+    echo "=== All tests passed! ==="
+
+# Clean up
+RUN rm /tmp/ocuroot.deb
+
+WORKDIR /root
+CMD ["/bin/bash"]
