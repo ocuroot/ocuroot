@@ -72,7 +72,7 @@ def build(ctx):
     arch = ctx.inputs.arch
     version = ctx.inputs.version
 
-    # Build the binary for this platform
+    # Build the binary for this platform with full version
     output = "./.build/{os}-{arch}/ocuroot".format(os=os, arch=arch)
     host.shell("GOOS={os} GOARCH={arch} go build -o {output} -ldflags=\"-X 'github.com/ocuroot/ocuroot/about.Version={version}'\" ./cmd/ocuroot".format(os=os, arch=arch, output=output, version=version))
     
@@ -88,6 +88,10 @@ def build(ctx):
             bucket_path=bucket_path,    
         )
     )
+
+    # Build and test packages for Linux platforms
+    if os == "linux":
+        add_linux_packages_to_release(version, arch)
 
     add_binary_to_release(version, os, arch)
 
@@ -105,6 +109,20 @@ def add_binary_to_release(version, os, arch):
     host.shell("tar -czvf .build/{tar_name} -C .build/{os}-{arch} ocuroot".format(os=os, arch=arch, tar_name=tar_name))
     tar_path = "./.build/{tar_name}".format(tar_name=tar_name)
     host.shell("gh release upload v{version} {file}".format(version=version, file=tar_path))
+
+def add_linux_packages_to_release(version, arch):
+    # Extract semantic version for package metadata
+    semantic_version = version.split("-")[0]
+    host.shell("./distribution/build-package.sh {arch} {semantic_version}".format(arch=arch, semantic_version=semantic_version))
+    host.shell("./distribution/test/test-package.sh {arch} {semantic_version}".format(arch=arch, semantic_version=semantic_version))
+        
+    deb_path = "./.build/packages/ocuroot_{semantic_version}_{arch}.deb".format(semantic_version=semantic_version, arch=arch)
+    rpm_path = "./.build/packages/ocuroot_{semantic_version}_{arch}.rpm".format(semantic_version=semantic_version, arch=arch)
+    host.shell("gh release upload v{version} {deb_path} {rpm_path}".format(
+        version=version, 
+        deb_path=deb_path, 
+        rpm_path=rpm_path
+    ))
 
 phase(
     name="build",

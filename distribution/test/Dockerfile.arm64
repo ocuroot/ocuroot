@@ -10,7 +10,8 @@ RUN apt-get update && apt-get install -y \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy the ARM64 .deb package into the container
-COPY .build/packages/ocuroot_1.0.0_arm64.deb /tmp/ocuroot.deb
+ARG VERSION=1.0.0
+COPY .build/packages/ocuroot_${VERSION}_arm64.deb /tmp/ocuroot.deb
 
 # Install the package
 RUN dpkg -i /tmp/ocuroot.deb || (apt-get update && apt-get install -f -y && dpkg -i /tmp/ocuroot.deb)
@@ -33,8 +34,16 @@ RUN set -e && \
     echo "=== Functionality Tests ===" && \
     ocuroot --help > /dev/null && \
     echo "✓ Help command works" && \
-    ocuroot version && \
+    ocuroot version > /dev/null && \
     echo "✓ Version command works" && \
+    \
+    echo "=== Package Metadata Tests ===" && \
+    PACKAGE_VERSION=$(dpkg -s ocuroot | grep '^Version:' | cut -d' ' -f2) && \
+    echo "Package version: $PACKAGE_VERSION" && \
+    EXPECTED_PACKAGE_VERSION=$(echo "${VERSION}" | cut -d'-' -f1) && \
+    echo "Expected package version: $EXPECTED_PACKAGE_VERSION" && \
+    [ "$PACKAGE_VERSION" = "$EXPECTED_PACKAGE_VERSION" ] && \
+    echo "✓ Package version matches expected version" && \
     \
     echo "=== All tests passed! ==="
 

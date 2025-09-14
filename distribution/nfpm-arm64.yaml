@@ -4,7 +4,7 @@
 name: "ocuroot"
 arch: "arm64"
 platform: "linux"
-version: "1.0.0"
+version: "{{VERSION}}"
 section: "default"
 maintainer: "Tom Elliott <tom.w.elliott@gmail.com>"
 description: |
