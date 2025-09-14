@@ -28,7 +28,7 @@ phase(
 
 phase(
     name="prod",
-    work=[
+    tasks=[
         deploy(
             up=up,
             down=down,

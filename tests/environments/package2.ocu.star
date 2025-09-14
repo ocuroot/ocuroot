@@ -1,22 +1,22 @@
 ocuroot("0.3.0")
 
-def up(ctx):
+def up(environment):
     print("package2 up")
-    write("./.deploys/{}/package2.txt".format(ctx.inputs.environment["name"]), str(ctx))
+    write("./.deploys/{}/package2.txt".format(environment["name"]), str(environment))
     return done()
 
-def down(ctx):
+def down(environment):
     print("package2 down")
-    content = read("./.deploys/{}/package2.txt".format(ctx.inputs.environment["name"]))
-    if content != str(ctx):
+    content = read("./.deploys/{}/package2.txt".format(environment["name"]))
+    if content != str(environment):
         return fail("content does not match")
-    shell("rm -f ./.deploys/{}/package2.txt".format(ctx.inputs.environment["name"]))
+    shell("rm -f ./.deploys/{}/package2.txt".format(environment["name"]))
     return done()
 
 
 phase(
     "deploy",
-    work=[
+    tasks=[
         deploy(
             up=up,
             down=down,

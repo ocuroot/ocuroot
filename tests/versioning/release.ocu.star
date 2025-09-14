@@ -38,8 +38,8 @@ def next_prerelease_version(prerelease, version):
     # Next prerelease for this major/minor version
     return "{}.{}.{}-{}".format(MAJOR, MINOR, ps.patch, ps.prerelease + 1)
 
-def prerelease(ctx):
-    prerelease = next_prerelease_version(ctx.inputs.prev_prerelease, ctx.inputs.prev_version)
+def prerelease(prev_prerelease, prev_version):
+    prerelease = next_prerelease_version(prev_prerelease, prev_version)
     return done(
         outputs={
             "prerelease": prerelease,
@@ -49,7 +49,7 @@ def prerelease(ctx):
 
 phase(
     name="version",
-    work=[call(
+    tasks=[task(
         prerelease, 
         name="prerelease", 
         inputs={
@@ -61,7 +61,7 @@ phase(
 
 phase(
     name="build",
-    work=[call(
+    tasks=[task(
         build, 
         name="build", 
         inputs={
@@ -72,13 +72,13 @@ phase(
 
 promotion_ref = ref("./custom/promote")
 
-def promote(ctx):
+def promote():
     print("Promoting")
     return done()
 
 phase(
     name="promote",
-    work=[call(
+    tasks=[task(
         promote, 
         name="promote", 
         inputs={
@@ -93,8 +93,8 @@ phase(
     )],
 )
 
-def release(ctx):
-    version = ctx.inputs.prerelease.split("-")[0]
+def release(prerelease):
+    version = prerelease.split("-")[0]
 
     do_release(version)
 
@@ -107,8 +107,8 @@ def release(ctx):
 
 phase(
     name="release",
-    work=[
-        call(
+    tasks=[
+        task(
             release,
             name="release",
             inputs={
@@ -118,8 +118,8 @@ phase(
     ],
 )
 
-def finalize(ctx):
-    version = ctx.inputs.prerelease.split("-")[0]
+def finalize(prerelease):
+    version = prerelease.split("-")[0]
     return done(
         outputs={
             "version": version,
@@ -128,8 +128,8 @@ def finalize(ctx):
 
 phase(
     name="finalize",
-    work=[
-        call(
+    tasks=[
+        task(
             finalize,
             name="finalize",
             inputs={

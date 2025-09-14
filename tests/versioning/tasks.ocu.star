@@ -1,6 +1,6 @@
 ocuroot("0.3.0")
 
-def build(ctx):
+def build():
     print("Building")
     return done()
 

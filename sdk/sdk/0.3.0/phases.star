@@ -76,8 +76,8 @@ def deploy(environment=None, up=_default_up, down=_default_down, inputs={}):
         A dictionary representing the deploy action
     """
 
-    checked_inputs = _check_inputs(up, inputs)
-    _check_inputs(down, inputs) # Check without keeping the results
+    checked_inputs = _check_inputs(up, inputs, environment)
+    _check_inputs(down, inputs, environment) # Check without keeping the results
 
     # Make the environment an implicit input to this deployment
     checked_inputs["environment"] = {
@@ -174,10 +174,10 @@ def _add_func(func):
     package["functions"] = functions
     backend.thread.set("package", package)
 
-def _check_inputs(fn, inputs):
+def _check_inputs(fn, inputs, environment=None):
     checked_inputs = {}
     for key, value in inputs.items():
-        if key == "environment":
+        if key == "environment" and environment:
             fail("environment is a reserved input for deployments")
         if type(value) == "dict" and ("ref" in value or "default" in value or "value" in value):
             checked_inputs[key] = value
@@ -185,6 +185,8 @@ def _check_inputs(fn, inputs):
             checked_inputs[key] = {
                 "value": value,
             }
+    if environment:
+        checked_inputs["environment"] = {"ref": "@/environment/{}".format(environment.name)}
 
     fParams = json.decode(backend.functions.get_args(fn))
     check_params(fn, fParams["args"], fParams["kwargs"], checked_inputs.keys())

@@ -1,7 +1,6 @@
 ocuroot("0.3.0")
 
-def foo(ctx):
-    print(ctx)
+def foo():
     return done(
         tags=[
             "r123",
@@ -10,5 +9,5 @@ def foo(ctx):
 
 phase(
     name="foo",
-    work=[call(foo, name="foo")],
+    tasks=[task(foo, name="foo")],
 )

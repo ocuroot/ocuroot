@@ -1,15 +1,12 @@
 ocuroot("0.3.0")
 
-def fn(ctx):
+def fn():
     value = "abc123"
     secret(value)
     print(value)
     return done()
 
-phase(
-    name="fn",
-    work=[call(fn, name="fn")],
-)
+task(fn=fn, name="fn")
 
 value2 = "def456"
 secret(value2)

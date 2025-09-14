@@ -1,6 +1,6 @@
 ocuroot("0.3.0")
 
-def up(ctx):
+def up(environment):
     # The first attempt to run this function will fail, as ready.txt does not exist
     # It will always succeed after this first attempt.
     # This simulates a failure that can be retried.
@@ -11,12 +11,12 @@ def up(ctx):
 
     return done()
 
-def down(ctx):
+def down(environment):
     return done()
 
 phase(
     "release",
-    work=[
+    tasks=[
         deploy(
             up=up,
             down=down,
@@ -25,7 +25,7 @@ phase(
     ],
 )
 
-def postrelease(ctx):
+def postrelease():
     return done(
         outputs={
             "foo": "bar",
@@ -34,8 +34,8 @@ def postrelease(ctx):
 
 phase(
     "postrelease",
-    work=[
-        call(
+    tasks=[
+        task(
             fn=postrelease,
             name="postrelease",
         )

@@ -4,7 +4,7 @@ envs = environments()
 staging = [e for e in envs if e.attributes["type"] == "staging"]
 prod = [e for e in envs if e.attributes["type"] == "prod"]
 
-def build(ctx):
+def build():
     print("Building")
     res = host.shell("cat message-frontend.txt", mute=True)
     print("Message: {}".format(res.stdout))
@@ -15,30 +15,29 @@ def build(ctx):
         },
     )
 
-def up(ctx):
-    print("Deploying to {}".format(ctx.inputs.environment["name"]))
-    print("foo = {}".format(ctx.inputs.foo))
-    print("Message: {}".format(ctx.inputs.message))
+def up(environment, foo, message, backend_message):
+    print("Deploying to {}".format(environment["name"]))
+    print("foo = {}".format(foo))
+    print("Message: {}".format(message))
     return done(
         outputs={
-            "backend_message": ctx.inputs.backend_message,
-            "message": ctx.inputs.message,
+            "backend_message": backend_message,
+            "message": message,
         },
     )
 
-def down(ctx):
-    print("Undeploying from {}".format(ctx.inputs.environment["name"]))
-    print("Message: {}".format(ctx.inputs.message))
+def down(environment, foo, message, backend_message):
+    print("Undeploying from {}".format(environment["name"]))
     return done()
 
 phase(
     name="build",
-    work=[call(build, name="build")],
+    tasks=[task(build, name="build")],
 )
 
 phase(
     name="staging",
-    work=[
+    tasks=[
         deploy(
             up=up,
             down=down,
@@ -54,7 +53,7 @@ phase(
 
 phase(
     name="prod",
-    work=[
+    tasks=[
         deploy(
             up=up,
             down=down,

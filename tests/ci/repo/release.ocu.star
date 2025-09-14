@@ -4,31 +4,31 @@ envs = environments()
 staging = [e for e in envs if e.attributes["type"] == "staging"]
 prod = [e for e in envs if e.attributes["type"] == "prod"]
 
-def build(ctx):
+def build():
     print("Building")
     return done()
 
-def up(ctx):
-    print("Deploying to {}".format(ctx.inputs.environment["name"]))
-    print("foo: {}".format(ctx.inputs.foo))
+def up(environment, foo):
+    print("Deploying to {}".format(environment["name"]))
+    print("foo: {}".format(foo))
     return done(
         outputs={
-            "foo": ctx.inputs.foo,
+            "foo": foo,
         }
     )
 
-def down(ctx):
-    print("Undeploying from {}".format(ctx.inputs.environment["name"]))
+def down(environment, foo):
+    print("Undeploying from {}".format(environment["name"]))
     return done()
 
 phase(
     name="build",
-    work=[call(build, name="build")],
+    tasks=[task(build, name="build")],
 )
 
 phase(
     name="staging",
-    work=[
+    tasks=[
         deploy(
             up=up,
             down=down,
@@ -42,7 +42,7 @@ phase(
 
 phase(
     name="prod",
-    work=[
+    tasks=[
         deploy(
             up=up,
             down=down,

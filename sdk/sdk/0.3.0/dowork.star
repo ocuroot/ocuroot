@@ -30,7 +30,7 @@ def check_params(
     # check that every fArg is represented in inputs
     for k in fArgs:
         if k not in inputs:
-            fail("Function parameter '" + k + "' is not present in inputs and has no default value for '" + str(fName) + "' at " + str(fPos))
+            fail("Function parameter '" + k + "' is not present in inputs and has no default value for '" + str(fName) + "' at " + str(fPos) + "inputs=" + str(inputs))
     
 
 def _do_work(
