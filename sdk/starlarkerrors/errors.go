@@ -2,10 +2,14 @@ package starlarkerrors
 
 import (
 	"fmt"
+	"regexp"
 	"strings"
 
+	"github.com/charmbracelet/log"
 	"go.starlark.net/starlark"
 )
+
+var sdkFilePathRegex = regexp.MustCompile(`^sdk/\d+\.\d+\.\d+/.+\.star`)
 
 func Wrap(err error) error {
 	if err == nil {
@@ -14,7 +18,14 @@ func Wrap(err error) error {
 	if evalErr, ok := err.(*starlark.EvalError); ok {
 		bt := evalErr.Backtrace()
 		lines := strings.Split(bt, "\n")
-		lastLine := lines[len(lines)-2]
+		for i := len(lines) - 2; i >= 0; i-- {
+			pos := strings.TrimLeft(lines[i], " \t")
+			log.Info("line", "line", lines[i])
+			if !sdkFilePathRegex.MatchString(pos) {
+				return fmt.Errorf("%s - %w", pos, err)
+			}
+		}
+		lastLine := lines[len(lines)-1]
 		return fmt.Errorf("%s - %w", lastLine, err)
 	}
 	return fmt.Errorf("%w", err)
