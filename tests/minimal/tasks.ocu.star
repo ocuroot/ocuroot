@@ -35,7 +35,7 @@ def build():
         },
     )
 
-def up(environment={"name": ""}, staging_name="", previous_count=0, input1=None):
+def up(environment, input1, previous_count=0, staging_name=""):
     print("Deploying minimal package")    
     print("Environment: ", environment["name"])
     outputs = {}
@@ -55,7 +55,7 @@ def up_stage2(count, environment, input1):
     print(input1)
     return done(outputs={"env_name": environment["name"], "count": count}, tags=["v"+str(count)])
 
-def down(environment={"name": ""}, staging_name="", previous_count=0, input1=None):
+def down(environment, staging_name="", previous_count=0, input1=None):
     print("Destroying minimal package")
     print("Environment: ", environment["name"])
     print("Input1: ", input1)

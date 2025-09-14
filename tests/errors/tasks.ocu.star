@@ -1,8 +1,7 @@
 ocuroot("0.3.0")
 
-def build(ctx):
+def build():
     print("Building minimal package")
-    print(ctx)
 
     res = host.shell("pwd", mute=True)
     print("Current directory: ", res.stdout.strip())
@@ -24,26 +23,24 @@ def build(ctx):
         },
     )
 
-def up(ctx):
+def up(environment, previous_count, input1, staging_name=""):
     print("Deploying minimal package")    
-    print("ctx: ", ctx)
-    print("Environment: ", ctx.inputs.environment["name"])
+    print("Environment: ", environment["name"])
     outputs = {}
-    outputs["count"] = ctx.inputs.previous_count + 1
-    outputs["env_name"] = ctx.inputs.environment
-    outputs["input1"] = ctx.inputs.input1
+    outputs["count"] = previous_count + 1
+    outputs["env_name"] = environment
+    outputs["input1"] = input1
 
     # Output some log lines and force a pause
     for i in range(1,10):
         host.shell("sleep 0.1")
         print("Log line number " + str(i))
 
-    if ctx.inputs.environment["name"] == "production2":
+    if environment["name"] == "production2":
         fail("something is wrong in production2")
 
     return done(outputs=outputs)
 
-def down(ctx):
+def down(environment, previous_count, input1, staging_name=""):
     print("Destroying minimal package")
-    print(ctx)
     return done()

@@ -12,33 +12,33 @@ def setup_deploy(environment):
         }
     )
 
-def up(ctx):
+def up(environment, credential):
     return done(outputs={
-        "host": "{}.backend.example.com".format(ctx.inputs.environment["name"]),
-        "credential": ctx.inputs.credential,
+        "host": "{}.backend.example.com".format(environment["name"]),
+        "credential": credential,
     })
 
-def down(ctx):
+def down(environment, credential):
     return done()
 
-def build(ctx):
+def build():
     return done()
 
 phase(
     name="build",
-    work=[call(fn=build, name="build")],
+    tasks=[task(fn=build, name="build")],
 )
 
 phase(
     name="staging",
-    work=[
+    tasks=[
         setup_deploy(e) for e in envs if e.attributes["type"] == "staging"
     ],
 )
         
 phase(
     name="prod",
-    work=[
+    tasks=[
         setup_deploy(e) for e in envs if e.attributes["type"] == "prod"
     ],
 )

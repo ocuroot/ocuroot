@@ -8,40 +8,38 @@ def setup_deploy(environment):
         down=down,
         environment=environment,
         inputs={
-            "backend_host": ref("./-/backend/package.ocu.star/@/deploy/{}#output/host".format(environment.name)),
             "backend_credential": ref("./-/backend/package.ocu.star/@/deploy/{}#output/credential".format(environment.name)),
         }
     )
 
-def up(ctx):
+def up(environment, backend_credential):
     print("up")
-    print(ctx)
     return done(
         outputs={
-            "host": "{}.frontend.example.com".format(ctx.inputs.environment["name"]),
-            "backend_credential": ctx.inputs.backend_credential,
+            "host": "{}.frontend.example.com".format(environment["name"]),
+            "backend_credential": backend_credential,
         }
     )
 
-def down(ctx):
+def down(environment, backend_credential):
     return done()
 
-def build(ctx):
+def build():
     return done()
 
 phase(
     name="build",
-    work=[call(fn=build, name="build")],
+    tasks=[task(fn=build, name="build")],
 )
 phase(
     name="staging",
-    work=[
+    tasks=[
         setup_deploy(e) for e in envs if e.attributes["type"] == "staging"
     ],
 )
 phase(
     name="prod",
-    work=[
+    tasks=[
         setup_deploy(e) for e in envs if e.attributes["type"] == "prod"
     ],
 )

@@ -1,7 +1,6 @@
 ocuroot("0.3.0")
 
-def foo(ctx):
-    print(ctx)
+def foo():
     return next(
         bar, 
         inputs={
@@ -10,11 +9,10 @@ def foo(ctx):
         },
     )
 
-def bar(ctx):
-    print(ctx)
+def bar():
     return done()
 
 phase(
     name="foo",
-    work=[call(foo, name="foo")],
+    tasks=[task(foo, name="foo")],
 )

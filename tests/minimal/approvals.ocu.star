@@ -8,12 +8,12 @@ prod = [e for e in envs if e.attributes["type"] == "prod"]
 
 phase(
     name="build",
-    work=[call(build, name="build")],
+    tasks=[task(build, name="build")],
 )
 
 phase(
     name="staging",
-    work=[
+    tasks=[
         deploy(
             up=up,
             down=down,
@@ -29,15 +29,14 @@ phase(
     ],
 )
 
-def check(ctx):
+def check(input1, staging_name):
     print("Checking call input")
-    print(ctx)
     return done()
 
 phase(
     name="call input check",
-    work=[
-        call(
+    tasks=[
+        task(
             fn=check,
             name="check",
             inputs={
@@ -49,7 +48,7 @@ phase(
 )
 
 # Require a second approval to proceed
-def approve(ctx):
+def approve(approval):
     return next(
         fn=_noop,
         inputs={
@@ -59,13 +58,13 @@ def approve(ctx):
         },
     )
 
-def _noop(ctx):
+def _noop(approval):
     print("Noop")
     return done()
 
 phase(
     name="prod approval",
-    work=[call(
+    tasks=[task(
         approve, 
         name="prod_approval", 
         inputs={
@@ -81,7 +80,7 @@ phase(
 
 phase(
     name="prod",
-    work=[
+    tasks=[
         deploy(
             up=up,
             down=down,

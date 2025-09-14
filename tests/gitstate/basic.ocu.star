@@ -8,12 +8,12 @@ prod = [e for e in envs if e.attributes["type"] == "prod"]
 
 phase(
     name="build",
-    work=[call(build, name="build")],
+    tasks=[task(build, name="build")],
 )
 
 phase(
     name="staging",
-    work=[
+    tasks=[
         deploy(
             up=up,
             down=down,
@@ -31,7 +31,7 @@ phase(
 
 phase(
     name="prod",
-    work=[
+    tasks=[
         deploy(
             up=up,
             down=down,
