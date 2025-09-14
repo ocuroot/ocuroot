@@ -27,28 +27,9 @@ Releases are entirely managed by Ocuroot based on the contents of your source re
 
 ## Installation
 
-### MacOS (Homebrew)
+For detailed installation instructions across all platforms, see the [installation documentation](https://www.ocuroot.com/docs/installation/).
 
-```bash
-brew install ocuroot/tap/ocuroot
-```
-
-### From Releases
-
-Binaries are available as assets on each [release](https://github.com/ocuroot/ocuroot/releases).
-
-You can use the excellent [bin](https://github.com/marcosnils/bin) tool to install direct from the
-latest release using:
-
-```bash
-bin install github.com/ocuroot/ocuroot
-```
-
-### From Source
-
-```bash
-go install github.com/ocuroot/ocuroot/cmd/ocuroot@latest
-```
+Pre-built binaries and packages are available on the [releases page](https://github.com/ocuroot/ocuroot/releases).
 
 ## Configuration
 
