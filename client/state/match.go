@@ -7,11 +7,13 @@ import (
 	"net/http"
 	"net/url"
 	"path"
+	"sort"
 	"strings"
 
 	"github.com/a-h/templ"
 	"github.com/ocuroot/ocuroot/lib/release"
 	"github.com/ocuroot/ocuroot/refs"
+	"github.com/ocuroot/ocuroot/store/models"
 )
 
 func (s *server) handleMatch(w http.ResponseWriter, r *http.Request) {
@@ -38,7 +40,7 @@ func (s *server) handleMatch(w http.ResponseWriter, r *http.Request) {
 	case release.GlobDeployment.Match(query):
 		content = s.buildDeploymentTable(r.Context(), matches)
 	case release.GlobRelease.Match(query):
-		content = s.buildReleaseTable(matches)
+		content = s.buildReleaseTable(r.Context(), matches)
 	case release.GlobTask.Match(query) || query == GlobTask:
 		content = s.buildTaskTable(r.Context(), matches)
 	default:
@@ -78,8 +80,16 @@ func (s *server) buildRepositoryTable(matches []string) templ.Component {
 	return ResultTable([]string{"Repo"}, tableContent)
 }
 
-func (s *server) buildReleaseTable(matches []string) templ.Component {
+func (s *server) buildReleaseTable(ctx context.Context, matches []string) templ.Component {
 	var tableContent []ResultTableRow
+
+	// TODO: Handle errors gracefully
+	allCurrentDeploys, _ := s.store.Match(ctx, "**/@/deploy/*")
+
+	sort.Slice(matches, func(i, j int) bool {
+		return matches[i] > matches[j]
+	})
+
 	for _, match := range matches {
 		pr, err := refs.Parse(match)
 		if err != nil {
@@ -88,16 +98,43 @@ func (s *server) buildReleaseTable(matches []string) templ.Component {
 		if pr.Filename == "repo.ocu.star" {
 			continue
 		}
+
+		results, err := s.store.Match(ctx, fmt.Sprintf("%s/**/status/*", match))
+		if err != nil {
+			continue
+		}
+		if len(results) == 0 {
+			continue
+		}
+
+		var statusCounts = make(map[models.Status]int)
+		for _, result := range results {
+			statusCounts[models.Status(path.Base(result))]++
+		}
+
+		var environmentCounts = make(map[models.Status]int)
+		for _, deploy := range allCurrentDeploys {
+			resolved, err := s.store.ResolveLink(ctx, deploy)
+			if err != nil {
+				continue
+			}
+			if strings.HasPrefix(resolved, match) {
+				environmentCounts[models.StatusComplete]++
+			}
+		}
+
 		tableContent = append(tableContent, ResultTableRow{
 			URL: templ.URL(fmt.Sprintf("/ref/%s", pr.String())),
 			Cells: []templ.Component{
 				textCell(pr.Repo),
 				textCell(pr.Filename),
 				textCell(string(pr.Release)),
+				StatusCell(statusCounts),
+				StatusCell(environmentCounts),
 			},
 		})
 	}
-	return ResultTable([]string{"Repo", "Filename", "Version"}, tableContent)
+	return ResultTable([]string{"Repo", "Filename", "Version", "Tasks", "Environments"}, tableContent)
 }
 
 func (s *server) buildDeploymentTable(ctx context.Context, matches []string) templ.Component {

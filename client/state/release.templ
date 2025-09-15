@@ -1,7 +1,10 @@
 package state
 
 import (
+    "fmt"
+
     "github.com/ocuroot/ui/components"
+    "github.com/ocuroot/ui/components/badges"
     "github.com/ocuroot/ocuroot/store/models"
     "github.com/ocuroot/ocuroot/lib/release"
     "github.com/ocuroot/ocuroot/ui/components/pipeline"
@@ -29,3 +32,20 @@ func ReleasePreview(props RefPageProps) *pipeline.ReleaseSummary {
     return summary
 }
 
+templ StatusCell(statusCounts map[models.Status]int) {
+    <div>
+        if statusCounts[models.StatusComplete] > 0 {
+            @badges.RoundLive(fmt.Sprint(statusCounts[models.StatusComplete]))
+        }
+        if statusCounts[models.StatusPending] + statusCounts[models.StatusPaused] > 0 {
+            @badges.RoundPending(fmt.Sprint(statusCounts[models.StatusPending] + statusCounts[models.StatusPaused]))
+        }       
+        if statusCounts[models.StatusFailed] + statusCounts[models.StatusFailedRetried] > 0  {
+            @badges.RoundFailed(fmt.Sprint(statusCounts[models.StatusFailed] + statusCounts[models.StatusFailedRetried]))
+        }
+        if statusCounts[models.StatusRunning] > 0 {
+            // TODO: Come up with a running specific status
+            @badges.RoundPending(fmt.Sprint(statusCounts[models.StatusRunning]))
+        }
+    </div>
+}
