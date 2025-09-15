@@ -143,9 +143,16 @@ func (h *HierarchyNode) Render(depth int, spinner spinner.Model, finished bool) 
 	for _, id := range elemIDs {
 		s += h.Elems[id].Render(depth, spinner, finished)
 	}
-	for name, child := range h.Children {
+
+	sortedNames := make([]string, 0, len(h.Children))
+	for name := range h.Children {
+		sortedNames = append(sortedNames, name)
+	}
+	sort.Strings(sortedNames)
+
+	for _, name := range sortedNames {
 		s += fmt.Sprintf("%s%s:\n", strings.Repeat("  ", depth), name)
-		s += child.Render(depth+1, spinner, finished)
+		s += h.Children[name].Render(depth+1, spinner, finished)
 	}
 	return s
 }
