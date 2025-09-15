@@ -15,8 +15,8 @@ import (
 )
 
 var (
-	updateMark = lipgloss.NewStyle().Foreground(lipgloss.Color("48")).SetString("+")
-	deleteMark = lipgloss.NewStyle().Foreground(lipgloss.Color("48")).SetString("-")
+	updateMark = lipgloss.NewStyle().Foreground(lipgloss.Color("48")).SetString("+++")
+	deleteMark = lipgloss.NewStyle().Foreground(lipgloss.Color("160")).SetString("---")
 )
 
 func initCustomStateEvent(ref refs.Ref, t tui.Tui, store refstore.Store) *CustomStateTaskEvent {
