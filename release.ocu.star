@@ -196,15 +196,16 @@ def release(ctx):
 
 def copy_release(source_tag, target_tag):
     body = shell("gh release view v{source} --json body -q .body".format(source=source_tag)).stdout
-    target_hash = shell("git rev-parse --abbrev-ref HEAD").stdout.strip()   
+    target_hash = shell("git rev-parse HEAD").stdout.strip()   
     shell("gh release create v{target} --target {target_hash} --title \"v{target}\" --notes \"$BODY\"".format(
         target=target_tag,
         target_hash=target_hash,
     ), env={"BODY": body})
 
     # Download assets from source and upload to target
-    shell("gh release download v{source} --clobber -p '*.tar.gz' -D ./.build/assets/".format(source=source_tag))
-    shell("gh release upload v{target} ./.build/assets/*.tar.gz".format(target=target_tag))
+    shell("rm -rf ./.build/assets/*")
+    shell("gh release download v{source} --clobber -p '*.*' -D ./.build/assets/".format(source=source_tag))
+    shell("gh release upload v{target} ./.build/assets/*.deb ./.build/assets/*.rpm ./.build/assets/*.tar.gz".format(target=target_tag))
 
 def release_inputs():
     inputs = {
