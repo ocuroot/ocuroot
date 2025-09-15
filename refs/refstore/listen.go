@@ -64,8 +64,12 @@ func (s *stateListener) Close() error {
 
 // Delete implements RefStore.
 func (s *stateListener) Delete(ctx context.Context, ref string) error {
+	err := s.store.Delete(ctx, ref)
+	if err != nil {
+		return err
+	}
 	s.updateIfMatches(ctx, ref, s.inTransaction)
-	return s.store.Delete(ctx, ref)
+	return nil
 }
 
 // Get implements RefStore.
@@ -120,8 +124,12 @@ func (s *stateListener) ResolveLink(ctx context.Context, ref string) (string, er
 
 // Set implements RefStore.
 func (s *stateListener) Set(ctx context.Context, ref string, v any) error {
+	err := s.store.Set(ctx, ref, v)
+	if err != nil {
+		return err
+	}
 	s.updateIfMatches(ctx, ref, s.inTransaction)
-	return s.store.Set(ctx, ref, v)
+	return nil
 }
 
 // StartTransaction implements RefStore.

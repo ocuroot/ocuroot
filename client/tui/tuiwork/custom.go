@@ -7,10 +7,16 @@ import (
 	"time"
 
 	"github.com/charmbracelet/bubbles/spinner"
+	"github.com/charmbracelet/lipgloss"
 	"github.com/ocuroot/ocuroot/client/tui"
 	librelease "github.com/ocuroot/ocuroot/lib/release"
 	"github.com/ocuroot/ocuroot/refs"
 	"github.com/ocuroot/ocuroot/refs/refstore"
+)
+
+var (
+	updateMark = lipgloss.NewStyle().Foreground(lipgloss.Color("48")).SetString("+")
+	deleteMark = lipgloss.NewStyle().Foreground(lipgloss.Color("48")).SetString("-")
 )
 
 func initCustomStateEvent(ref refs.Ref, t tui.Tui, store refstore.Store) *CustomStateTaskEvent {
@@ -40,6 +46,16 @@ func initCustomStateEvent(ref refs.Ref, t tui.Tui, store refstore.Store) *Custom
 			Created: time.Now(),
 		}
 	}
+
+	// Check if this ref still exists
+	matches, err := store.Match(context.TODO(), ref.String())
+	if err != nil {
+		if true {
+			panic(err)
+		}
+		return out
+	}
+	out.New.Exists = len(matches) > 0
 
 	return out
 }
@@ -75,6 +91,8 @@ type CustomStateTask struct {
 	Store refstore.Store
 
 	Created time.Time
+
+	Exists bool
 }
 
 func (t *CustomStateTask) SortKey() string {
@@ -92,7 +110,9 @@ func (t *CustomStateTask) StartTime() time.Time {
 func (t *CustomStateTask) Hierarchy() []string {
 	if t.Ref.Global {
 		if t.Ref.SubPathType == refs.SubPathTypeCustom {
-			return []string{}
+			return []string{
+				"Custom",
+			}
 		}
 		if t.Ref.SubPathType == refs.SubPathTypeEnvironment {
 			return []string{
@@ -108,5 +128,12 @@ func (t *CustomStateTask) Hierarchy() []string {
 }
 
 func (task *CustomStateTask) Render(depth int, spinner spinner.Model, final bool) string {
-	return strings.Repeat("  ", depth) + updateMark.String() + " " + task.Name + "\n"
+	mark := updateMark
+	if !task.Exists {
+		mark = deleteMark
+	}
+	if task.Ref.SubPathType == refs.SubPathTypeCustom {
+		return strings.Repeat("  ", depth) + mark.String() + " " + task.Ref.String() + "\n"
+	}
+	return strings.Repeat("  ", depth) + mark.String() + " " + task.Name + "\n"
 }

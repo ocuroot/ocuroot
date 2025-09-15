@@ -25,7 +25,6 @@ var (
 	checkMark   = lipgloss.NewStyle().Foreground(lipgloss.Color("42")).SetString("✓")
 	errorMark   = lipgloss.NewStyle().Foreground(lipgloss.Color("160")).SetString("✗")
 	pendingMark = lipgloss.NewStyle().Foreground(lipgloss.Color("208")).SetString("›")
-	updateMark  = lipgloss.NewStyle().Foreground(lipgloss.Color("48")).SetString("+")
 )
 
 func initRunStateEvent(ref refs.Ref, t tui.Tui, store refstore.Store) *RunTaskEvent {
