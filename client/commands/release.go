@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/charmbracelet/log"
+	"github.com/ocuroot/ocuroot/client/local"
 	"github.com/ocuroot/ocuroot/client/release"
 	"github.com/ocuroot/ocuroot/client/tui"
 	"github.com/ocuroot/ocuroot/client/tui/tuiwork"
@@ -225,6 +226,51 @@ var RetryReleaseCmd = &cobra.Command{
 	},
 }
 
+var LintReleaseCmd = &cobra.Command{
+	Use:   "lint [package-file]",
+	Short: "Lint a config file containing a release",
+	Long: `Execute a config file to check for errors.
+	
+This involves loading state for environment lists, so the state and intent stores must be correctly configured.`,
+	Args: cobra.ExactArgs(1),
+	RunE: func(cmd *cobra.Command, args []string) error {
+		ctx := cmd.Context()
+		tc, err := getTrackerConfig(ctx, cmd, args)
+		if err != nil {
+			return err
+		}
+
+		cmd.SilenceUsage = true
+
+		backend, _ := release.NewBackend(tc)
+		config, err := local.ExecutePackage(ctx, tc.RepoPath, tc.Ref, backend)
+		if err != nil {
+			return fmt.Errorf("failed to load config %w", err)
+		}
+
+		if config.Package == nil {
+			fmt.Println("No release configured")
+		} else {
+			for _, phase := range config.Package.Phases {
+				if len(phase.Tasks) > 1 || len(phase.Name) > 0 {
+					fmt.Printf("Phase %q: %v tasks\n", phase.Name, len(phase.Tasks))
+				} else if len(phase.Tasks) == 1 {
+					t := phase.Tasks[0]
+					if t.Task != nil {
+						fmt.Printf("Task: %q\n", t.Task.Name)
+					}
+					if t.Deployment != nil {
+						fmt.Printf("Deployment to %q\n", t.Deployment.Environment)
+					}
+				}
+			}
+		}
+		fmt.Println("Config file evaluated successfully")
+
+		return nil
+	},
+}
+
 func checkFinalReleaseState(
 	ctx context.Context,
 	tracker *librelease.ReleaseTracker,
@@ -247,8 +293,8 @@ func init() {
 	NewReleaseCmd.Flags().BoolP("force", "f", false, "Create a new release even if there are existing releases for this commit")
 
 	ReleaseCmd.AddCommand(ContinueReleaseCmd)
-
 	ReleaseCmd.AddCommand(RetryReleaseCmd)
+	ReleaseCmd.AddCommand(LintReleaseCmd)
 
 	AddRefFlags(ReleaseCmd, true)
 
