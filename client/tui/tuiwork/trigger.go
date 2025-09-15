@@ -15,7 +15,7 @@ func triggerID(repo, commit string) string {
 	return "@trigger" + "/" + repo + "/" + commit
 }
 
-func GetTriggerEvent(repo, commit string, t tui.Tui, status WorkStatus) *TriggerEvent {
+func GetTriggerEvent(repo, commit string, t tui.Tui, status TriggerStatus) *TriggerEvent {
 	var out *TriggerEvent = &TriggerEvent{}
 	id := triggerID(repo, commit)
 
@@ -29,14 +29,14 @@ func GetTriggerEvent(repo, commit string, t tui.Tui, status WorkStatus) *Trigger
 		out.New = &newTask
 	}
 	if out.New == nil {
-		name := fmt.Sprintf("Trigger work at %s", commit)
+		name := fmt.Sprintf("%v [%s]", repo, commit)
 
 		out.New = &Trigger{
 			Repo:   repo,
 			Commit: commit,
 
-			Name:         name,
-			CreationTime: time.Now(),
+			Name:    name,
+			Created: time.Now(),
 		}
 	}
 	out.New.Status = status
@@ -46,7 +46,7 @@ func GetTriggerEvent(repo, commit string, t tui.Tui, status WorkStatus) *Trigger
 
 func TuiLoggerForTrigger(tuiWork tui.Tui, repo, commit string) func(msg sdk.Log) {
 	return func(msg sdk.Log) {
-		out := GetTriggerEvent(repo, commit, tuiWork, WorkStatusRunning)
+		out := GetTriggerEvent(repo, commit, tuiWork, TriggerStatusRunning)
 		out.New.Logs = append(out.New.Logs, msg.Message)
 		tuiWork.UpdateTask(out)
 	}
@@ -80,10 +80,10 @@ type Trigger struct {
 	Repo   string
 	Commit string
 
-	CreationTime time.Time
+	Created time.Time
 
 	Name   string
-	Status WorkStatus
+	Status TriggerStatus
 	Error  error
 	Logs   []string
 }
@@ -91,17 +91,17 @@ type Trigger struct {
 func (t *Trigger) SortKey() string {
 	var statusSort = 0
 	switch t.Status {
-	case WorkStatusPending:
+	case TriggerStatusPending:
 		statusSort = 2
-	case WorkStatusRunning:
+	case TriggerStatusRunning:
 		statusSort = 1
-	case WorkStatusFailed:
+	case TriggerStatusFailed:
 		statusSort = 0
-	case WorkStatusDone:
+	case TriggerStatusDone:
 		statusSort = 0
 	}
 
-	return fmt.Sprintf("%d-%d", statusSort, t.CreationTime.UnixNano())
+	return fmt.Sprintf("%d-%d", statusSort, t.Created.UnixNano())
 }
 
 func (t *Trigger) ID() string {
@@ -110,24 +110,31 @@ func (t *Trigger) ID() string {
 
 func (t *Trigger) Hierarchy() []string {
 	return []string{
-		t.Repo,
+		"Other commits",
 	}
+}
+
+func (t *Trigger) StartTime() time.Time {
+	return t.Created
 }
 
 func (task *Trigger) Render(depth int, spinner spinner.Model, final bool) string {
 	var s string
-	if task.Status == WorkStatusPending && !final {
-		return ""
+	if task.Status == TriggerStatusPending && !final {
+		return pendingMark.String() + " "
 	}
 	var prefix any = pendingMark.String() + " "
-	if task.Status == WorkStatusDone {
+	if task.Status == TriggerStatusDone {
 		prefix = checkMark.String() + " "
 	}
-	if task.Error != nil || task.Status == WorkStatusFailed {
+	if task.Error != nil || task.Status == TriggerStatusFailed {
 		prefix = errorMark.String() + " "
 	}
-	if task.Status == WorkStatusRunning {
+	if task.Status == TriggerStatusRunning {
 		prefix = spinner.View()
+	}
+	if task.Status == TriggerStatusNoTrigger {
+		prefix = pendingMark.String() + " "
 	}
 
 	s += fmt.Sprintf("%s%s%v\n", strings.Repeat("  ", depth), prefix, task.Name)
@@ -138,16 +145,57 @@ func (task *Trigger) Render(depth int, spinner spinner.Model, final bool) string
 
 	// Only show streaming for incomplete jobs
 	// Unless in debug mode
-	if task.Status == WorkStatusDone && os.Getenv("OCUROOT_DEBUG") == "" {
+	if task.Status == TriggerStatusDone && os.Getenv("OCUROOT_DEBUG") == "" {
 		return s
 	}
 
 	logs := task.Logs
-	if task.Status != WorkStatusFailed && len(logs) > 4 {
+	if task.Status != TriggerStatusFailed && len(logs) > 4 {
 		logs = logs[len(logs)-4:]
 	}
 	for _, log := range logs {
 		s += fmt.Sprintf("%s%s\n", strings.Repeat("  ", depth+1), log)
 	}
+
+	if task.Status == TriggerStatusNoTrigger {
+		messages := []string{
+			fmt.Sprintf("To execute this work, open the %q repo and run:", task.Repo),
+			fmt.Sprintf(" git checkout %v", task.Commit),
+			" ocuroot work any",
+		}
+
+		for _, msg := range messages {
+			s += fmt.Sprintf("%s%s\n", strings.Repeat("  ", depth+1), msg)
+		}
+	}
+
 	return s
 }
+
+type TriggerStatus int
+
+func (w TriggerStatus) String() string {
+	switch w {
+	case TriggerStatusPending:
+		return "pending"
+	case TriggerStatusRunning:
+		return "running"
+	case TriggerStatusFailed:
+		return "failed"
+	case TriggerStatusDone:
+		return "done"
+	case TriggerStatusNoTrigger:
+		return "no trigger"
+	default:
+		return "unknown"
+	}
+}
+
+const (
+	TriggerStatusPending TriggerStatus = iota
+	TriggerStatusRunning
+	TriggerStatusFailed
+	TriggerStatusDone
+	TriggerStatusNoTrigger
+	TriggerStatusUnknown
+)

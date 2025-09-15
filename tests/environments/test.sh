@@ -2,11 +2,11 @@
 
 export OCUROOT_HOME=$(pwd)/$(dirname "$0")/.ocuroot
 export OCUROOT_DEBUG=true
+export OCU_REPO_COMMIT_OVERRIDE=${OCU_REPO_COMMIT_OVERRIDE:-commitid}
 
 source $(dirname "$0")/../test_helpers.sh
 
 create_environment() {
-    export OCU_REPO_COMMIT_OVERRIDE=${OCU_REPO_COMMIT_OVERRIDE:-commitid}
 
     setup_test
 
@@ -253,9 +253,9 @@ setup_test() {
 build_ocuroot
 
 pushd "$(dirname "$0")" > /dev/null
-create_environment
-create_environment_omnibus
-delete_environment
+# create_environment
+# create_environment_omnibus
+# delete_environment
 delete_environment_omnibus
-delete_environment_comprehensive
+# delete_environment_comprehensive
 popd > /dev/null

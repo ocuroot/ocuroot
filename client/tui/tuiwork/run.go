@@ -72,10 +72,10 @@ func initRunStateEvent(ref refs.Ref, t tui.Tui, store refstore.Store) *RunTaskEv
 		name += fmt.Sprintf(" [%s]", path.Base(runRef.SubPath))
 
 		out.New = &RunTask{
-			RunRef:       runRef,
-			Name:         name,
-			Status:       WorkStatusPending,
-			CreationTime: time.Now(),
+			RunRef:  runRef,
+			Name:    name,
+			Status:  WorkStatusPending,
+			Created: time.Now(),
 
 			Store:  store,
 			JobRef: runRef,
@@ -94,12 +94,12 @@ func tuiRunStatusChange(ctx context.Context, store refstore.Store, tuiWork tui.T
 
 		if out.New.Status == WorkStatusRunning {
 			if out.Old == nil || out.Old.Status != WorkStatusRunning {
-				out.New.StartTime = time.Now()
+				out.New.Start = time.Now()
 			}
 		}
 		if out.New.Status == WorkStatusDone || out.New.Status == WorkStatusFailed {
 			if out.Old == nil || (out.Old.Status != WorkStatusDone && out.Old.Status != WorkStatusFailed) {
-				out.New.EndTime = time.Now()
+				out.New.End = time.Now()
 			}
 		}
 
@@ -123,7 +123,7 @@ func (e *RunTaskEvent) Description() (string, bool) {
 	}
 	if e.New.Status != e.Old.Status {
 		if e.New.Status == WorkStatusDone {
-			return fmt.Sprintf("%v> %v -> %v (%v)", fullName, e.Old.Status, e.New.Status, e.New.EndTime.Sub(e.New.StartTime)), true
+			return fmt.Sprintf("%v> %v -> %v (%v)", fullName, e.Old.Status, e.New.Status, e.New.End.Sub(e.New.Start)), true
 		} else {
 			return fmt.Sprintf("%v> %v -> %v", fullName, e.Old.Status, e.New.Status), true
 		}
@@ -139,9 +139,9 @@ var _ tui.Task = (*RunTask)(nil)
 type RunTask struct {
 	RunRef refs.Ref
 
-	CreationTime time.Time
-	StartTime    time.Time
-	EndTime      time.Time
+	Created time.Time
+	Start   time.Time
+	End     time.Time
 
 	Name   string
 	Status WorkStatus
@@ -166,10 +166,10 @@ func (t *RunTask) SortKey() string {
 	}
 
 	var keyTime string
-	if t.StartTime.IsZero() {
-		keyTime = fmt.Sprintf("%d", t.CreationTime.UnixNano())
+	if t.Start.IsZero() {
+		keyTime = fmt.Sprintf("%d", t.Created.UnixNano())
 	} else {
-		keyTime = fmt.Sprintf("%d", t.StartTime.UnixNano())
+		keyTime = fmt.Sprintf("%d", t.Start.UnixNano())
 	}
 	return fmt.Sprintf("%d-%s", statusSort, keyTime)
 }
@@ -183,6 +183,10 @@ func (t *RunTask) Hierarchy() []string {
 		t.RunRef.Repo,
 		t.RunRef.Filename,
 	}
+}
+
+func (t *RunTask) StartTime() time.Time {
+	return t.Created
 }
 
 func (task *RunTask) Render(depth int, spinner spinner.Model, final bool) string {
@@ -202,12 +206,12 @@ func (task *RunTask) Render(depth int, spinner spinner.Model, final bool) string
 	}
 
 	duration := "N/A"
-	if !task.StartTime.IsZero() {
-		endTime := task.EndTime
+	if !task.Start.IsZero() {
+		endTime := task.End
 		if endTime.IsZero() {
 			endTime = time.Now()
 		}
-		duration = endTime.Sub(task.StartTime).String()
+		duration = endTime.Sub(task.Start).String()
 		s += fmt.Sprintf("%s%s%v (%v)\n", strings.Repeat("  ", depth), prefix, task.Name, duration)
 	} else {
 		s += fmt.Sprintf("%s%s%v\n", strings.Repeat("  ", depth), prefix, task.Name)

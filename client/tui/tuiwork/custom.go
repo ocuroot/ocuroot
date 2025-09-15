@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/charmbracelet/bubbles/spinner"
 	"github.com/ocuroot/ocuroot/client/tui"
@@ -33,9 +34,10 @@ func initCustomStateEvent(ref refs.Ref, t tui.Tui, store refstore.Store) *Custom
 		name := ref.SubPath
 
 		out.New = &CustomStateTask{
-			Ref:   ref,
-			Name:  name,
-			Store: store,
+			Ref:     ref,
+			Name:    name,
+			Store:   store,
+			Created: time.Now(),
 		}
 	}
 
@@ -71,6 +73,8 @@ type CustomStateTask struct {
 	Name string
 
 	Store refstore.Store
+
+	Created time.Time
 }
 
 func (t *CustomStateTask) SortKey() string {
@@ -79,6 +83,10 @@ func (t *CustomStateTask) SortKey() string {
 
 func (t *CustomStateTask) ID() string {
 	return t.Ref.String()
+}
+
+func (t *CustomStateTask) StartTime() time.Time {
+	return t.Created
 }
 
 func (t *CustomStateTask) Hierarchy() []string {

@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/charmbracelet/bubbles/spinner"
 	tea "github.com/charmbracelet/bubbletea"
@@ -32,6 +33,7 @@ type Task interface {
 	ID() string
 	Hierarchy() []string
 	SortKey() string
+	StartTime() time.Time
 	Render(depth int, spinner spinner.Model, final bool) string
 }
 
@@ -144,13 +146,15 @@ func (h *HierarchyNode) Render(depth int, spinner spinner.Model, finished bool) 
 		s += h.Elems[id].Render(depth, spinner, finished)
 	}
 
-	sortedNames := make([]string, 0, len(h.Children))
+	childNames := make([]string, 0, len(h.Children))
 	for name := range h.Children {
-		sortedNames = append(sortedNames, name)
+		childNames = append(childNames, name)
 	}
-	sort.Strings(sortedNames)
+	sort.Slice(childNames, func(i, j int) bool {
+		return h.Children[childNames[i]].StartTime().Before(h.Children[childNames[j]].StartTime())
+	})
 
-	for _, name := range sortedNames {
+	for _, name := range childNames {
 		s += fmt.Sprintf("%s%s:\n", strings.Repeat("  ", depth), name)
 		s += h.Children[name].Render(depth+1, spinner, finished)
 	}
@@ -179,4 +183,19 @@ func (h *HierarchyNode) Add(hierarchy []string, t Task) {
 	}
 
 	h.Children[child].Add(hierarchy, t)
+}
+
+func (h *HierarchyNode) StartTime() time.Time {
+	var startTime time.Time
+	for _, elem := range h.Elems {
+		if elem.StartTime().Before(startTime) || startTime.IsZero() {
+			startTime = elem.StartTime()
+		}
+	}
+	for _, child := range h.Children {
+		if child.StartTime().Before(startTime) || startTime.IsZero() {
+			startTime = child.StartTime()
+		}
+	}
+	return startTime
 }
