@@ -253,9 +253,9 @@ setup_test() {
 build_ocuroot
 
 pushd "$(dirname "$0")" > /dev/null
-# create_environment
-# create_environment_omnibus
-# delete_environment
+create_environment
+create_environment_omnibus
+delete_environment
 delete_environment_omnibus
-# delete_environment_comprehensive
+delete_environment_comprehensive
 popd > /dev/null
