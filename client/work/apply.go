@@ -130,6 +130,9 @@ func applyCustomIntent(ctx context.Context, ref refs.Ref, state, intent refstore
 
 	var content any
 	if err := intent.Get(ctx, ref.String(), &content); err != nil {
+		if err == refstore.ErrRefNotFound {
+			return applyDeletedCustomIntent(ctx, ref, state)
+		}
 		return fmt.Errorf("failed to get intent at %s: %w", ref.String(), err)
 	}
 
@@ -137,6 +140,14 @@ func applyCustomIntent(ctx context.Context, ref refs.Ref, state, intent refstore
 		return fmt.Errorf("failed to set state at %s: %w", ref.String(), err)
 	}
 
+	return nil
+}
+
+func applyDeletedCustomIntent(ctx context.Context, ref refs.Ref, state refstore.Store) error {
+	log.Info("Applying deleted custom intent", "ref", ref.String())
+	if err := state.Delete(ctx, ref.String()); err != nil {
+		return fmt.Errorf("failed to delete state at %s: %w", ref.String(), err)
+	}
 	return nil
 }
 
