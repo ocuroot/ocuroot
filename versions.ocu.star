@@ -14,7 +14,7 @@ def version_to_struct(version):
     )
 
 def next_prerelease_version(prerelease, version):
-    res = host.shell("cat ./VERSION")
+    res = host.shell("cat ./VERSION", mute=True)
     major_minor = res.stdout.strip()
     MAJOR = major_minor.split(".")[0]
     MINOR = major_minor.split(".")[1]
@@ -28,6 +28,13 @@ def next_prerelease_version(prerelease, version):
         version = ""
 
     ps = version_to_struct(prerelease)
+
+    # Check for a pre-existing tag for the prerelease version.
+    # This would indicate that a release was completed manually and not tracked in state.
+    result = shell("git rev-parse v{}.{}.{}".format(MAJOR, MINOR, ps.patch), continue_on_error=True, mute=True)
+    if result.exit_code == 0:
+        print("Found untracked tag for {}.{}.{}, incrementing.".format(MAJOR, MINOR, ps.patch))
+        version = "{}.{}.{}".format(MAJOR, MINOR, ps.patch)
 
     if version != "":
         vs = version_to_struct(version)
