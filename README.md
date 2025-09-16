@@ -109,17 +109,19 @@ trigger(_trigger)
 
 Releases describe deployment processes end-to-end. They can be included in any *.ocu.star file.
 
-Releases are divided into Phases, which are executed in order. Within each Phase are a set of Work items,
-which may be calls to functions or deployments. These items may be executed concurrently within each Phase.
+Releases are divided into Phases, which are executed in order. Within each Phase are a set of tasks, which may
+be calls to a single function, or deployments with an up and down function.
+
+These items may be executed concurrently within each Phase.
 
 ```python
 def build(ctx):
     shell("./build.sh")
 
-    # All functions for call or deploy must return done when complete.
+    # All functions for task or deploy must return done when complete.
     return done()
 
-call(build, name="build")
+task(build, name="build")
 
 envs = environments()
 
@@ -137,7 +139,7 @@ def down(ctx):
 
 phase(
     name="deploy",
-    work=[
+    tasks=[
         deploy(
             up=up, # Executed when deploying a release to this environment
             down=down, # Executed when tearing down a release
