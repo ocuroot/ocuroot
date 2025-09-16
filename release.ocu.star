@@ -170,7 +170,7 @@ def copy_release(source_tag, target_tag):
     # Download assets from source and upload to target
     shell("rm -rf ./.build/assets/*")
     shell("gh release download v{source} --clobber -p '*.*' -D ./.build/assets/".format(source=source_tag))
-    shell("sha256sum * > checksums.txt", dir="./.build/assets")
+    shell("cd ./.build/assets && sha256sum * > checksums.txt")
     shell("gh release upload v{target} ./.build/assets/*.deb ./.build/assets/*.rpm ./.build/assets/*.tar.gz ./.build/assets/checksums.txt".format(target=target_tag))
 
 def release_inputs():
