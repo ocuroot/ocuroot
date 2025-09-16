@@ -10,10 +10,7 @@ def unit_test(ctx):
     host.shell("go test ./...")
     return done()
 
-phase(
-    name="unit",
-    work=[call(unit_test, name="unit_test")],
-)
+task(unit_test, name="unit_test")
 
 def endtoend(ctx):
     print("Running end-to-end tests")
@@ -75,19 +72,6 @@ def build(ctx):
     # Build the binary for this platform with full version
     output = "./.build/{os}-{arch}/ocuroot".format(os=os, arch=arch)
     host.shell("GOOS={os} GOARCH={arch} go build -o {output} -ldflags=\"-X 'github.com/ocuroot/ocuroot/about.Version={version}'\" ./cmd/ocuroot".format(os=os, arch=arch, output=output, version=version))
-    
-    # Upload to R2
-    bucket_path = "ocuroot_binaries:client-binaries/ocuroot/{version}/{os}-{arch}".format(
-        os=os, 
-        arch=arch, 
-        version=version
-    )
-    host.shell(
-        "rclone copy {output} {bucket_path}".format(
-            output=output, 
-            bucket_path=bucket_path,    
-        )
-    )
 
     # Build and test packages for Linux platforms
     if os == "linux":
@@ -96,11 +80,10 @@ def build(ctx):
     add_binary_to_release(version, os, arch)
 
     # Output the URL for future use
-    url = "https://downloads.ocuroot.com/ocuroot/{version}/{os}-{arch}/ocuroot".format(os=os, arch=arch, version=version)
+    url = "https://www.github.com/ocuroot/ocuroot/releases/download/v{version}/ocuroot-{os}-{arch}.tar.gz".format(os=os, arch=arch, version=version)
     return done(
         outputs={
             "download_url": url,
-            "bucket_path": bucket_path,
         }
     )
 
@@ -167,24 +150,6 @@ phase(
 
 def release(ctx):
     version = ctx.inputs.prerelease.split("-")[0]
-
-    download_links = ""
-    for os in oses:
-        for arch in arches:
-            source_path = getattr(ctx.inputs, "bucket_path_{os}_{arch}".format(os=os, arch=arch))
-            dest_path = "ocuroot_binaries:client-binaries/ocuroot/{version}/{os}-{arch}".format(
-                os=os, 
-                arch=arch, 
-                version=version
-            )
-            host.shell(
-                "rclone copy {source_path} {dest_path}".format(
-                    source_path=source_path, 
-                    dest_path=dest_path,    
-                )
-            )
-            download_links += "https://downloads.ocuroot.com/ocuroot/{version}/{os}-{arch}/ocuroot\n".format(os=os, arch=arch, version=version)
-
     copy_release(ctx.inputs.prerelease, version)
 
     return done(
@@ -205,18 +170,13 @@ def copy_release(source_tag, target_tag):
     # Download assets from source and upload to target
     shell("rm -rf ./.build/assets/*")
     shell("gh release download v{source} --clobber -p '*.*' -D ./.build/assets/".format(source=source_tag))
-    shell("gh release upload v{target} ./.build/assets/*.deb ./.build/assets/*.rpm ./.build/assets/*.tar.gz".format(target=target_tag))
+    shell("sha256sum * > checksums.txt", dir="./.build/assets")
+    shell("gh release upload v{target} ./.build/assets/*.deb ./.build/assets/*.rpm ./.build/assets/*.tar.gz ./.build/assets/checksums.txt".format(target=target_tag))
 
 def release_inputs():
     inputs = {
         "prerelease": input(ref="./@/task/increment_version#output/prerelease"),
     }
-
-    for os in oses:
-        for arch in arches:
-            key = "bucket_path_{os}_{arch}".format(os=os, arch=arch)
-            inputs[key] = ref("./task/build_{os}_{arch}#output/bucket_path".format(os=os, arch=arch))
-
     return inputs
 
 phase(
