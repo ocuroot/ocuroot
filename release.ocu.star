@@ -79,13 +79,7 @@ def build(ctx):
 
     add_binary_to_release(version, os, arch)
 
-    # Output the URL for future use
-    url = "https://www.github.com/ocuroot/ocuroot/releases/download/v{version}/ocuroot-{os}-{arch}.tar.gz".format(os=os, arch=arch, version=version)
-    return done(
-        outputs={
-            "download_url": url,
-        }
-    )
+    return done()
 
 def add_binary_to_release(version, os, arch):
     tar_name = "ocuroot_{os}-{arch}.tar.gz".format(os=os, arch=arch)
