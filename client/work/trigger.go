@@ -71,16 +71,16 @@ func (w *Worker) TriggerAll(ctx context.Context) error {
 }
 
 func (w *Worker) TriggerCommit(ctx context.Context, repo, commit string) error {
-	tuiEvent := tuiwork.GetTriggerEvent(repo, commit, w.Tui, tuiwork.TriggerStatusRunning)
+	tuiEvent := tuiwork.GetTriggerEvent(repo, commit, w.Tui, tuiwork.TriggerStatusRunning, w.Tracker)
 	w.Tui.UpdateTask(tuiEvent)
 
-	tLog := tuiwork.TuiLoggerForTrigger(w.Tui, repo, commit)
+	tLog := tuiwork.TuiLoggerForTrigger(w.Tui, repo, commit, w.Tracker)
 
 	configRef := repo + "/-/repo.ocu.star/@" + commit
 
 	configWithCommit, err := w.Tracker.State.ResolveLink(ctx, configRef)
 	if err != nil {
-		tuiEvent := tuiwork.GetTriggerEvent(repo, commit, w.Tui, tuiwork.TriggerStatusFailed)
+		tuiEvent := tuiwork.GetTriggerEvent(repo, commit, w.Tui, tuiwork.TriggerStatusFailed, w.Tracker)
 		w.Tui.UpdateTask(tuiEvent)
 		return fmt.Errorf("failed to resolve config ref (%v): %w", configRef, err)
 	}
@@ -88,7 +88,7 @@ func (w *Worker) TriggerCommit(ctx context.Context, repo, commit string) error {
 	log.Info("Triggering work for repo", "ref", configWithCommit)
 	var repoConfig models.RepoConfig
 	if err := w.Tracker.State.Get(ctx, configWithCommit, &repoConfig); err != nil {
-		tuiEvent := tuiwork.GetTriggerEvent(repo, commit, w.Tui, tuiwork.TriggerStatusFailed)
+		tuiEvent := tuiwork.GetTriggerEvent(repo, commit, w.Tui, tuiwork.TriggerStatusFailed, w.Tracker)
 		w.Tui.UpdateTask(tuiEvent)
 		return fmt.Errorf("failed to get repo config (%v): %w", configWithCommit, err)
 	}
@@ -104,7 +104,7 @@ func (w *Worker) TriggerCommit(ctx context.Context, repo, commit string) error {
 		func(thread *starlark.Thread, msg string) {},
 	)
 	if err != nil {
-		tuiEvent := tuiwork.GetTriggerEvent(repo, commit, w.Tui, tuiwork.TriggerStatusFailed)
+		tuiEvent := tuiwork.GetTriggerEvent(repo, commit, w.Tui, tuiwork.TriggerStatusFailed, w.Tracker)
 		w.Tui.UpdateTask(tuiEvent)
 		return fmt.Errorf("failed to load repo: %w", err)
 	}
@@ -132,7 +132,7 @@ func (w *Worker) TriggerCommit(ctx context.Context, repo, commit string) error {
 		}
 		_, err = starlark.Call(thread, be.RepoTrigger, starlark.Tuple{starlark.String(commit)}, nil)
 		if err != nil {
-			tuiEvent := tuiwork.GetTriggerEvent(repo, commit, w.Tui, tuiwork.TriggerStatusFailed)
+			tuiEvent := tuiwork.GetTriggerEvent(repo, commit, w.Tui, tuiwork.TriggerStatusFailed, w.Tracker)
 			w.Tui.UpdateTask(tuiEvent)
 			return fmt.Errorf("failed to call repo trigger: %w", err)
 		}
@@ -141,12 +141,12 @@ func (w *Worker) TriggerCommit(ctx context.Context, repo, commit string) error {
 			Timestamp: time.Now(),
 			Message:   "No repo trigger found",
 		})
-		tuiEvent := tuiwork.GetTriggerEvent(repo, commit, w.Tui, tuiwork.TriggerStatusNoTrigger)
+		tuiEvent := tuiwork.GetTriggerEvent(repo, commit, w.Tui, tuiwork.TriggerStatusNoTrigger, w.Tracker)
 		w.Tui.UpdateTask(tuiEvent)
 		return nil
 	}
 
-	tuiEvent = tuiwork.GetTriggerEvent(repo, commit, w.Tui, tuiwork.TriggerStatusDone)
+	tuiEvent = tuiwork.GetTriggerEvent(repo, commit, w.Tui, tuiwork.TriggerStatusDone, w.Tracker)
 	w.Tui.UpdateTask(tuiEvent)
 
 	return nil

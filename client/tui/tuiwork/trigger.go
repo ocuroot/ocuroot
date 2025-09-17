@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/charmbracelet/bubbles/spinner"
+	"github.com/ocuroot/ocuroot/client/release"
 	"github.com/ocuroot/ocuroot/client/tui"
 	"github.com/ocuroot/ocuroot/sdk"
 )
@@ -15,7 +16,7 @@ func triggerID(repo, commit string) string {
 	return "@trigger" + "/" + repo + "/" + commit
 }
 
-func GetTriggerEvent(repo, commit string, t tui.Tui, status TriggerStatus) *TriggerEvent {
+func GetTriggerEvent(repo, commit string, t tui.Tui, status TriggerStatus, tc release.TrackerConfig) *TriggerEvent {
 	var out *TriggerEvent = &TriggerEvent{}
 	id := triggerID(repo, commit)
 
@@ -40,13 +41,14 @@ func GetTriggerEvent(repo, commit string, t tui.Tui, status TriggerStatus) *Trig
 		}
 	}
 	out.New.Status = status
+	out.New.TC = &tc
 
 	return out
 }
 
-func TuiLoggerForTrigger(tuiWork tui.Tui, repo, commit string) func(msg sdk.Log) {
+func TuiLoggerForTrigger(tuiWork tui.Tui, repo, commit string, tc release.TrackerConfig) func(msg sdk.Log) {
 	return func(msg sdk.Log) {
-		out := GetTriggerEvent(repo, commit, tuiWork, TriggerStatusRunning)
+		out := GetTriggerEvent(repo, commit, tuiWork, TriggerStatusRunning, tc)
 		out.New.Logs = append(out.New.Logs, msg.Message)
 		tuiWork.UpdateTask(out)
 	}
@@ -86,6 +88,8 @@ type Trigger struct {
 	Status TriggerStatus
 	Error  error
 	Logs   []string
+
+	TC *release.TrackerConfig
 }
 
 func (t *Trigger) SortKey() string {
@@ -158,10 +162,19 @@ func (task *Trigger) Render(depth int, spinner spinner.Model, final bool) string
 	}
 
 	if task.Status == TriggerStatusNoTrigger {
-		messages := []string{
-			fmt.Sprintf("To execute this work, open the %q repo and run:", task.Repo),
-			fmt.Sprintf(" git checkout %v", task.Commit),
-			" ocuroot work any",
+		var messages []string
+		if task.Repo != task.TC.Ref.Repo || task.Commit != task.TC.Commit {
+			messages = []string{
+				fmt.Sprintf("To execute this work, open the %q repo and run:", task.Repo),
+				fmt.Sprintf(" git checkout %v", task.Commit),
+				" ocuroot work any",
+			}
+		} else {
+			messages = []string{
+				"You are currently on this commit.",
+				"To execute this work, run:",
+				" ocuroot work any",
+			}
 		}
 
 		for _, msg := range messages {
