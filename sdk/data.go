@@ -44,7 +44,6 @@ type InputDescriptor struct {
 	Ref     *refs.Ref `json:"ref,omitempty"`
 	Default any       `json:"default,omitempty"`
 	Value   any       `json:"value,omitempty"`
-	Doc     *string   `json:"doc,omitempty"`
 }
 
 type Function struct {

@@ -70,9 +70,6 @@ phase(
         inputs={
             "approval": input(
                 ref=ref("./custom/approval"),
-                doc="""Manually approve this step by running 
-        ocuroot state set \"{approval_ref}\" 1
-        ocuroot state apply \"{approval_ref}\"""".format(approval_ref=ref("./custom/approval")["ref"].replace("@", "+")),
             ),
         }    
     )],
