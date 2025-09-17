@@ -14,8 +14,6 @@ def next(fn, annotation="", inputs={}):
         A dictionary representing the next work item
     """
     fd = render_function(fn)["function"]
-    # TODO: This might not be necessary
-    # add_func(fd)
 
     return {
         "next": {

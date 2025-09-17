@@ -44,7 +44,7 @@ templ StatusCell(statusCounts map[models.Status]int) {
             @badges.RoundFailed(fmt.Sprint(statusCounts[models.StatusFailed] + statusCounts[models.StatusFailedRetried]))
         }
         if statusCounts[models.StatusRunning] > 0 {
-            // TODO: Come up with a running specific status
+            // TODO: Come up with a running specific status badge
             @badges.RoundPending(fmt.Sprint(statusCounts[models.StatusRunning]))
         }
     </div>

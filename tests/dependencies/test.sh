@@ -82,8 +82,6 @@ test_releases_with_intent_update() {
     ocuroot state apply "./-/backend/package.ocu.star/@/custom/credential/staging"
     assert_equal "0" "$?" "Failed to apply backend credential"
 
-    # TODO: In ocuroot work trigger, identify stale deployments and run continue.
-
     echo "Continuing work to capture backend credential"
     ocuroot work continue
     assert_equal "0" "$?" "Failed to continue work on this commit"

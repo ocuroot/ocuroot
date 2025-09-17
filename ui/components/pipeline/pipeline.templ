@@ -102,17 +102,6 @@ func marshalValue(value interface{}) string {
 	return string(jsonBytes)
 }
 
-// displayVarValue returns a human-readable representation of a Var
-func displayVarValue(v *any) string {
-	// TODO: Handle redacting secrets
-
-	if v == nil {
-		return "N/A"
-	}
-	
-	return fmt.Sprintf("%v", *v)	
-}
-
 // getStatusClass returns the CSS class for a given status
 func getStatusClass(status models.Status) string {
 	switch status {
