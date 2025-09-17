@@ -11,7 +11,6 @@ import (
 	"github.com/charmbracelet/log"
 	"github.com/ocuroot/ocuroot/client/local"
 	"github.com/ocuroot/ocuroot/client/release"
-	"github.com/ocuroot/ocuroot/client/tui"
 	"github.com/ocuroot/ocuroot/client/tui/tuiwork"
 	"github.com/ocuroot/ocuroot/client/work"
 	librelease "github.com/ocuroot/ocuroot/lib/release"
@@ -20,6 +19,7 @@ import (
 	"github.com/ocuroot/ocuroot/store/models"
 	"github.com/spf13/cobra"
 	"go.opentelemetry.io/otel/trace"
+	"go.starlark.net/starlark"
 )
 
 var ReleaseCmd = &cobra.Command{
@@ -43,12 +43,22 @@ var NewReleaseCmd = &cobra.Command{
 		)
 		defer span.End()
 
-		tc, err := getTrackerConfig(ctx, cmd, args)
+		force := cmd.Flag("force").Changed
+
+		ref, err := GetRef(cmd, args)
+		if err != nil {
+			return fmt.Errorf("failed to get ref: %w", err)
+		}
+
+		cmd.SilenceUsage = true
+
+		worker, err := work.NewWorker(ctx, ref)
 		if err != nil {
 			return err
 		}
+		defer worker.Cleanup()
 
-		force := cmd.Flag("force").Changed
+		tc := worker.Tracker
 
 		if !force {
 			existingReleases, err := release.GetExistingReleases(ctx, tc)
@@ -56,6 +66,8 @@ var NewReleaseCmd = &cobra.Command{
 				return err
 			}
 			if len(existingReleases) > 0 {
+				worker.Cleanup()
+
 				fmt.Println(strings.Join(existingReleases, "\n"))
 				fmt.Println()
 				fmt.Printf("There are already %d releases for this commit (listed above).\nYou can force a new release with the --force flag\n", len(existingReleases))
@@ -64,19 +76,7 @@ var NewReleaseCmd = &cobra.Command{
 			}
 		}
 
-		cmd.SilenceUsage = true
-
-		workTui := tui.StartWorkTui()
-		defer workTui.Cleanup()
-
-		tc.State = tuiwork.WatchForStateUpdates(ctx, tc.State, workTui)
-
-		worker := &work.Worker{
-			Tracker: tc,
-			Tui:     workTui,
-		}
-
-		tracker, environments, err := release.TrackerForNewRelease(ctx, tc)
+		tracker, environments, err := worker.TrackerForNewRelease(ctx)
 		if err != nil {
 			return err
 		}
@@ -104,16 +104,13 @@ var NewReleaseCmd = &cobra.Command{
 
 		err = tracker.RunToPause(
 			ctx,
-			tuiwork.TuiLogger(workTui),
+			tuiwork.TuiLogger(worker.Tui),
 		)
 		if err != nil {
 			return err
 		}
 
-		err = workTui.Cleanup()
-		if err != nil {
-			return err
-		}
+		worker.Cleanup()
 
 		return checkFinalReleaseState(ctx, tracker)
 	},
@@ -128,27 +125,28 @@ var ContinueReleaseCmd = &cobra.Command{
 		ctx, span := tracer.Start(cmd.Context(), "ocuroot release continue")
 		defer span.End()
 
-		tc, err := getTrackerConfig(ctx, cmd, args)
+		ref, err := GetRef(cmd, args)
 		if err != nil {
 			return err
 		}
 
-		if !tc.Ref.HasRelease() {
+		if !ref.HasRelease() {
 			fmt.Println("A release ID or tag must be specified")
 			return nil
 		}
 
 		cmd.SilenceUsage = true
 
-		workTui := tui.StartWorkTui()
-		defer workTui.Cleanup()
+		worker, err := work.NewWorker(ctx, ref)
+		if err != nil {
+			return err
+		}
+		defer worker.Cleanup()
 
-		tc.State = tuiwork.WatchForStateUpdates(ctx, tc.State, workTui)
-
-		tracker, err := release.TrackerForExistingRelease(ctx, tc)
+		tracker, err := worker.TrackerForExistingRelease(ctx)
 		if err != nil {
 			if errors.Is(err, refstore.ErrRefNotFound) {
-				fmt.Println("The specified release was not found. " + tc.Ref.String())
+				fmt.Println("The specified release was not found. " + ref.String())
 				return nil
 			}
 			return err
@@ -156,7 +154,7 @@ var ContinueReleaseCmd = &cobra.Command{
 
 		err = tracker.RunToPause(
 			ctx,
-			tuiwork.TuiLogger(workTui),
+			tuiwork.TuiLogger(worker.Tui),
 		)
 		if err != nil {
 			return err
@@ -175,19 +173,27 @@ var RetryReleaseCmd = &cobra.Command{
 		ctx, span := tracer.Start(cmd.Context(), "ocuroot release retry")
 		defer span.End()
 
-		tc, err := getTrackerConfig(ctx, cmd, args)
+		ref, err := GetRef(cmd, args)
 		if err != nil {
 			return err
 		}
 
-		if !tc.Ref.HasRelease() {
-			releasesForCommit, err := releasesForCommit(ctx, tc.State, tc.Ref.Repo, tc.Commit)
+		cmd.SilenceUsage = true
+
+		worker, err := work.NewWorker(ctx, ref)
+		if err != nil {
+			return err
+		}
+		defer worker.Cleanup()
+
+		if !ref.HasRelease() {
+			releasesForCommit, err := releasesForCommit(ctx, worker.Tracker.State, worker.Tracker.Ref.Repo, worker.Tracker.Commit)
 			if err != nil {
 				return fmt.Errorf("failed to get releases for commit: %w", err)
 			}
 
 			if len(releasesForCommit) == 0 {
-				log.Error("No releases found for commit", "repo", tc.Ref.Repo, "commit", tc.Commit)
+				log.Error("No releases found for commit", "repo", worker.Tracker.Ref.Repo, "commit", worker.Tracker.Commit)
 				return nil
 			}
 
@@ -195,20 +201,13 @@ var RetryReleaseCmd = &cobra.Command{
 				return releasesForCommit[i].String() > releasesForCommit[j].String()
 			})
 
-			tc.Ref = releasesForCommit[0]
+			worker.Tracker.Ref = releasesForCommit[0]
 		}
 
-		cmd.SilenceUsage = true
-
-		workTui := tui.StartWorkTui()
-		defer workTui.Cleanup()
-
-		tc.State = tuiwork.WatchForStateUpdates(ctx, tc.State, workTui)
-
-		tracker, err := release.TrackerForExistingRelease(ctx, tc)
+		tracker, err := worker.TrackerForExistingRelease(ctx)
 		if err != nil {
 			if errors.Is(err, refstore.ErrRefNotFound) {
-				fmt.Println("The specified release was not found. " + tc.Ref.String())
+				fmt.Println("The specified release was not found. " + worker.Tracker.Ref.String())
 				return nil
 			}
 			return err
@@ -216,7 +215,7 @@ var RetryReleaseCmd = &cobra.Command{
 
 		err = tracker.Retry(
 			ctx,
-			tuiwork.TuiLogger(workTui),
+			tuiwork.TuiLogger(worker.Tui),
 		)
 		if err != nil {
 			return err
@@ -235,18 +234,29 @@ This involves loading state for environment lists, so the state and intent store
 	Args: cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx := cmd.Context()
-		tc, err := getTrackerConfig(ctx, cmd, args)
+
+		ref, err := GetRef(cmd, args)
 		if err != nil {
 			return err
 		}
 
 		cmd.SilenceUsage = true
 
-		backend, _ := release.NewBackend(tc)
-		config, err := local.ExecutePackage(ctx, tc.RepoPath, tc.Ref, backend)
+		worker, err := work.NewWorker(ctx, ref)
+		if err != nil {
+			return err
+		}
+		defer worker.Cleanup()
+
+		backend, _ := release.NewBackend(worker.Tracker)
+		config, err := local.ExecutePackageWithLogging(ctx, worker.Tracker.RepoPath, worker.Tracker.Ref, backend, func(thread *starlark.Thread, msg string) {
+			fmt.Println(msg)
+		})
 		if err != nil {
 			return fmt.Errorf("failed to load config %w", err)
 		}
+
+		worker.Cleanup()
 
 		if config.Package == nil {
 			fmt.Println("No release configured")

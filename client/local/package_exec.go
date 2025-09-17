@@ -2,7 +2,6 @@ package local
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"os"
 
@@ -13,6 +12,13 @@ import (
 )
 
 func ExecutePackage(ctx context.Context, root string, ref refs.Ref, backend sdk.Backend) (*sdk.Config, error) {
+	return ExecutePackageWithLogging(ctx, root, ref, backend, func(thread *starlark.Thread, msg string) {
+		cf := thread.CallFrame(1)
+		log.Info(msg, "filename", cf.Pos.Filename(), "line", cf.Pos.Line, "col", cf.Pos.Col)
+	})
+}
+
+func ExecutePackageWithLogging(ctx context.Context, root string, ref refs.Ref, backend sdk.Backend, logf func(thread *starlark.Thread, msg string)) (*sdk.Config, error) {
 	configFile := ref.Filename
 	log.Info("Loading config", "root", root, "filename", configFile, "ref", ref)
 	config, err := sdk.LoadConfig(
@@ -20,10 +26,7 @@ func ExecutePackage(ctx context.Context, root string, ref refs.Ref, backend sdk.
 		sdk.NewFSResolver(os.DirFS(root)),
 		configFile,
 		backend,
-		func(thread *starlark.Thread, msg string) {
-			cf := thread.CallFrame(1)
-			log.Info(msg, "filename", cf.Pos.Filename(), "line", cf.Pos.Line, "col", cf.Pos.Col)
-		},
+		logf,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("LoadConfig: %w", err)
@@ -40,18 +43,8 @@ func ExecutePackage(ctx context.Context, root string, ref refs.Ref, backend sdk.
 		for _, err := range validationErrors {
 			errorMsg += fmt.Sprintf("  - %s\n", err.Error())
 		}
-		return nil, fmt.Errorf("Validation: %s", errorMsg)
+		return nil, fmt.Errorf("validation: %s", errorMsg)
 	}
 
 	return config, nil
-}
-
-func printJSON(arg ...any) {
-	for _, v := range arg {
-		j, err := json.MarshalIndent(v, "", "  ")
-		if err != nil {
-			fmt.Println(err)
-		}
-		fmt.Println(string(j))
-	}
 }

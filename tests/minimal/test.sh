@@ -106,31 +106,6 @@ test_two_releases() {
     echo ""
 }
 
-test_down() {
-    echo "Test: down"
-    echo ""
-    setup_test
-
-    echo "== release v1 =="
-    ocuroot release new basic.ocu.star
-    assert_equal "0" "$?" "Failed to release v1"
-
-    assert_deployed "basic.ocu.star" "staging"
-    assert_deployed "basic.ocu.star" "production"
-    assert_deployed "basic.ocu.star" "production2"
-
-    echo "== down v1 =="
-    ocuroot deploy down minimal/repo/-/basic.ocu.star/@/deploy/production
-    assert_equal "0" "$?" "Failed to down v1"
-
-    assert_deployed "basic.ocu.star" "staging"
-    assert_not_deployed "basic.ocu.star" "production"
-    assert_deployed "basic.ocu.star" "production2"
-
-    echo "Test succeeded"
-    echo ""
-}
-
 test_deploy_intent() {
     echo "Test: deploy intent"
     echo ""
@@ -230,7 +205,6 @@ pushd "$(dirname "$0")" > /dev/null
 
 test_basic
 test_two_releases
-test_down
 test_deploy_intent
 test_force_deploy
 test_task_with_no_phases

@@ -25,23 +25,19 @@ var WorkContinueCmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx := cmd.Context()
 
-		tc, err := getTrackerConfig(ctx, cmd, args)
+		ref, err := GetRef(cmd, args)
 		if err != nil {
-			return fmt.Errorf("failed to get tracker config: %w", err)
+			return fmt.Errorf("failed to get ref: %w", err)
 		}
 
-		cmd.SilenceUsage = true
 		dryRun := cmd.Flag("dryrun").Changed
+		cmd.SilenceUsage = true
 
-		workTui := tui.StartWorkTui()
-		defer workTui.Cleanup()
-
-		tc.State = tuiwork.WatchForStateUpdates(ctx, tc.State, workTui)
-
-		worker := &work.Worker{
-			Tracker: tc,
-			Tui:     workTui,
+		worker, err := work.NewWorker(ctx, ref)
+		if err != nil {
+			return fmt.Errorf("failed to create worker: %w", err)
 		}
+		defer worker.Cleanup()
 
 		todo, err := worker.ReadyRuns(ctx, work.IndentifyWorkRequest{
 			GitFilter: work.GitFilterCurrentCommitOnly,
@@ -60,7 +56,7 @@ var WorkContinueCmd = &cobra.Command{
 		log.Info("Identified work", "todo", toJSON(todo))
 
 		if dryRun {
-			workTui.Cleanup()
+			worker.Cleanup()
 
 			todoJSON, err := json.MarshalIndent(todo, "", "  ")
 			if err != nil {
@@ -98,22 +94,18 @@ finally it will trigger work for other commits ('ocuroot work trigger').
 			return fmt.Errorf("--comprehensive and --dryrun are mutually exclusive")
 		}
 
-		tc, err := getTrackerConfig(ctx, cmd, args)
+		ref, err := GetRef(cmd, args)
 		if err != nil {
-			return fmt.Errorf("failed to get tracker config: %w", err)
+			return fmt.Errorf("failed to get ref: %w", err)
 		}
 
 		cmd.SilenceUsage = true
 
-		workTui := tui.StartWorkTui()
-		defer workTui.Cleanup()
-
-		tc.State = tuiwork.WatchForStateUpdates(ctx, tc.State, workTui)
-
-		worker := &work.Worker{
-			Tracker: tc,
-			Tui:     workTui,
+		worker, err := work.NewWorker(ctx, ref)
+		if err != nil {
+			return fmt.Errorf("failed to create worker: %w", err)
 		}
+		defer worker.Cleanup()
 
 		for {
 			todo, err := worker.IdentifyWork(ctx, work.IndentifyWorkRequest{
@@ -129,7 +121,7 @@ finally it will trigger work for other commits ('ocuroot work trigger').
 			}
 
 			if dryRun {
-				workTui.Cleanup()
+				worker.Cleanup()
 
 				todoJSON, err := json.MarshalIndent(todo, "", "  ")
 				if err != nil {
@@ -223,16 +215,20 @@ var WorkOpsCmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx := cmd.Context()
 
-		tc, err := getTrackerConfig(ctx, cmd, args)
-		if err != nil {
-			return fmt.Errorf("failed to get tracker config: %w", err)
-		}
-
 		dryRun := cmd.Flag("dryrun").Changed
 
-		worker := &work.Worker{
-			Tracker: tc,
+		ref, err := GetRef(cmd, args)
+		if err != nil {
+			return fmt.Errorf("failed to get ref: %w", err)
 		}
+
+		cmd.SilenceUsage = true
+
+		worker, err := work.NewWorker(ctx, ref)
+		if err != nil {
+			return fmt.Errorf("failed to create worker: %w", err)
+		}
+		defer worker.Cleanup()
 
 		todo, err := worker.Ops(ctx, work.IndentifyWorkRequest{
 			GitFilter: work.GitFilterCurrentCommitOnly,
@@ -244,6 +240,8 @@ var WorkOpsCmd = &cobra.Command{
 		log.Info("Identified work", "todo", toJSON(todo))
 
 		if dryRun {
+			worker.Cleanup()
+
 			todoJSON, err := json.MarshalIndent(todo, "", "  ")
 			if err != nil {
 				return fmt.Errorf("failed to marshal todo: %w", err)

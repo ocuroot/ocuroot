@@ -17,6 +17,24 @@ import (
 	librelease "github.com/ocuroot/ocuroot/lib/release"
 )
 
+func NewWorker(ctx context.Context, ref refs.Ref) (*Worker, error) {
+	workTui := tui.StartWorkTui()
+
+	w := &Worker{
+		Tui: workTui,
+	}
+
+	err := w.InitTracker(ctx, ref)
+	if err != nil {
+		workTui.Cleanup()
+		return nil, fmt.Errorf("failed to init tracker: %w", err)
+	}
+
+	w.Tracker.State = tuiwork.WatchForStateUpdates(ctx, w.Tracker.State, workTui)
+
+	return w, nil
+}
+
 type Worker struct {
 	Tracker release.TrackerConfig
 
@@ -34,6 +52,10 @@ const (
 type IndentifyWorkRequest struct {
 	// Filter work based on the repo and commit required
 	GitFilter GitFilter
+}
+
+func (w *Worker) Cleanup() {
+	w.Tui.Cleanup()
 }
 
 func (w *Worker) IdentifyWork(ctx context.Context, req IndentifyWorkRequest) ([]Work, error) {
@@ -122,7 +144,7 @@ func (w *Worker) runOp(ctx context.Context, ref string) error {
 	w.Tracker.Ref.SubPathType = refs.SubPathTypeNone
 
 	log.Info("Setting up tracker", "tc", w.Tracker)
-	tracker, err := release.TrackerForExistingRelease(ctx, w.Tracker)
+	tracker, err := w.TrackerForExistingRelease(ctx)
 	if err != nil {
 		if errors.Is(err, refstore.ErrRefNotFound) {
 			log.Error("The specified release was not found", "ref", w.Tracker.Ref.String())
@@ -140,7 +162,7 @@ func (w *Worker) runOp(ctx context.Context, ref string) error {
 }
 
 func (w *Worker) continueRelease(ctx context.Context, workTui tui.Tui) error {
-	tracker, err := release.TrackerForExistingRelease(ctx, w.Tracker)
+	tracker, err := w.TrackerForExistingRelease(ctx)
 	if err != nil {
 		if errors.Is(err, refstore.ErrRefNotFound) {
 			log.Error("The specified release was not found", "ref", w.Tracker.Ref.String())

@@ -51,7 +51,9 @@ func initRunStateEvent(ref refs.Ref, t tui.Tui, store refstore.Store) *RunTaskEv
 	}
 	if out.New == nil {
 		name := strings.Split(runRef.SubPath, "/")[0]
-		if runRef.SubPathType == refs.SubPathTypeDeploy {
+
+		switch runRef.SubPathType {
+		case refs.SubPathTypeDeploy:
 			var run models.Run
 			if store != nil {
 				err = store.Get(ctx, runRef.String(), &run)
@@ -59,15 +61,18 @@ func initRunStateEvent(ref refs.Ref, t tui.Tui, store refstore.Store) *RunTaskEv
 					log.Error("failed to get run", "error", err)
 				} else {
 					if run.Type == models.RunTypeDown {
-						name = fmt.Sprintf("remove from %s", name)
+						name = fmt.Sprintf("Remove from %s", name)
 					} else {
-						name = fmt.Sprintf("deploy to %s", name)
+						name = fmt.Sprintf("Deploy to %s", name)
 					}
 				}
 			} else {
 				log.Error("failed to get run", "error", "no store")
 			}
+		case refs.SubPathTypeTask:
+			name = fmt.Sprintf("Task: %s", name)
 		}
+
 		name += fmt.Sprintf(" [%s]", path.Base(runRef.SubPath))
 
 		out.New = &RunTask{
