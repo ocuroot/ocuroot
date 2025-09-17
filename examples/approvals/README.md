@@ -1,62 +1,74 @@
-# Approvals
+# Approvals example
 
-## High Level
+This directory contains example configuration for a release that deploys first to staging, then
+requires manual approval before deploying to production.
 
-This example demonstrates a four-phase release process where production deploys require explicit approval before proceeding.
+The entrypoint is `approvals.ocu.star`, which contains the described release workflow. This relies
+on `tasks.ocu.star` to define functions to power the release.
 
-```mermaid
-graph LR
-    B(Build)
-    B --> S[Staging Phase]
-    S -- Wait for approval state --> A[Production Approval Phase]
-    A --> P1[Production Phase]
-    A --> P2[Production Phase]
-    
-    subgraph "Phase 1: Build"
-        B[Build]
-    end
+Environments are configured in `environments.ocu.star`.
 
-    subgraph "Phase 2: Staging"
-        S[Deploy to Staging]
-    end
-    
-    subgraph "Phase 3: Approval"
-        A[Handle approval]
-    end
-    
-    subgraph "Phase 4: Production"
-        P1[Deploy to Production]
-        P2[Deploy to Production2]
-    end
-```
-
-## Four-Phase Structure
-
-The release process is organized into four sequential phases:
-
-1. **Build Phase**: Builds an artifact
-2. **Staging Phase**: Deploys to all staging environments
-3. **Production Approval Phase**: Waits for manual approval via custom state
-4. **Production Phase**: Deploys to all production environments after approval
-
-Each phase must complete successfully before the next phase can begin.
-
-## Approval Process
-
-Approvals are handled through Ocuroot's custom state mechanism. The approval phase references a custom state at `./custom/approval` that must be manually set before the production phase can proceed.
-
-### How to Approve a Release
-
-1. **Review the staging deployment**: Ensure the staging phase completed successfully and the application is working as expected
-
-2. **Set the approval state**: Use the Ocuroot CLI to set the custom approval state:
+A typical execution would look like:
 
 ```bash
-ocuroot state set ./release.ocu.star/@<release>/custom/approval "approved"
-```
+# Set up the environments first
+$ ocuroot release new environments.ocu.star
+approvals:
+  ✓ Load config
+  environments.ocu.star:
+    ✓ Loaded config: No phases
+environments:
+  +++ production
+  +++ production2
+  +++ staging
 
-3. **Apply the intent**: Once the state is set, apply the intent to allow the production phase to proceed:
+# Kick off the release
+$ ocuroot release new approvals.ocu.star
+approvals:
+  ✓ Load config
+  approvals.ocu.star:
+    ✓ Loaded config: 2 tasks, deploy to 3 environments
+    ✓ Task: build [1] (10.191875ms)
+      Outputs
+      ├── approvals/-/approvals.ocu.star/@r1/task/build/1#output/output1
+      │   └── 5.5
+      ├── approvals/-/approvals.ocu.star/@r1/task/build/1#output/output2
+      │   └── value2
+      ├── approvals/-/approvals.ocu.star/@r1/task/build/1#output/output3
+      │   └── true
+      └── approvals/-/approvals.ocu.star/@r1/task/build/1#output/output4
+          └── 3
+    ✓ Deploy to staging [1] (80.064583ms)
+      Outputs
+      ├── approvals/-/approvals.ocu.star/@r1/deploy/staging/1#output/count
+      │   └── 1
+      └── approvals/-/approvals.ocu.star/@r1/deploy/staging/1#output/env_name
+          └── staging
+    › Task: prod_approval [1]
+      Pending Inputs
+      └── approvals/-/approvals.ocu.star/@r1/custom/approval
+    › Deploy to production [1]
+    › Deploy to production2 [1]
 
-```bash
-ocuroot state apply ./release.ocu.star/@<release>/custom/approval
+# Approve promotion to production
+$ ocuroot state set approvals/-/approvals.ocu.star/@r1/custom/approval 1
+$ ocuroot work any --comprehensive
+approvals:
+  ✓ Load config
+  approvals.ocu.star:
+    ✓ Loaded config: 2 tasks, deploy to 3 environments
+    ✓ Task: prod_approval [1] (6.488667ms)
+    ✓ Deploy to production [1] (75.744083ms)
+      Outputs
+      ├── approvals/-/approvals.ocu.star/@r1/deploy/production/1#output/count
+      │   └── 1
+      └── approvals/-/approvals.ocu.star/@r1/deploy/production/1#output/env_name
+          └── production
+    ✓ Deploy to production2 [1] (83.84675ms)
+      Outputs
+      ├── approvals/-/approvals.ocu.star/@r1/deploy/production2/1#output/count
+      │   └── 1
+      └── approvals/-/approvals.ocu.star/@r1/deploy/production2/1#output/env_name
+          └── production2
+    +++ approvals/-/approvals.ocu.star/@r1/custom/approval
 ```
