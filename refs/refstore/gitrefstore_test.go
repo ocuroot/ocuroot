@@ -10,13 +10,11 @@ import (
 )
 
 func TestGitRefStore(t *testing.T) {
-	tempDir, err := os.MkdirTemp("", "ocuroot_test")
-	if err != nil {
+	tempDir := "./testdata/git_testdata"
+	_ = os.RemoveAll(tempDir)
+	if err := os.MkdirAll(tempDir, os.ModePerm); err != nil {
 		t.Fatal(err)
 	}
-	t.Cleanup(func() {
-		os.RemoveAll(tempDir)
-	})
 
 	remotePath, cleanup, err := gittools.CreateTestRemoteRepoWithBranch("ocuroot_test", "main")
 	if err != nil {

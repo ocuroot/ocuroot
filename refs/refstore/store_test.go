@@ -121,7 +121,6 @@ func testStoreLink(t *testing.T, store Store) {
 	if err := store.Link(ctx, link2, ref3); err != nil {
 		t.Errorf("failed to link: %v", err)
 	}
-	// TODO: Allow removing links
 
 	var got string
 	if err := store.Get(ctx, link, &got); err != nil {
@@ -195,6 +194,18 @@ func testStoreLink(t *testing.T, store Store) {
 	}
 	if len(links) != 1 || links[0] != link {
 		t.Errorf("unexpected links: got %v, want %v", links, []string{link})
+	}
+
+	if err := store.Unlink(ctx, link); err != nil {
+		t.Errorf("failed to unlink: %v", err)
+	}
+
+	links, err = store.GetLinks(ctx, ref)
+	if err != nil {
+		t.Errorf("failed to get links: %v", err)
+	}
+	if len(links) != 0 {
+		t.Errorf("unexpected links: got %v, want %v", links, []string{})
 	}
 }
 

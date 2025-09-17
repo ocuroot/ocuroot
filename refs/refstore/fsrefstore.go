@@ -97,12 +97,10 @@ type FSStateStore struct {
 }
 
 func (f *FSStateStore) StartTransaction(ctx context.Context, message string) error {
-	// TODO: Implement
 	return nil
 }
 
 func (f *FSStateStore) CommitTransaction(ctx context.Context) error {
-	// TODO: Implement
 	return nil
 }
 
@@ -273,8 +271,15 @@ func (f *FSStateStore) Delete(ctx context.Context, ref string) error {
 		}
 		return err
 	}
-	if err := os.Remove(filepath.Dir(rpath)); err != nil && !errors.Is(err, fs.ErrNotExist) {
+
+	// Delete the directory that contained this ref iff empty
+	dir := filepath.Dir(rpath)
+	if entries, err := os.ReadDir(dir); err != nil {
 		return err
+	} else if len(entries) == 0 {
+		if err := os.Remove(filepath.Dir(rpath)); err != nil && !errors.Is(err, fs.ErrNotExist) {
+			return err
+		}
 	}
 
 	return nil

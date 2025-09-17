@@ -6,15 +6,13 @@ import (
 )
 
 func TestFSRefStore(t *testing.T) {
-	dir, err := os.MkdirTemp("", "ocuroot-release-test")
-	if err != nil {
+	tempDir := "./testdata/fs_testdata"
+	_ = os.RemoveAll(tempDir)
+	if err := os.MkdirAll(tempDir, os.ModePerm); err != nil {
 		t.Fatal(err)
 	}
-	t.Cleanup(func() {
-		os.RemoveAll(dir)
-	})
 
-	store, err := NewFSRefStore(dir)
+	store, err := NewFSRefStore(tempDir)
 	if err != nil {
 		t.Fatal(err)
 	}
