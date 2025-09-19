@@ -41,8 +41,10 @@ func LoadRepo(
 
 	var builtins starlark.StringDict
 	if sdkVersion != "" {
+		// Try to resolve version alias first
+		resolvedVersion := resolveVersionAlias(sdkVersion)
 		var exists bool
-		builtins, exists = builtinsByVersion[sdkVersion]
+		builtins, exists = builtinsByVersion[resolvedVersion]
 		if !exists {
 			return nil, fmt.Errorf("version %s not found", sdkVersion)
 		}
@@ -102,8 +104,10 @@ func LoadRepoFromBytes(
 
 	var builtins starlark.StringDict
 	if sdkVersion != "" {
+		// Try to resolve version alias first
+		resolvedVersion := resolveVersionAlias(sdkVersion)
 		var exists bool
-		builtins, exists = builtinsByVersion[sdkVersion]
+		builtins, exists = builtinsByVersion[resolvedVersion]
 		if !exists {
 			return nil, fmt.Errorf("version %s not found", sdkVersion)
 		}
