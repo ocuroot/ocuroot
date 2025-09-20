@@ -1,5 +1,3 @@
-ocuroot("0.3.0")
-
 def build():
     print("Building minimal package")
 

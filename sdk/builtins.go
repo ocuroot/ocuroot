@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/charmbracelet/log"
+	"github.com/ocuroot/ocuroot/about"
 	starlarkjson "go.starlark.net/lib/json"
 	"go.starlark.net/starlark"
 	"go.starlark.net/starlarkstruct"
@@ -33,6 +34,47 @@ func AvailableVersions() []string {
 	sort.Strings(versions)
 
 	return versions
+}
+
+// resolveVersionAlias resolves a version to its target SDK version if it matches known patterns
+// This allows binary versions like 0.3.14 to map to SDK version 0.3.0
+func resolveVersionAlias(version string) string {
+	// Check if it's a 0.3.x version (where x is any number)
+	if strings.HasPrefix(version, "0.3.") && version != "0.3.0" {
+		parts := strings.Split(version, ".")
+		if len(parts) == 3 {
+			// Validate that the patch version is numeric
+			if _, err := fmt.Sscanf(parts[2], "%d", new(int)); err == nil {
+				return "0.3.0"
+			}
+		}
+	}
+	
+	// Return the original version if no alias found
+	return version
+}
+
+// getCurrentSDKVersion returns the appropriate SDK version based on the current binary version
+func getCurrentSDKVersion() string {
+	binaryVersion := about.Version
+	if binaryVersion == "dev" {
+		return "0.3.0" // Default for development
+	}
+	
+	// Extract major.minor from binary version
+	parts := strings.Split(binaryVersion, ".")
+	if len(parts) >= 2 {
+		majorMinor := fmt.Sprintf("%s.%s", parts[0], parts[1])
+		// Map to appropriate SDK version
+		switch majorMinor {
+		case "0.3":
+			return "0.3.0"
+		default:
+			return "0.3.0" // Fallback to current SDK version
+		}
+	}
+	
+	return "0.3.0" // Fallback
 }
 
 func GetVersionStubs(version string) map[string]string {
@@ -77,6 +119,11 @@ func (c *configLoader) LoadBuiltinsForAllVersion(ctx context.Context) (map[strin
 			builtinsByVersion[version] = builtins
 		}
 	}
+
+	// Add version aliases to support binary versions mapping to SDK versions
+	// We need to check all possible 0.3.x versions that might be requested
+	// Since we can't predict all possible patch versions, we'll handle this dynamically
+	// in the version resolution logic instead of pre-populating aliases
 
 	return builtinsByVersion, nil
 }

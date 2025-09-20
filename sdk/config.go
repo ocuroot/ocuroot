@@ -73,8 +73,10 @@ func LoadConfig(
 
 	var builtins starlark.StringDict
 	if sdkVersion != "" {
+		// Try to resolve version alias first
+		resolvedVersion := resolveVersionAlias(sdkVersion)
 		var exists bool
-		builtins, exists = builtinsByVersion[sdkVersion]
+		builtins, exists = builtinsByVersion[resolvedVersion]
 		if !exists {
 			return nil, fmt.Errorf("version %s not found", sdkVersion)
 		}
@@ -254,7 +256,8 @@ func IdentifySDKVersion(filename string, data []byte) (string, error) {
 	}
 
 	if ocurootCallCount == 0 {
-		return "", nil
+		// No ocuroot() call found - use current binary version mapped to appropriate SDK version
+		return getCurrentSDKVersion(), nil
 	}
 
 	if ocurootCallCount > 1 {

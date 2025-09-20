@@ -129,8 +129,10 @@ func (m *moduleLoader) Load(_ *starlark.Thread, module string) (starlark.StringD
 
 	var builtins starlark.StringDict
 	if sdkVersion != "" {
+		// Try to resolve version alias first
+		resolvedVersion := resolveVersionAlias(sdkVersion)
 		var exists bool
-		builtins, exists = m.builtinsByVersion[sdkVersion]
+		builtins, exists = m.builtinsByVersion[resolvedVersion]
 		if !exists {
 			return nil, fmt.Errorf("version %s not found", sdkVersion)
 		}

@@ -1,5 +1,3 @@
-ocuroot("0.3.0")
-
 load("./tasks.ocu.star", "build", "up", "down")
 
 envs = environments()
