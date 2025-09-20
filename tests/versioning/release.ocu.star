@@ -1,4 +1,4 @@
-ocuroot("0.3.14")
+ocuroot("0.3.0")
 
 load("./tasks.ocu.star", "build", "do_release")
 
