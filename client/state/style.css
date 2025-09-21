@@ -110,3 +110,8 @@ pre.text_value, pre.json_value {
     overflow: auto;
     max-height: calc(10 * 1.6rem); /* 16px per line */
 }
+
+.empty-state {
+    color: var(--text-secondary);
+    font-style: italic;
+}

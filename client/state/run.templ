@@ -45,6 +45,9 @@ templ RunContent(run models.Run, children []string) {
 			}
 			@components.Card() {
 				<h3>Outputs</h3>
+				if len(run.Outputs) == 0 {
+					<p class="empty-state">No outputs. Output values can be set as a dictionary with <code>{ "done(outputs={...})" }</code>.</p>
+				} else {
 				<ul>
 					for key, output := range run.Outputs {
 						<div class="output">
@@ -52,6 +55,7 @@ templ RunContent(run models.Run, children []string) {
 						</div>
 					}
 				</ul>
+				}
 			}
 		}
 		@Column60() {
