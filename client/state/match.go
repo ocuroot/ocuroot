@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	"github.com/a-h/templ"
+	"github.com/maruel/natural"
 	"github.com/ocuroot/ocuroot/lib/release"
 	"github.com/ocuroot/ocuroot/refs"
 	"github.com/ocuroot/ocuroot/store/models"
@@ -44,6 +45,10 @@ func (s *server) handleMatch(w http.ResponseWriter, r *http.Request) {
 	case release.GlobTask.Match(query) || query == GlobTask:
 		content = s.buildTaskTable(r.Context(), matches)
 	default:
+		// Sort matches using natural ordering for consistent display
+		sort.Slice(matches, func(i, j int) bool {
+			return natural.Less(matches[i], matches[j])
+		})
 		content = Match(query, matches)
 	}
 
@@ -65,6 +70,12 @@ func textCell(text string) templ.Component {
 
 func (s *server) buildRepositoryTable(matches []string) templ.Component {
 	var tableContent []ResultTableRow
+	
+	// Sort matches using natural ordering
+	sort.Slice(matches, func(i, j int) bool {
+		return natural.Less(matches[i], matches[j])
+	})
+	
 	for _, match := range matches {
 		pr, err := refs.Parse(match)
 		if err != nil {
@@ -87,7 +98,7 @@ func (s *server) buildReleaseTable(ctx context.Context, matches []string) templ.
 	allCurrentDeploys, _ := s.store.Match(ctx, "**/@/deploy/*")
 
 	sort.Slice(matches, func(i, j int) bool {
-		return matches[i] > matches[j]
+		return !natural.Less(matches[i], matches[j])
 	})
 
 	for _, match := range matches {
@@ -139,6 +150,12 @@ func (s *server) buildReleaseTable(ctx context.Context, matches []string) templ.
 
 func (s *server) buildDeploymentTable(ctx context.Context, matches []string) templ.Component {
 	var tableContent []ResultTableRow
+	
+	// Sort matches using natural ordering
+	sort.Slice(matches, func(i, j int) bool {
+		return natural.Less(matches[i], matches[j])
+	})
+	
 	for _, match := range matches {
 		resolved, err := s.store.ResolveLink(ctx, match)
 		if err != nil {
@@ -167,6 +184,12 @@ func (s *server) buildDeploymentTable(ctx context.Context, matches []string) tem
 
 func (s *server) buildTaskTable(ctx context.Context, matches []string) templ.Component {
 	var tableContent []ResultTableRow
+	
+	// Sort matches using natural ordering
+	sort.Slice(matches, func(i, j int) bool {
+		return natural.Less(matches[i], matches[j])
+	})
+	
 	for _, match := range matches {
 		resolved, err := s.store.ResolveLink(ctx, match)
 		if err != nil {

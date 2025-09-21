@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/maruel/natural"
 	"github.com/ocuroot/ocuroot/lib/release"
 	"github.com/ocuroot/ocuroot/refs"
 	"github.com/ocuroot/ocuroot/refs/refstore"
@@ -190,7 +191,9 @@ func (rm RefMap) OrderedKeys() []string {
 	for k := range rm {
 		keys = append(keys, k)
 	}
-	sort.Strings(keys)
+	sort.Slice(keys, func(i, j int) bool {
+		return natural.Less(keys[i], keys[j])
+	})
 	return keys
 }
 
