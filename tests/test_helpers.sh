@@ -1,13 +1,18 @@
 #!/usr/bin/env bash
 
+# Set up PATH to include test binary directory
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+TEST_BIN_DIR="$SCRIPT_DIR/bin"
+export PATH="$TEST_BIN_DIR:$PATH"
+
 build_ocuroot() {
     if [ -n "$NO_INSTALL" ]; then
         return 0
     fi
 
     pushd "$(dirname "$0")/../../" > /dev/null
-    make install
-    assert_equal "0" "$?" "Failed to install ocuroot"
+    make test-build
+    assert_equal "0" "$?" "Failed to build ocuroot for tests"
     popd > /dev/null
 }
 

@@ -10,7 +10,11 @@ install: templ
 	mkdir -p ~/ocuroot
 	go build -o ~/ocuroot/ocuroot ./cmd/ocuroot
 
-e2e: install
+test-build: templ
+	mkdir -p ./tests/bin
+	go build -o ./tests/bin/ocuroot ./cmd/ocuroot
+
+e2e: test-build
 	NO_INSTALL=1 ./tests/minimal/test.sh
 	NO_INSTALL=1 ./tests/dependencies/test.sh
 	NO_INSTALL=1 ./tests/errors/test.sh
