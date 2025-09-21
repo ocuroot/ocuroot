@@ -13,6 +13,7 @@ require (
 	github.com/google/go-cmp v0.7.0
 	github.com/google/uuid v1.6.0
 	github.com/mark3labs/mcp-go v0.38.0
+	github.com/maruel/natural v1.1.1
 	github.com/mattn/go-isatty v0.0.20
 	github.com/ocuroot/gittools v0.0.9
 	github.com/ocuroot/ui v0.0.18

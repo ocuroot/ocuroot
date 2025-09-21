@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	"github.com/a-h/templ"
+	"github.com/maruel/natural"
 	"github.com/ocuroot/ocuroot/lib/release"
 	"github.com/ocuroot/ocuroot/refs"
 	"github.com/ocuroot/ocuroot/store/models"
@@ -87,7 +88,7 @@ func (s *server) buildReleaseTable(ctx context.Context, matches []string) templ.
 	allCurrentDeploys, _ := s.store.Match(ctx, "**/@/deploy/*")
 
 	sort.Slice(matches, func(i, j int) bool {
-		return matches[i] > matches[j]
+		return !natural.Less(matches[i], matches[j])
 	})
 
 	for _, match := range matches {
