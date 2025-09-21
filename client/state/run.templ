@@ -48,13 +48,13 @@ templ RunContent(run models.Run, children []string) {
 				if len(run.Outputs) == 0 {
 					<p class="empty-state">No outputs. Output values can be set as a dictionary with <code>{ "done(outputs={...})" }</code>.</p>
 				} else {
-				<ul>
-					for key, output := range run.Outputs {
-						<div class="output">
-							@Output(key, output)
-						</div>
-					}
-				</ul>
+					<ul>
+						for key, output := range run.Outputs {
+							<div class="output">
+								@Output(key, output)
+							</div>
+						}
+					</ul>
 				}
 			}
 		}
