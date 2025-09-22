@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 
 	"github.com/charmbracelet/log"
+	"github.com/ocuroot/gittools"
 	"github.com/ocuroot/ocuroot/client"
 	"github.com/ocuroot/ocuroot/client/local"
 	"github.com/ocuroot/ocuroot/client/release"
@@ -232,8 +233,19 @@ func saveRepoConfig(ctx context.Context, tc release.TrackerConfig, data []byte) 
 		SetSubPath("").
 		SetFragment("")
 
+	r, err := gittools.Open(tc.RepoPath)
+	if err != nil {
+		return fmt.Errorf("failed to open repo: %w", err)
+	}
+
+	remotes, err := r.Remotes()
+	if err != nil {
+		return fmt.Errorf("failed to get remotes: %w", err)
+	}
+
 	repoConfig := models.RepoConfig{
-		Source: data,
+		Remotes: remotes,
+		Source:  data,
 	}
 
 	err = tc.State.StartTransaction(ctx, "Save repo config")

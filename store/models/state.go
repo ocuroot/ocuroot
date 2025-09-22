@@ -1,6 +1,7 @@
 package models
 
 import (
+	"github.com/ocuroot/gittools"
 	"github.com/ocuroot/ocuroot/refs"
 	"github.com/ocuroot/ocuroot/sdk"
 )
@@ -46,5 +47,6 @@ type Environment struct {
 }
 
 type RepoConfig struct {
-	Source []byte `json:"source"`
+	Remotes []gittools.Remote
+	Source  []byte `json:"source"`
 }
