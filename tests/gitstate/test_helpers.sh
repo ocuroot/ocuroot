@@ -69,3 +69,23 @@ check_file_in_remote() {
         exit 1
     fi
 }
+
+check_last_log_in_remote() {
+    local remote_url="$1"
+    local branch="$2"
+    local expected_content="$3"
+    
+    local tmp_dir=$(mktemp -d)
+    trap "rm -rf $tmp_dir" EXIT
+    git clone "$remote_url" "$tmp_dir"
+    git -C "$tmp_dir" checkout "$branch"
+    local last_log=$(git -C "$tmp_dir" log -1)
+    if echo "$last_log" | grep -q "$expected_content"; then
+        return 0
+    else
+        echo "Last log does not contain expected content"
+        echo "Got: "
+        echo "$last_log"
+        exit 1
+    fi
+}

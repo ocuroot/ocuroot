@@ -13,6 +13,13 @@ import (
 	"github.com/ocuroot/gittools"
 )
 
+type GitRepoConfig struct {
+	CreateBranch bool
+
+	GitUserName  string
+	GitUserEmail string
+}
+
 type GitRepo interface {
 	RepoPath() string
 	Branch() string
@@ -30,8 +37,8 @@ type GitRepoWrapper struct {
 	branch string
 }
 
-func NewGitRepoForRemote(baseDir, remote, branch string, createBranch bool) (GitRepo, error) {
-	g, branch, err := getRepoForRemote(baseDir, remote, branch, createBranch)
+func NewGitRepoForRemote(baseDir, remote, branch string, cfg GitRepoConfig) (GitRepo, error) {
+	g, branch, err := getRepoForRemote(baseDir, remote, branch, cfg)
 	if err != nil {
 		return nil, err
 	}
@@ -41,7 +48,7 @@ func NewGitRepoForRemote(baseDir, remote, branch string, createBranch bool) (Git
 	}, nil
 }
 
-func getRepoForRemote(baseDir, remote, branch string, createBranch bool) (*gittools.Repo, string, error) {
+func getRepoForRemote(baseDir, remote, branch string, cfg GitRepoConfig) (*gittools.Repo, string, error) {
 	statePath, err := getStatePath(baseDir, remote)
 	if err != nil {
 		return nil, "", err
@@ -118,7 +125,7 @@ func getRepoForRemote(baseDir, remote, branch string, createBranch bool) (*gitto
 			}
 		}
 
-		if createBranch && !branchExists {
+		if cfg.CreateBranch && !branchExists {
 			if err := r.CreateBranch(branch); err != nil {
 				return nil, "", err
 			}
@@ -132,6 +139,9 @@ func getRepoForRemote(baseDir, remote, branch string, createBranch bool) (*gitto
 	} else {
 		branch = cb
 	}
+
+	// Apply user to the final client rather than any intermediates
+	r.Client.SetUser(cfg.GitUserName, cfg.GitUserEmail)
 
 	return r, branch, nil
 }

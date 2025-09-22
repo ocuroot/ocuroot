@@ -1,6 +1,6 @@
 ocuroot("0.3.0")
 
-repo_alias("gitstate/repo")
+repo_alias("gitstate_shared/repo")
 
 env_vars = host.env()
 

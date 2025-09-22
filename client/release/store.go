@@ -2,6 +2,7 @@ package release
 
 import (
 	"fmt"
+	"os"
 	"path/filepath"
 
 	"github.com/ocuroot/ocuroot/client"
@@ -75,12 +76,27 @@ func newRefStoreFromBackend(
 		}
 	}
 	if storeConfig.Git != nil {
+		gitUserName := "Ocuroot"
+		gitUserEmail := "contact@ocuroot.com"
+		if os.Getenv("OCUROOT_GIT_USER_NAME") != "" {
+			gitUserName = os.Getenv("OCUROOT_GIT_USER_NAME")
+		}
+		if os.Getenv("OCUROOT_GIT_USER_EMAIL") != "" {
+			gitUserEmail = os.Getenv("OCUROOT_GIT_USER_EMAIL")
+		}
+
 		store, err = refstore.NewGitRefStore(
 			filepath.Join(client.HomeDir(), "state", repoURL),
 			storeConfig.Git.RemoteURL,
 			storeConfig.Git.Branch,
-			pathPrefix,
-			storeConfig.Git.CreateBranch,
+			refstore.GitRefStoreConfig{
+				PathPrefix: pathPrefix,
+				GitRepoConfig: refstore.GitRepoConfig{
+					CreateBranch: storeConfig.Git.CreateBranch,
+					GitUserName:  gitUserName,
+					GitUserEmail: gitUserEmail,
+				},
+			},
 		)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create state store: %w", err)

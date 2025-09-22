@@ -58,6 +58,9 @@ test_gitstate() {
     echo "== check for files in state store =="
     check_file_in_remote "$STATE_REMOTE" "state" "support.txt" "state"
 
+    echo "== check author in state store =="
+    check_last_log_in_remote "$STATE_REMOTE" "state" "Author: Ocuroot <contact@ocuroot.com>"
+
     echo "== check for files in intent store =="
     check_file_in_remote "$INTENT_REMOTE" "intent" "support.txt" "intent"
 

@@ -16,24 +16,29 @@ import (
 	"go.opentelemetry.io/otel/trace"
 )
 
+type GitRefStoreConfig struct {
+	GitRepoConfig
+
+	PathPrefix string
+}
+
 func NewGitRefStore(
 	baseDir string,
 	remote string,
 	branch string,
-	pathPrefix string,
-	create_branch bool, // Create the branch if it doesn't exist
+	cfg GitRefStoreConfig,
 ) (*GitRefStore, error) {
 	// Create a branch-specific path to avoid FSRefStore collision
 	branchSpecificPath := filepath.Join(baseDir, "branches", branch)
 
-	r, err := NewGitRepoForRemote(branchSpecificPath, remote, branch, create_branch)
+	r, err := NewGitRepoForRemote(branchSpecificPath, remote, branch, cfg.GitRepoConfig)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create git ref store: %w", err)
 	}
 	r = GitRepoWithOtel(r)
 
 	var addInfoFile bool
-	storeInfoFile := filepath.Join(pathPrefix, storeInfoFile)
+	storeInfoFile := filepath.Join(cfg.PathPrefix, storeInfoFile)
 	infoFilePath := filepath.Join(r.RepoPath(), storeInfoFile)
 	if _, err = os.Stat(infoFilePath); err != nil {
 		if os.IsNotExist(err) {
@@ -44,7 +49,7 @@ func NewGitRefStore(
 	}
 
 	fsStore, err := NewFSRefStore(
-		filepath.Join(r.RepoPath(), pathPrefix),
+		filepath.Join(r.RepoPath(), cfg.PathPrefix),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create state store: %w", err)
@@ -53,7 +58,7 @@ func NewGitRefStore(
 	g := &GitRefStore{
 		s:          fsStore,
 		g:          r,
-		pathPrefix: pathPrefix,
+		pathPrefix: cfg.PathPrefix,
 		lastPull:   time.Now(),
 	}
 
