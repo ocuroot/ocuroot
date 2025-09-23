@@ -8,6 +8,7 @@ source $(dirname "$0")/../git_helpers.sh
 test_gitstate() {
     # Clean up test data
     rm -rf ./testdata
+    rm -rf .ocuroot
 
     # Call the init function to create repositories and set environment variables
     init_repo "./testdata/remote"
@@ -62,10 +63,6 @@ test_gitstate() {
 }
 
 setup_test() {
-    echo "State remote: $STATE_REMOTE"
-    echo "Intent remote: $INTENT_REMOTE"
-
-    rm -rf .ocuroot
 
     # Set up environments
     echo "ocuroot release new environments.ocu.star"

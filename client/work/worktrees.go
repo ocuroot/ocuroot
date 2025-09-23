@@ -7,6 +7,7 @@ import (
 	"os"
 	"path"
 	"sort"
+	"strconv"
 	"strings"
 
 	"github.com/charmbracelet/log"
@@ -14,6 +15,7 @@ import (
 	"github.com/ocuroot/ocuroot/client"
 	"github.com/ocuroot/ocuroot/refs"
 	"github.com/oklog/ulid/v2"
+	"github.com/ricochet2200/go-disk-usage/du"
 )
 
 func (w *Worker) CopyInWorktree(ctx context.Context, todo Work) (*Worker, func(), error) {
@@ -33,9 +35,15 @@ func (w *Worker) CopyInWorktree(ctx context.Context, todo Work) (*Worker, func()
 		return nil, nil, fmt.Errorf("todo ref repo %s does not match worker ref repo %s", todo.Ref.Repo, w.Tracker.Ref.Repo)
 	}
 
-	// TODO: Estimate the size of the worktree and don't create the worktree if it'll fill the remaining space on disk
-	// Size of objects in a tree: git ls-tree -r --format "%(objectsize)"
-	// Free space: https://stackoverflow.com/questions/20108520/get-amount-of-free-disk-space-using-go
+	// Estimate the size of the worktree and don't create the worktree if it'll fill the remaining space on disk
+	spaceAvailable, err := w.checkSpaceForWorktree(r, todo.Commit)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to check space for worktree: %w", err)
+	}
+	if !spaceAvailable {
+		return nil, nil, fmt.Errorf("not enough space to create worktree")
+	}
+
 	if _, stderr, err := r.Client.Exec("worktree", "add", workTreePath, todo.Commit); err != nil {
 		return nil, nil, fmt.Errorf("failed to add worktree: %w\nworkTreePath=%q, commit=%q, todo=%+v\n%v", err, workTreePath, todo.Commit, todo, string(stderr))
 	}
@@ -47,8 +55,6 @@ func (w *Worker) CopyInWorktree(ctx context.Context, todo Work) (*Worker, func()
 	newWorker.Tracker.Commit = todo.Commit
 	newWorker.Tracker.RepoPath = workTreePath
 	newWorker.Tracker.Ref = todo.Ref
-
-	fmt.Println(workTreePath)
 
 	// Check that the worktree is as expected
 	wtr, err := gittools.Open(workTreePath)
@@ -62,13 +68,35 @@ func (w *Worker) CopyInWorktree(ctx context.Context, todo Work) (*Worker, func()
 	}
 	if strings.TrimSpace(string(head)) != todo.Commit {
 		return nil, nil, fmt.Errorf("commit in worktree does not match expected commit: %s != %s", string(head), todo.Commit)
-	} else {
-		fmt.Println("Confirmed that the commit was as expected")
 	}
 
 	return newWorker, func() {
 		os.RemoveAll(workTreePath)
 	}, nil
+}
+
+func (w *Worker) checkSpaceForWorktree(repo *gittools.Repo, commit string) (bool, error) {
+	counts, stderr, err := repo.Client.Exec("ls-tree", "-r", "--format=%(objectsize)", commit)
+	if err != nil {
+		return false, fmt.Errorf("failed to get counts: %w\n%v", err, string(stderr))
+	}
+	var totalSize uint64
+	for _, count := range strings.Split(string(counts), "\n") {
+		if len(count) == 0 {
+			continue
+		}
+		size, err := strconv.ParseUint(strings.TrimSpace(count), 10, 64)
+		if err != nil {
+			continue
+		}
+		totalSize += size
+	}
+
+	usage := du.NewDiskUsage(workTreeBaseDir())
+
+	log.Info("worktree space check", "path", workTreeBaseDir(), "worktreeSize", totalSize, "free", usage.Free(), "available", usage.Available())
+
+	return usage.Free() > totalSize, nil
 }
 
 func (w *Worker) ExecuteWorkInCleanWorktrees(ctx context.Context, todos []Work) error {
@@ -120,8 +148,6 @@ func (w *Worker) ExecuteWorkInCleanWorktrees(ctx context.Context, todos []Work) 
 		for _, t := range workGroups[g] {
 			if t.WorkType == WorkTypeRun {
 				log.Info("Processing run", "run", t.Ref.String())
-				fmt.Println("Processing run:", t.Ref.String())
-				fmt.Println(newWorker.Tracker.Commit)
 				if err := newWorker.ExecuteWork(ctx, []Work{t}); err != nil {
 					return fmt.Errorf("failed to execute work: %w", err)
 				}
