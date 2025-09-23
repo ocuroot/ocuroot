@@ -258,6 +258,65 @@ var WorkOpsCmd = &cobra.Command{
 	},
 }
 
+var WorkCascadeCommand = &cobra.Command{
+	Use:   "cascade",
+	Short: "Pick up any outstanding work",
+	Long: `Pick up any outstanding work based on the contents of the state store.
+
+Will start by running any release work (equivalent to 'ocuroot work continue'), then
+any ops ('ocuroot work ops'), then sync any intent ('ocuroot state diff | xargs -r -n1 ocuroot state apply'),
+finally it will trigger work for other commits ('ocuroot work trigger').
+	`,
+	Args: cobra.RangeArgs(0, 1),
+	RunE: func(cmd *cobra.Command, args []string) error {
+		ctx := cmd.Context()
+
+		dryRun := cmd.Flag("dryrun").Changed
+
+		ref, err := GetRef(cmd, args)
+		if err != nil {
+			return fmt.Errorf("failed to get ref: %w", err)
+		}
+
+		cmd.SilenceUsage = true
+
+		worker, err := work.NewWorker(ctx, ref)
+		if err != nil {
+			return fmt.Errorf("failed to create worker: %w", err)
+		}
+		defer worker.Cleanup()
+
+		for {
+			todo, err := worker.IdentifyWork(ctx, work.IndentifyWorkRequest{})
+			if err != nil {
+				return fmt.Errorf("failed to identify work: %w", err)
+			}
+
+			log.Info("Identified work", "todo", toJSON(todo))
+			if len(todo) == 0 {
+				return nil
+			}
+
+			if dryRun {
+				worker.Cleanup()
+
+				todoJSON, err := json.MarshalIndent(todo, "", "  ")
+				if err != nil {
+					return fmt.Errorf("failed to marshal todo: %w", err)
+				}
+				fmt.Println(string(todoJSON))
+				return nil
+			}
+
+			if err := worker.ExecuteWorkInCleanWorktrees(ctx, todo); err != nil {
+				return err
+			}
+		}
+
+		return nil
+	},
+}
+
 func toJSON(v any) string {
 	b, err := json.MarshalIndent(v, "", "  ")
 	if err != nil {
@@ -282,4 +341,7 @@ func init() {
 	WorkAnyCommand.Flags().Bool("comprehensive", false, "Run in comprehensive mode, which will continue requesting work until this commit is stable")
 	WorkAnyCommand.Flags().BoolP("dryrun", "d", false, "List refs for work that would be triggered. Will only list the first set of work so is incompatible with --comprehensive")
 	WorkCmd.AddCommand(WorkAnyCommand)
+
+	WorkCascadeCommand.Flags().BoolP("dryrun", "d", false, "List refs for work that would be triggered")
+	WorkCmd.AddCommand(WorkCascadeCommand)
 }
