@@ -27,4 +27,5 @@ e2e: test-build
 	NO_INSTALL=1 ./tests/retries/test.sh
 	NO_INSTALL=1 ./tests/validation/test.sh
 	NO_INSTALL=1 ./tests/customstate/test.sh
+	NO_INSTALL=1 ./tests/sdk_version/test.sh
 
