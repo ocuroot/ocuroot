@@ -40,16 +40,13 @@ func AvailableVersions() []string {
 // resolveVersionAlias resolves a version to its target SDK version using semver constraints
 // Supports patterns like "0.3.x", ">=0.3", "0.3.14", etc.
 func resolveVersionAlias(version string) string {
-	// Handle special semver patterns including wildcards and constraints
-	if strings.Contains(version, "x") || strings.Contains(version, "X") || strings.Contains(version, "*") || 
-	   strings.Contains(version, ">=") || strings.Contains(version, "<=") || strings.Contains(version, ">") || 
-	   strings.Contains(version, "<") || strings.Contains(version, "~") || strings.Contains(version, "^") ||
-	   strings.Contains(version, "-") {
-		return resolveVersionConstraint(version)
-	}
+	// Always use semver library for version resolution - it handles exact versions,
+	// wildcards, and constraints uniformly
+	resolved := resolveVersionConstraint(version)
 	
 	// Handle exact version matching - check if it's a 0.3.x version (where x is any number)
-	if strings.HasPrefix(version, "0.3.") && version != "0.3.0" {
+	// This provides backward compatibility for the specific 0.3.x -> 0.3.0 aliasing
+	if resolved == version && strings.HasPrefix(version, "0.3.") && version != "0.3.0" {
 		parts := strings.Split(version, ".")
 		if len(parts) == 3 {
 			// Validate that the patch version is numeric
@@ -59,8 +56,7 @@ func resolveVersionAlias(version string) string {
 		}
 	}
 	
-	// Return the original version if no alias found
-	return version
+	return resolved
 }
 
 // resolveVersionConstraint resolves semver constraints to the appropriate SDK version
