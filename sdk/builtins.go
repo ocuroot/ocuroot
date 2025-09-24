@@ -7,6 +7,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/Masterminds/semver/v3"
 	"github.com/charmbracelet/log"
 	"github.com/ocuroot/ocuroot/about"
 	starlarkjson "go.starlark.net/lib/json"
@@ -36,10 +37,15 @@ func AvailableVersions() []string {
 	return versions
 }
 
-// resolveVersionAlias resolves a version to its target SDK version if it matches known patterns
-// This allows binary versions like 0.3.14 to map to SDK version 0.3.0
+// resolveVersionAlias resolves a version to its target SDK version using semver constraints
+// Supports patterns like "0.3.x", ">=0.3", "0.3.14", etc.
 func resolveVersionAlias(version string) string {
-	// Check if it's a 0.3.x version (where x is any number)
+	// Handle special semver patterns
+	if strings.Contains(version, "x") || strings.Contains(version, ">=") || strings.Contains(version, "~") || strings.Contains(version, "^") {
+		return resolveVersionConstraint(version)
+	}
+	
+	// Handle exact version matching - check if it's a 0.3.x version (where x is any number)
 	if strings.HasPrefix(version, "0.3.") && version != "0.3.0" {
 		parts := strings.Split(version, ".")
 		if len(parts) == 3 {
@@ -52,6 +58,51 @@ func resolveVersionAlias(version string) string {
 	
 	// Return the original version if no alias found
 	return version
+}
+
+// resolveVersionConstraint resolves semver constraints to the appropriate SDK version
+func resolveVersionConstraint(constraint string) string {
+	// Get available SDK versions
+	availableVersions := AvailableVersions()
+	
+	// Handle x-range patterns like "0.3.x"
+	if strings.HasSuffix(constraint, ".x") {
+		prefix := strings.TrimSuffix(constraint, ".x")
+		for _, v := range availableVersions {
+			if strings.HasPrefix(v, prefix+".") {
+				return v
+			}
+		}
+	}
+	
+	// Handle semver constraints like ">=0.3", "~0.3", "^0.3"
+	c, err := semver.NewConstraint(constraint)
+	if err != nil {
+		// If constraint parsing fails, return original version
+		return constraint
+	}
+	
+	// Find the best matching version
+	var bestMatch *semver.Version
+	for _, v := range availableVersions {
+		version, err := semver.NewVersion(v)
+		if err != nil {
+			continue
+		}
+		
+		if c.Check(version) {
+			if bestMatch == nil || version.GreaterThan(bestMatch) {
+				bestMatch = version
+			}
+		}
+	}
+	
+	if bestMatch != nil {
+		return bestMatch.String()
+	}
+	
+	// Return original constraint if no match found
+	return constraint
 }
 
 // getCurrentSDKVersion returns the appropriate SDK version based on the current binary version

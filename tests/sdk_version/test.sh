@@ -49,6 +49,44 @@ test_no_version() {
     echo ""
 }
 
+test_semver_x_range() {
+    echo "Test: semver x-range pattern (0.3.x)"
+    echo ""
+    setup_test
+
+    echo "== release with semver x-range pattern =="
+    ocuroot release new semver_test.ocu.star
+    assert_equal "0" "$?" "Failed to release with semver x-range pattern"
+
+    # Verify the build task completed
+    check_ref_exists "semver_test.ocu.star/@r1/task/build/1/status/complete"
+    
+    # Verify the deploy task completed
+    check_ref_exists "semver_test.ocu.star/@r1/task/deploy_test/1/status/complete"
+
+    echo "Test succeeded"
+    echo ""
+}
+
+test_semver_constraint() {
+    echo "Test: semver constraint pattern (>=0.3)"
+    echo ""
+    setup_test
+
+    echo "== release with semver constraint pattern =="
+    ocuroot release new semver_constraint_test.ocu.star
+    assert_equal "0" "$?" "Failed to release with semver constraint pattern"
+
+    # Verify the build task completed
+    check_ref_exists "semver_constraint_test.ocu.star/@r1/task/build/1/status/complete"
+    
+    # Verify the deploy task completed
+    check_ref_exists "semver_constraint_test.ocu.star/@r1/task/deploy_test/1/status/complete"
+
+    echo "Test succeeded"
+    echo ""
+}
+
 setup_test() {
     # Clean up any previous runs
     rm -rf .store
@@ -59,5 +97,7 @@ build_ocuroot
 
 test_explicit_version
 test_no_version
+test_semver_x_range
+test_semver_constraint
 
 echo "All SDK version tests passed!"
