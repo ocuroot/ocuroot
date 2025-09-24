@@ -40,8 +40,11 @@ func AvailableVersions() []string {
 // resolveVersionAlias resolves a version to its target SDK version using semver constraints
 // Supports patterns like "0.3.x", ">=0.3", "0.3.14", etc.
 func resolveVersionAlias(version string) string {
-	// Handle special semver patterns
-	if strings.Contains(version, "x") || strings.Contains(version, ">=") || strings.Contains(version, "~") || strings.Contains(version, "^") {
+	// Handle special semver patterns including wildcards and constraints
+	if strings.Contains(version, "x") || strings.Contains(version, "X") || strings.Contains(version, "*") || 
+	   strings.Contains(version, ">=") || strings.Contains(version, "<=") || strings.Contains(version, ">") || 
+	   strings.Contains(version, "<") || strings.Contains(version, "~") || strings.Contains(version, "^") ||
+	   strings.Contains(version, "-") {
 		return resolveVersionConstraint(version)
 	}
 	
@@ -65,17 +68,8 @@ func resolveVersionConstraint(constraint string) string {
 	// Get available SDK versions
 	availableVersions := AvailableVersions()
 	
-	// Handle x-range patterns like "0.3.x"
-	if strings.HasSuffix(constraint, ".x") {
-		prefix := strings.TrimSuffix(constraint, ".x")
-		for _, v := range availableVersions {
-			if strings.HasPrefix(v, prefix+".") {
-				return v
-			}
-		}
-	}
-	
-	// Handle semver constraints like ">=0.3", "~0.3", "^0.3"
+	// Handle semver constraints including wildcards (x, X, *), ranges (>=, ~, ^), etc.
+	// The semver library natively supports wildcards, so no custom handling needed
 	c, err := semver.NewConstraint(constraint)
 	if err != nil {
 		// If constraint parsing fails, return original version
