@@ -11,7 +11,6 @@ import (
 
 	"github.com/ocuroot/ocuroot/lib/release"
 	"github.com/ocuroot/ocuroot/refs"
-	"github.com/ocuroot/ocuroot/refs/refstore"
 	"github.com/ocuroot/ocuroot/store/models"
 )
 
@@ -26,13 +25,35 @@ func (w *Worker) ReadyRuns(ctx context.Context, req IndentifyWorkRequest) ([]Wor
 	}
 
 	// Match any outstanding runs in the state repo
-	outstanding, err := state.Match(
-		ctx,
-		prefix+"/@*/{deploy,task}/*/*/status/pending",
-		prefix+"/@*/{deploy,task}/*/*/status/paused",
+	var (
+		outstanding []string
+		err         error
 	)
-	if err != nil {
-		return nil, fmt.Errorf("failed to match refs: %w", err)
+
+	if req.StateChanges == nil {
+		outstanding, err = state.Match(
+			ctx,
+			prefix+"/@*/{deploy,task}/*/*/status/pending",
+			prefix+"/@*/{deploy,task}/*/*/status/paused",
+		)
+		if err != nil {
+			return nil, fmt.Errorf("failed to match refs: %w", err)
+		}
+	} else {
+		potentialMatches := make([]string, 0, len(req.StateChanges))
+		for ref := range req.StateChanges {
+			if strings.Contains(ref, "/status/pending") || strings.Contains(ref, "/status/paused") {
+				potentialMatches = append(potentialMatches, ref)
+			}
+		}
+
+		outstanding, err = state.Match(
+			ctx,
+			potentialMatches...,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("failed to match refs: %w", err)
+		}
 	}
 
 	for _, ref := range outstanding {
@@ -122,7 +143,7 @@ func (w *Worker) ReconcilableDeployments(ctx context.Context, req IndentifyWorkR
 			continue
 		}
 
-		resolved, err := reconcileDeployment(ctx, w.Tracker.State, ref)
+		resolved, err := w.reconcileDeployment(ctx, ref, req)
 		if err != nil {
 			log.Error("Failed to reconcile deployment", "ref", ref, "error", err)
 			continue
@@ -160,6 +181,12 @@ func (w *Worker) Ops(ctx context.Context, req IndentifyWorkRequest) ([]Work, err
 	}
 
 	for _, ref := range outstanding {
+		if req.StateChanges != nil {
+			if _, ok := req.StateChanges[ref]; !ok {
+				continue
+			}
+		}
+
 		commit, valid, err := w.CheckCommit(ctx, ref, req)
 		if err != nil {
 			return nil, fmt.Errorf("failed to check commit: %w", err)
@@ -182,7 +209,8 @@ func (w *Worker) Ops(ctx context.Context, req IndentifyWorkRequest) ([]Work, err
 	return out, nil
 }
 
-func reconcileDeployment(ctx context.Context, store refstore.Store, ref string) (*refs.Ref, error) {
+func (w *Worker) reconcileDeployment(ctx context.Context, ref string, req IndentifyWorkRequest) (*refs.Ref, error) {
+	store := w.Tracker.State
 	var deployment models.Task
 	if err := store.Get(ctx, ref, &deployment); err != nil {
 		return nil, fmt.Errorf("failed to get deployment at %s: %w", ref, err)
@@ -222,6 +250,19 @@ func reconcileDeployment(ctx context.Context, store refstore.Store, ref string) 
 		// Ensure we don't create loops with the outputs of this job
 		if v.Ref != nil && isForSameJob(*v.Ref, parsedResolvedDeployment) {
 			continue
+		}
+		if v.Ref != nil && req.StateChanges != nil {
+			resolvedV, err := store.ResolveLink(ctx, v.Ref.String())
+			if err != nil {
+				return nil, fmt.Errorf("failed to resolve inputs %q: %w", v.Ref.String(), err)
+			}
+			parsedResolvedV, err := refs.Parse(resolvedV)
+			if err != nil {
+				return nil, fmt.Errorf("failed to parse resolved inputs %q: %w", resolvedV, err)
+			}
+			if _, ok := req.StateChanges[parsedResolvedV.SetFragment("").String()]; !ok {
+				continue
+			}
 		}
 
 		if !reflect.DeepEqual(entryFunctionInputs[k].Value, v.Value) {

@@ -135,7 +135,6 @@ func (w *Worker) ExecuteWorkInCleanWorktrees(ctx context.Context, todos []Work) 
 
 	for _, g := range sortedGroups {
 		log.Info("Processing group", "group", g)
-		fmt.Println("Processing group:", g)
 
 		// TODO: We may want an option to do this in-place for the sake of performance
 		// So just a checkout of the appropriate commit, then `git reset --hard`, `git clean -fdxx`
@@ -147,7 +146,6 @@ func (w *Worker) ExecuteWorkInCleanWorktrees(ctx context.Context, todos []Work) 
 
 		for _, t := range workGroups[g] {
 			if t.WorkType == WorkTypeRun {
-				log.Info("Processing run", "run", t.Ref.String())
 				if err := newWorker.ExecuteWork(ctx, []Work{t}); err != nil {
 					return fmt.Errorf("failed to execute work: %w", err)
 				}

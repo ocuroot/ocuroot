@@ -22,6 +22,9 @@ func NewWorker(ctx context.Context, ref refs.Ref) (*Worker, error) {
 
 	w := &Worker{
 		Tui: workTui,
+
+		StateChanges:  make(map[string]struct{}),
+		IntentChanges: make(map[string]struct{}),
 	}
 
 	err := w.InitTracker(ctx, ref)
@@ -31,6 +34,7 @@ func NewWorker(ctx context.Context, ref refs.Ref) (*Worker, error) {
 	}
 
 	w.Tracker.State = tuiwork.WatchForStateUpdates(ctx, w.Tracker.State, workTui)
+	w.RecordStateUpdates(ctx)
 
 	return w, nil
 }
@@ -39,6 +43,9 @@ type Worker struct {
 	Tracker release.TrackerConfig
 
 	Tui tui.Tui
+
+	StateChanges  map[string]struct{}
+	IntentChanges map[string]struct{}
 }
 
 type GitFilter int
@@ -52,6 +59,12 @@ const (
 type IndentifyWorkRequest struct {
 	// Filter work based on the repo and commit required
 	GitFilter GitFilter
+
+	// Filter work based on upstream changes that impact it
+	// This allows work to apply a release to continue through
+	// other releases with dependencies, for example
+	IntentChanges map[string]struct{}
+	StateChanges  map[string]struct{}
 }
 
 func (w *Worker) Cleanup() {
