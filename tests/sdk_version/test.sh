@@ -91,13 +91,21 @@ setup_test() {
     # Clean up any previous runs
     rm -rf .store
     rm -rf $OCUROOT_HOME
+    
+    # No environment setup needed for SDK version tests
+    # The tests are simple task-only releases
 }
 
 build_ocuroot
+
+# Change to the test directory
+pushd "$(dirname "$0")" > /dev/null
 
 test_explicit_version
 test_no_version
 test_semver_x_range
 test_semver_constraint
+
+popd > /dev/null
 
 echo "All SDK version tests passed!"
