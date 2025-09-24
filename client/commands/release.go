@@ -111,27 +111,10 @@ var NewReleaseCmd = &cobra.Command{
 			return err
 		}
 
-		for {
-			if !cascade {
-				break
-			}
-
-			followOn, err := worker.IdentifyWork(ctx, work.IndentifyWorkRequest{
-				IntentChanges: worker.IntentChanges,
-				StateChanges:  worker.StateChanges,
-			})
-			if err != nil {
+		if cascade {
+			if err := worker.Cascade(ctx); err != nil {
 				return err
 			}
-
-			if len(followOn) == 0 {
-				break
-			}
-
-			if err := worker.ExecuteWorkInCleanWorktrees(ctx, followOn); err != nil {
-				return err
-			}
-
 		}
 
 		worker.Cleanup()

@@ -8,6 +8,29 @@ import (
 	"github.com/ocuroot/ocuroot/refs/refstore"
 )
 
+func (w *Worker) Cascade(ctx context.Context) error {
+	for {
+		followOn, err := w.IdentifyWork(ctx, IndentifyWorkRequest{
+			IntentChanges: w.IntentChanges,
+			StateChanges:  w.StateChanges,
+		})
+		if err != nil {
+			return err
+		}
+
+		if len(followOn) == 0 {
+			break
+		}
+
+		if err := w.ExecuteWorkInCleanWorktrees(ctx, followOn); err != nil {
+			return err
+		}
+
+	}
+
+	return nil
+}
+
 func (w *Worker) RecordStateUpdates(ctx context.Context) error {
 
 	stateListener, err := refstore.ListenToStateChanges(

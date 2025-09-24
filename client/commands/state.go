@@ -7,8 +7,6 @@ import (
 
 	"github.com/ocuroot/ocuroot/client/release"
 	"github.com/ocuroot/ocuroot/client/state"
-	"github.com/ocuroot/ocuroot/client/tui"
-	"github.com/ocuroot/ocuroot/client/tui/tuiwork"
 	"github.com/ocuroot/ocuroot/client/work"
 	"github.com/ocuroot/ocuroot/refs"
 	"github.com/ocuroot/ocuroot/refs/refstore"
@@ -226,25 +224,28 @@ var StateApplyIntentCmd = &cobra.Command{
 	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx := cmd.Context()
-		tc, err := getTrackerConfig(ctx, cmd, args)
+		ref, err := GetRef(cmd, args)
 		if err != nil {
-			return fmt.Errorf("failed to get tracker config: %w", err)
+			return fmt.Errorf("failed to get ref: %w", err)
 		}
+		cascade := cmd.Flags().Changed("cascade")
 
 		cmd.SilenceUsage = true
 
-		workTui := tui.StartWorkTui()
-		defer workTui.Cleanup()
+		worker, err := work.NewWorker(ctx, ref)
+		if err != nil {
+			return fmt.Errorf("failed to create worker: %w", err)
+		}
+		defer worker.Cleanup()
 
-		tc.State = tuiwork.WatchForStateUpdates(ctx, tc.State, workTui)
-
-		worker := &work.Worker{
-			Tracker: tc,
-			Tui:     workTui,
+		if err := worker.ApplyIntent(ctx, worker.Tracker.Ref); err != nil {
+			return fmt.Errorf("failed to apply intent: %w", err)
 		}
 
-		if err := worker.ApplyIntent(ctx, tc.Ref); err != nil {
-			return fmt.Errorf("failed to apply intent: %w", err)
+		if cascade {
+			if err := worker.Cascade(ctx); err != nil {
+				return err
+			}
 		}
 
 		return nil
@@ -283,6 +284,7 @@ func init() {
 	StateCmd.AddCommand(StateSetIntentCmd)
 	StateSetIntentCmd.Flags().StringP("format", "f", "string", "format of the input value. One of 'string', 'starlark' or 'json'.")
 
+	StateApplyIntentCmd.Flags().Bool("cascade", false, "Cascade follow on work caused by updating this state")
 	StateCmd.AddCommand(StateApplyIntentCmd)
 	StateCmd.AddCommand(StateDeleteIntentCmd)
 

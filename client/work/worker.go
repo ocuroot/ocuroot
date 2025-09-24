@@ -40,7 +40,8 @@ func NewWorker(ctx context.Context, ref refs.Ref) (*Worker, error) {
 }
 
 type Worker struct {
-	Tracker release.TrackerConfig
+	Tracker  release.TrackerConfig
+	RepoName string
 
 	Tui tui.Tui
 

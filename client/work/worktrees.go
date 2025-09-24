@@ -31,8 +31,12 @@ func (w *Worker) CopyInWorktree(ctx context.Context, todo Work) (*Worker, func()
 	workTreePath := path.Join(workTreeBaseDir(), ulid.MustNew(ulid.Now(), rand.Reader).String())
 
 	// TODO: Support other repos, using the stored remotes
-	if todo.Ref.Repo != w.Tracker.Ref.Repo {
-		return nil, nil, fmt.Errorf("todo ref repo %s does not match worker ref repo %s", todo.Ref.Repo, w.Tracker.Ref.Repo)
+	if todo.Ref.Repo != w.RepoName {
+		return nil, nil, fmt.Errorf("todo ref repo %s does not match worker ref repo %s", todo.Ref, w.Tracker.Ref)
+	}
+	// No-op if the same repo and the same commit
+	if todo.Commit == w.Tracker.Commit {
+		return w, func() {}, nil
 	}
 
 	// Estimate the size of the worktree and don't create the worktree if it'll fill the remaining space on disk

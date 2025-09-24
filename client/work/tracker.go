@@ -70,6 +70,15 @@ func (w *Worker) InitTracker(ctx context.Context, ref refs.Ref) error {
 		return fmt.Errorf("failed to load repo: %w", err)
 	}
 
+	w.RepoName = be.RepoAlias
+	if w.RepoName == "" {
+		repoURL, err := client.GetRepoURL(repoRootPath)
+		if err != nil {
+			return err
+		}
+		w.RepoName = repoURL
+	}
+
 	if ref.IsRelative() {
 		wdRel, err := filepath.Rel(repoRootPath, wd)
 		if err != nil {
@@ -77,16 +86,8 @@ func (w *Worker) InitTracker(ctx context.Context, ref refs.Ref) error {
 		}
 
 		baseRef := refs.Ref{
-			Repo:     be.RepoAlias,
+			Repo:     w.RepoName,
 			Filename: wdRel,
-		}
-
-		if be.RepoAlias == "" {
-			repoURL, err := client.GetRepoURL(repoRootPath)
-			if err != nil {
-				return err
-			}
-			baseRef.Repo = repoURL
 		}
 		ref, err = ref.RelativeTo(baseRef)
 		if err != nil {
