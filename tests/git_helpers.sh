@@ -3,11 +3,10 @@
 
 init_repo() {
     local base_dir=${1:-$(mktemp -d)}
-    mkdir -p "$base_dir"
-    export REPO_REMOTE="$(realpath $base_dir)/repo.git"
-    git -c init.defaultBranch=main init --bare "$REPO_REMOTE"
-
-    echo "Repository initialized at: $REPO_REMOTE"
+    mkdir -p "$base_dir" > /dev/null
+    REPO_REMOTE="$(realpath $base_dir)/repo.git"
+    git -c init.defaultBranch=main init --bare "$REPO_REMOTE" > /dev/null
+    echo $REPO_REMOTE
 }
 
 # Initialize git repositories and set up environment variables

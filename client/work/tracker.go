@@ -70,6 +70,7 @@ func (w *Worker) InitTracker(ctx context.Context, ref refs.Ref) error {
 		return fmt.Errorf("failed to load repo: %w", err)
 	}
 
+	w.RepoRemotes = be.RepoRemotes
 	w.RepoName = be.RepoAlias
 	if w.RepoName == "" {
 		repoURL, err := client.GetRepoURL(repoRootPath)

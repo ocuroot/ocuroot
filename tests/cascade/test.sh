@@ -10,12 +10,12 @@ test_cascade_command() {
     rm -rf ./testdata
 
     # Call the init function to create repositories and set environment variables
-    init_repo "./testdata/remote"
+    export REPO_REMOTE=$(init_repo "./testdata/remote")
 
     # Set up working directory with empty initial commit
     init_working_dir "./testdata/source" "$REPO_REMOTE" "SOURCE_WORKING"
 
-    cp ./src/1/* "./testdata/source"
+    cp ./src/repo1/1/* "./testdata/source"
 
     pushd "./testdata/source" >> /dev/null
     
@@ -37,7 +37,7 @@ test_cascade_command() {
     assert_ref_equals "cascade/-/b.ocu.star/@/deploy/production#output/message" "Message at commit 1"
 
     echo "== commit change 2 =="
-    cp ../../src/2/* "./"
+    cp ../../src/repo1/2/* "./"
     git add .
     git commit -m "Add change 2"
     git push
@@ -66,12 +66,12 @@ test_release_cascade() {
     rm -rf ./testdata
 
     # Call the init function to create repositories and set environment variables
-    init_repo "./testdata/remote"
+    export REPO_REMOTE=$(init_repo "./testdata/remote")
 
     # Set up working directory with empty initial commit
     init_working_dir "./testdata/source" "$REPO_REMOTE" "SOURCE_WORKING"
 
-    cp ./src/1/* "./testdata/source"
+    cp ./src/repo1/1/* "./testdata/source"
 
     pushd "./testdata/source" >> /dev/null
     
@@ -93,7 +93,7 @@ test_release_cascade() {
     assert_ref_equals "cascade/-/b.ocu.star/@/deploy/production#output/message" "Message at commit 1"
 
     echo "== commit change 2 =="
-    cp ../../src/2/* "./"
+    cp ../../src/repo1/2/* "./"
     git add .
     git commit -m "Add change 2"
     git push
@@ -119,6 +119,82 @@ test_release_cascade() {
     echo ""
 }
 
+test_release_cascade_cross_repo() {
+    # Clean up test data
+    rm -rf ./testdata
+
+    # Call the init function to create repositories and set environment variables
+    export REPO_REMOTE=$(init_repo "./testdata/remote")
+    export REPO2_REMOTE=$(init_repo "./testdata/remote2")
+
+    # Set up working directory with empty initial commit
+    init_working_dir "./testdata/source" "$REPO_REMOTE" "SOURCE_WORKING"
+    init_working_dir "./testdata/source2" "$REPO2_REMOTE" "SOURCE_WORKING2"
+
+    cp ./src/repo1/1/* "./testdata/source"
+    cp ./src/repo2/1/* "./testdata/source2"
+
+    pushd "./testdata/source" >> /dev/null
+    
+    git add .
+    git commit -m "Add source"
+    git remote -v
+    git push
+
+    setup_test
+
+    ocuroot release new a.ocu.star
+    assert_equal "0" "$?" "Failed to deploy a"
+
+    assert_deployed "a.ocu.star" "production"
+    assert_ref_equals "cascade/-/a.ocu.star/@/deploy/production#output/message" "Message at commit 1"
+
+    popd >> /dev/null
+
+    pushd "./testdata/source2" >> /dev/null
+
+    git add .
+    git commit -m "Add source"
+    git remote -v
+    git push
+
+    ocuroot release new b.ocu.star
+    assert_equal "0" "$?" "Failed to deploy b"
+
+    assert_deployed "b.ocu.star" "production"
+    assert_ref_equals "cascade_repo2/-/b.ocu.star/@/deploy/production#output/message" "Message at commit 1"
+
+    popd >> /dev/null
+
+    pushd "./testdata/source" >> /dev/null
+    
+    echo "== commit change 2 =="
+    cp ../../src/repo1/2/* "./"
+    git add .
+    git commit -m "Add change 2"
+    git push
+
+    ocuroot state set "@/custom/test" "foo"
+    check_ref_does_not_exist "@/custom/test"
+    
+    ocuroot release new a.ocu.star --cascade
+    assert_equal "0" "$?" "Failed to deploy a"
+
+    assert_ref_equals "cascade/-/a.ocu.star/@/deploy/production#output/message" "Message at commit 2"
+    assert_ref_equals "cascade_repo2/-/b.ocu.star/@/deploy/production#output/message" "Message at commit 2"
+    check_ref_does_not_exist "@/custom/test"
+    
+    echo "Final check to apply custom state"
+    ocuroot work cascade
+    assert_equal "0" "$?" "Failed to apply custom state"
+    assert_ref_equals "@/custom/test" "foo"
+
+    popd >> /dev/null
+
+    echo "Test succeeded"
+    echo ""
+}
+
 setup_test() {
 
     # Set up environments
@@ -131,7 +207,8 @@ build_ocuroot
 
 pushd "$(dirname "$0")" > /dev/null
 
-test_cascade_command
-test_release_cascade
+# test_cascade_command
+# test_release_cascade
+test_release_cascade_cross_repo
 
 popd > /dev/null

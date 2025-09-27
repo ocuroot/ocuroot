@@ -37,6 +37,7 @@ func BackendForRepo() (sdk.Backend, *BackendOutputs) {
 
 type BackendOutputs struct {
 	RepoAlias    string
+	RepoRemotes  []string
 	RepoTrigger  *starlark.Function
 	Environments []sdk.Environment
 	Store        *sdk.Store
@@ -95,6 +96,11 @@ func (r *RepoBackend) Alias(ctx context.Context, alias string) error {
 
 func (r *RepoBackend) Trigger(ctx context.Context, fn *starlark.Function) {
 	r.Outputs.RepoTrigger = fn
+}
+
+func (r *RepoBackend) Remotes(ctx context.Context, remotes []string) error {
+	r.Outputs.RepoRemotes = remotes
+	return nil
 }
 
 type EnvironmentBackend struct {

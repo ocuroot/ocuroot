@@ -182,6 +182,9 @@ func (c *configLoader) repoBuiltins(ctx context.Context, backend Backend) starla
 			repoBackend.Trigger(ctx, triggerFN)
 			return starlark.None, nil
 		})
+		repoBuiltins["remotes"] = JSONBuiltin("repo.remotes", func(ctx context.Context, remotes []string) (any, error) {
+			return starlark.None, repoBackend.Remotes(ctx, remotes)
+		})
 	} else {
 		repoBuiltins["alias"] = unimplementedFunction("repo.alias")
 		repoBuiltins["apply"] = unimplementedFunction("repo.apply")

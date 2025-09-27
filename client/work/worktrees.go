@@ -14,30 +14,112 @@ import (
 	"github.com/ocuroot/gittools"
 	"github.com/ocuroot/ocuroot/client"
 	"github.com/ocuroot/ocuroot/refs"
+	"github.com/ocuroot/ocuroot/store/models"
 	"github.com/oklog/ulid/v2"
 	"github.com/ricochet2200/go-disk-usage/du"
 )
 
-func (w *Worker) CopyInWorktree(ctx context.Context, todo Work) (*Worker, func(), error) {
-	r, err := gittools.Open(w.Tracker.RepoPath)
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed to open repo: %w", err)
-	}
-
-	if err := os.MkdirAll(workTreeBaseDir(), 0755); err != nil {
-		return nil, nil, fmt.Errorf("failed to mkdir: %w", err)
-	}
-
-	workTreePath := path.Join(workTreeBaseDir(), ulid.MustNew(ulid.Now(), rand.Reader).String())
-
-	// TODO: Support other repos, using the stored remotes
+func (w *Worker) WorkerForWork(ctx context.Context, todo Work) (*Worker, func(), error) {
 	if todo.Ref.Repo != w.RepoName {
-		return nil, nil, fmt.Errorf("todo ref repo %s does not match worker ref repo %s", todo.Ref, w.Tracker.Ref)
+		return w.CopyInRepoClone(ctx, todo)
 	}
 	// No-op if the same repo and the same commit
 	if todo.Commit == w.Tracker.Commit {
 		return w, func() {}, nil
 	}
+	return w.CopyInWorktree(ctx, todo)
+}
+
+func (w *Worker) CopyInRepoClone(ctx context.Context, todo Work) (*Worker, func(), error) {
+	if err := os.MkdirAll(repoCloneBaseDir(), 0755); err != nil {
+		return nil, nil, fmt.Errorf("failed to mkdir: %w", err)
+	}
+
+	var repoInfo models.RepoConfig
+	repoRef := fmt.Sprintf("%v/-/repo.ocu.star/@", todo.Ref.Repo)
+	err := w.Tracker.State.Get(ctx, repoRef, &repoInfo)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to get repo info for %s: %w", repoRef, err)
+	}
+
+	be, err := w.RepoConfigFromState(ctx, todo.Ref.Repo)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to get repo config: %w", err)
+	}
+
+	repoCloneDir := path.Join(repoCloneBaseDir(), ulid.MustNew(ulid.Now(), rand.Reader).String())
+
+	var remotes []string
+	// Add discovered fetch URLs
+	for _, r := range repoInfo.Remotes {
+		remotes = append(remotes, r.URL)
+	}
+	// Override with configured remotes
+	if len(be.RepoRemotes) > 0 {
+		remotes = be.RepoRemotes
+	}
+
+	var repo *gittools.Repo
+	var remoteToError = make(map[string]error)
+	for _, remote := range remotes {
+		repo, err = gittools.NewClient().Clone(remote, repoCloneDir)
+		if err != nil {
+			log.Error("failed to clone repo", "remote", remote, "repoCloneDir", repoCloneDir, "err", err)
+			remoteToError[remote] = err
+		} else {
+			break
+		}
+	}
+	if repo == nil {
+		return nil, nil, fmt.Errorf("all remotes exhausted trying to clone repo\n%v", remoteToError)
+	}
+
+	err = repo.Checkout(todo.Commit)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to checkout commit: %w", err)
+	}
+
+	newWorker := &Worker{
+		Tracker: w.Tracker,
+		Tui:     w.Tui,
+	}
+	newWorker.Tracker.Commit = todo.Commit
+	newWorker.Tracker.RepoPath = repoCloneDir
+	newWorker.Tracker.Ref = todo.Ref
+
+	// Check that the worktree is as expected
+	wtr, err := gittools.Open(repoCloneDir)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to open worktree: %w", err)
+	}
+
+	head, stderr, err := wtr.Client.Exec("rev-parse", "HEAD")
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to get head: %w\n%v", err, string(stderr))
+	}
+	if strings.TrimSpace(string(head)) != todo.Commit {
+		return nil, nil, fmt.Errorf("commit in worktree does not match expected commit: %s != %s", string(head), todo.Commit)
+	}
+
+	return newWorker, func() {
+		if true {
+			return
+		}
+		os.RemoveAll(repoCloneDir)
+	}, nil
+}
+
+func (w *Worker) CopyInWorktree(ctx context.Context, todo Work) (*Worker, func(), error) {
+	if err := os.MkdirAll(workTreeBaseDir(), 0755); err != nil {
+		return nil, nil, fmt.Errorf("failed to mkdir: %w", err)
+	}
+
+	r, err := gittools.Open(w.Tracker.RepoPath)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to open repo: %w", err)
+	}
+
+	workTreePath := path.Join(workTreeBaseDir(), ulid.MustNew(ulid.Now(), rand.Reader).String())
 
 	// Estimate the size of the worktree and don't create the worktree if it'll fill the remaining space on disk
 	spaceAvailable, err := w.checkSpaceForWorktree(r, todo.Commit)
@@ -48,6 +130,8 @@ func (w *Worker) CopyInWorktree(ctx context.Context, todo Work) (*Worker, func()
 		return nil, nil, fmt.Errorf("not enough space to create worktree")
 	}
 
+	// TODO: We may want an option to do this in-place for the sake of performance
+	// So just a checkout of the appropriate commit, then `git reset --hard`, `git clean -fdxx`
 	if _, stderr, err := r.Client.Exec("worktree", "add", workTreePath, todo.Commit); err != nil {
 		return nil, nil, fmt.Errorf("failed to add worktree: %w\nworkTreePath=%q, commit=%q, todo=%+v\n%v", err, workTreePath, todo.Commit, todo, string(stderr))
 	}
@@ -140,11 +224,10 @@ func (w *Worker) ExecuteWorkInCleanWorktrees(ctx context.Context, todos []Work) 
 	for _, g := range sortedGroups {
 		log.Info("Processing group", "group", g)
 
-		// TODO: We may want an option to do this in-place for the sake of performance
-		// So just a checkout of the appropriate commit, then `git reset --hard`, `git clean -fdxx`
-		newWorker, cleanup, err := w.CopyInWorktree(ctx, workGroups[g][0])
+		// Create a new Worker as needed for different repos and commits
+		newWorker, cleanup, err := w.WorkerForWork(ctx, workGroups[g][0])
 		if err != nil {
-			return fmt.Errorf("failed to create worktree: %w", err)
+			return fmt.Errorf("creating worker: %w", err)
 		}
 		defer cleanup()
 
@@ -157,6 +240,11 @@ func (w *Worker) ExecuteWorkInCleanWorktrees(ctx context.Context, todos []Work) 
 		}
 	}
 	return nil
+}
+
+func repoCloneBaseDir() string {
+	// TODO: Allow this to be overriden
+	return path.Join(client.HomeDir(), "clones")
 }
 
 func workTreeBaseDir() string {

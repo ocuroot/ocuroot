@@ -70,6 +70,37 @@ func (w *Worker) TriggerAll(ctx context.Context) error {
 	return nil
 }
 
+func (w *Worker) RepoConfigFromState(ctx context.Context, repo string) (*local.BackendOutputs, error) {
+	configRef := repo + "/-/repo.ocu.star/@"
+
+	configWithCommit, err := w.Tracker.State.ResolveLink(ctx, configRef)
+	if err != nil {
+		return nil, fmt.Errorf("failed to resolve config ref (%v): %w", configRef, err)
+	}
+
+	log.Info("Triggering work for repo", "ref", configWithCommit)
+	var repoConfig models.RepoConfig
+	if err := w.Tracker.State.Get(ctx, configWithCommit, &repoConfig); err != nil {
+		return nil, fmt.Errorf("failed to get repo config (%v): %w", configWithCommit, err)
+	}
+
+	backend, be := local.BackendForRepo()
+
+	_, err = sdk.LoadRepoFromBytes(
+		ctx,
+		sdk.NewNullResolver(),
+		"repo.ocu.star",
+		repoConfig.Source,
+		backend,
+		func(thread *starlark.Thread, msg string) {},
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to load repo: %w", err)
+	}
+
+	return be, nil
+}
+
 func (w *Worker) TriggerCommit(ctx context.Context, repo, commit string) error {
 	tuiEvent := tuiwork.GetTriggerEvent(repo, commit, w.Tui, tuiwork.TriggerStatusRunning, w.Tracker)
 	w.Tui.UpdateTask(tuiEvent)
