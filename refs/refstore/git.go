@@ -3,6 +3,7 @@ package refstore
 import (
 	"context"
 	"fmt"
+	"net/url"
 	"os"
 	"path/filepath"
 	"runtime/debug"
@@ -46,6 +47,22 @@ func NewGitRepoForRemote(baseDir, remote, branch string, cfg GitRepoConfig) (Git
 		g:      g,
 		branch: branch,
 	}, nil
+}
+
+func GitURLToValidPath(gitURL string) string {
+	gitURL = strings.TrimSuffix(gitURL, ".git")
+
+	if strings.HasPrefix(gitURL, "git@") {
+		gitURL := strings.TrimPrefix(gitURL, "git@")
+		gitURL = strings.ReplaceAll(gitURL, ":", "/")
+		return gitURL
+	}
+
+	gu, err := url.Parse(gitURL)
+	if err != nil {
+		return gitURL
+	}
+	return fmt.Sprintf("%s/%s", gu.Host, strings.TrimPrefix(gu.Path, "/"))
 }
 
 func getRepoForRemote(baseDir, remote, branch string, cfg GitRepoConfig) (*gittools.Repo, string, error) {

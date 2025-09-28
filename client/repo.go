@@ -3,12 +3,12 @@ package client
 import (
 	"errors"
 	"fmt"
-	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
 
 	"github.com/ocuroot/gittools"
+	"github.com/ocuroot/ocuroot/refs/refstore"
 )
 
 var (
@@ -63,7 +63,7 @@ func GetRepoURL(repoRootPath string) (string, error) {
 		return "", fmt.Errorf("failed to get repo URL: %w", err)
 	}
 	repoURL = strings.TrimRight(repoURL, "\n")
-	repoURL = GitURLToRefPath(repoURL)
+	repoURL = refstore.GitURLToValidPath(repoURL)
 	return repoURL, nil
 }
 
@@ -95,20 +95,4 @@ func GetRepoCommit(repoRootPath string) (string, error) {
 	}
 	commit = strings.TrimRight(string(commitB), "\n")
 	return commit, nil
-}
-
-func GitURLToRefPath(gitURL string) string {
-	gitURL = strings.TrimSuffix(gitURL, ".git")
-
-	if strings.HasPrefix(gitURL, "git@") {
-		gitURL := strings.TrimPrefix(gitURL, "git@")
-		gitURL = strings.ReplaceAll(gitURL, ":", "/")
-		return gitURL
-	}
-
-	gu, err := url.Parse(gitURL)
-	if err != nil {
-		return gitURL
-	}
-	return fmt.Sprintf("%s/%s", gu.Host, strings.TrimPrefix(gu.Path, "/"))
 }

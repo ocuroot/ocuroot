@@ -3,7 +3,6 @@ package refstore
 import (
 	"context"
 	"fmt"
-	"net/url"
 	"os"
 	"path/filepath"
 	"runtime/debug"
@@ -100,11 +99,8 @@ var _ GitSupportFileWriter = (*GitRefStore)(nil)
 var _ Store = (*GitRefStore)(nil)
 
 func getStatePath(baseDir, remote string) (string, error) {
-	remoteURL, err := url.Parse(remote)
-	if err != nil {
-		return "", err
-	}
-	return filepath.Join(baseDir, "state", remoteURL.Host, remoteURL.Path), nil
+	p := GitURLToValidPath(remote)
+	return filepath.Join(baseDir, "state", p), nil
 }
 
 func (g *GitRefStore) StartTransaction(ctx context.Context, message string) error {

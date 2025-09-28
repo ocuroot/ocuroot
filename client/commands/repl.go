@@ -62,7 +62,8 @@ func runSingleCommand(ctx context.Context, filePath string, command string) erro
 	if err != nil {
 		return fmt.Errorf("failed to create worker: %w", err)
 	}
-	defer w.Cleanup()
+	// We don't need the TUI after this
+	w.Cleanup()
 
 	if filePath != "" {
 		w.Tracker.Ref = refs.Ref{
@@ -162,7 +163,8 @@ func runStarlarkReplWithFile(ctx context.Context, filePath string) error {
 	if err != nil {
 		return fmt.Errorf("failed to create worker: %w", err)
 	}
-	defer w.Cleanup()
+	// We don't need the TUI after this
+	w.Cleanup()
 
 	if filePath == "" {
 		filePath = "repo.ocu.star"
