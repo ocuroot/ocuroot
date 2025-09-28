@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/ocuroot/ocuroot/client/release"
+	"github.com/ocuroot/ocuroot/client/work"
 	"github.com/ocuroot/ocuroot/refs"
 	"github.com/ocuroot/ocuroot/sdk"
 	"github.com/spf13/cobra"
@@ -54,19 +55,23 @@ Examples:
 // runSingleCommand executes a single Starlark command and exits
 func runSingleCommand(ctx context.Context, filePath string, command string) error {
 	// Get tracker config to load repo.ocu.star and set up state store
-	tc, err := getTrackerConfig(ctx, nil, nil)
+	w, err := work.NewWorker(ctx, refs.Ref{
+		Repo:     "preview.git",
+		Filename: filePath,
+	})
 	if err != nil {
-		return fmt.Errorf("failed to get tracker config: %w", err)
+		return fmt.Errorf("failed to create worker: %w", err)
 	}
+	defer w.Cleanup()
 
 	if filePath != "" {
-		tc.Ref = refs.Ref{
-			Repo:     tc.Ref.Repo,
+		w.Tracker.Ref = refs.Ref{
+			Repo:     w.Tracker.Ref.Repo,
 			Filename: filePath,
 		}
 	}
 	// Create a backend for SDK operations
-	backend, _ := release.NewBackend(tc)
+	backend, _ := release.NewBackend(w.Tracker)
 
 	var globals starlark.StringDict
 
@@ -77,7 +82,7 @@ func runSingleCommand(ctx context.Context, filePath string, command string) erro
 		// Load the .ocu.star file using sdk.LoadConfig to get user-defined functions
 		config, err := sdk.LoadConfig(
 			ctx,
-			sdk.NewFSResolver(os.DirFS(tc.RepoPath)),
+			sdk.NewFSResolver(os.DirFS(w.Tracker.RepoPath)),
 			filePath,
 			backend,
 			func(thread *starlark.Thread, msg string) {
@@ -150,25 +155,29 @@ func runSingleCommand(ctx context.Context, filePath string, command string) erro
 
 func runStarlarkReplWithFile(ctx context.Context, filePath string) error {
 	// Get tracker config to load repo.ocu.star and set up state store
-	tc, err := getTrackerConfig(ctx, nil, nil)
+	w, err := work.NewWorker(ctx, refs.Ref{
+		Repo:     "preview.git",
+		Filename: filePath,
+	})
 	if err != nil {
-		return fmt.Errorf("failed to get tracker config: %w", err)
+		return fmt.Errorf("failed to create worker: %w", err)
 	}
+	defer w.Cleanup()
 
 	if filePath == "" {
 		filePath = "repo.ocu.star"
 	}
-	tc.Ref = refs.Ref{
-		Repo:     tc.Ref.Repo,
+	w.Tracker.Ref = refs.Ref{
+		Repo:     w.Tracker.Ref.Repo,
 		Filename: filePath,
 	}
 	// Create a backend for SDK operations
-	backend, _ := release.NewBackend(tc)
+	backend, _ := release.NewBackend(w.Tracker)
 
 	// Load the .ocu.star file using sdk.LoadConfig to get user-defined functions
 	config, err := sdk.LoadConfig(
 		ctx,
-		sdk.NewFSResolver(os.DirFS(tc.RepoPath)),
+		sdk.NewFSResolver(os.DirFS(w.Tracker.RepoPath)),
 		filePath,
 		backend,
 		func(thread *starlark.Thread, msg string) {
@@ -195,7 +204,7 @@ func runStarlarkReplWithFile(ctx context.Context, filePath string) error {
 	fmt.Println("Starting Starlark REPL with Ocuroot SDK")
 	fmt.Println("Type Ctrl+D to exit (Ctrl+C will interrupt the current operation)")
 	fmt.Println("Type 'help()' to see available SDK modules")
-	fmt.Printf("Loaded repo: %s\n", tc.Ref.Repo)
+	fmt.Printf("Loaded repo: %s\n", w.Tracker.Ref.Repo)
 	fmt.Printf("Loaded file: %s\n", filePath)
 	fmt.Printf("Available user functions: %d\n", len(config.GlobalFuncs()))
 	fmt.Println()

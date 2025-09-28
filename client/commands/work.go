@@ -160,16 +160,22 @@ var WorkTriggerCommand = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx := cmd.Context()
 
-		store, err := getReadOnlyStore(ctx)
+		ref, err := GetRef(cmd, args)
 		if err != nil {
-			return fmt.Errorf("failed to get read only store: %w", err)
+			return fmt.Errorf("failed to get ref: %w", err)
 		}
+
+		w, err := work.NewWorker(ctx, ref)
+		if err != nil {
+			return fmt.Errorf("failed to create worker: %w", err)
+		}
+		w.Cleanup()
 
 		workTui := tui.StartWorkTui()
 		defer workTui.Cleanup()
 
 		tc := release.TrackerConfig{
-			State: store,
+			State: w.Tracker.State,
 		}
 		tc.State = tuiwork.WatchForStateUpdates(ctx, tc.State, workTui)
 

@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/ocuroot/gittools"
+	"github.com/ocuroot/ocuroot/client/work"
 	librelease "github.com/ocuroot/ocuroot/lib/release"
 	"github.com/ocuroot/ocuroot/refs"
 	"github.com/ocuroot/ocuroot/store/models"
@@ -24,18 +25,26 @@ Example:
 	Args: cobra.ExactArgs(2),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx := cmd.Context()
-		tc, err := getTrackerConfig(ctx, cmd, args)
+
+		ref, err := GetRef(cmd, args)
 		if err != nil {
-			return fmt.Errorf("failed to get tracker config: %w", err)
+			return fmt.Errorf("failed to get ref: %w", err)
 		}
+
+		cmd.SilenceUsage = true
+
+		w, err := work.NewWorker(ctx, ref)
+		if err != nil {
+			return fmt.Errorf("failed to create worktree: %w", err)
+		}
+
+		defer w.Cleanup()
 
 		startCommit := args[0]
 		endCommit := args[1]
 
-		cmd.SilenceUsage = true
-
 		// Get the repository path (assuming current directory if not specified)
-		repoPath := tc.RepoPath
+		repoPath := w.Tracker.RepoPath
 
 		// Open the repository
 		repo, err := gittools.Open(repoPath)
@@ -57,18 +66,18 @@ Example:
 		releaseToDeployment := make(map[string]librelease.ReleaseInfo)
 		commitToRef := make(map[string]string)
 		// Find all deploys from this repo
-		reploymentRefs, err := tc.State.Match(ctx, fmt.Sprintf("%v/-/**/@/deploy/*", tc.Ref.Repo))
+		reploymentRefs, err := w.Tracker.State.Match(ctx, fmt.Sprintf("%v/-/**/@/deploy/*", w.Tracker.Ref.Repo))
 		if err != nil {
 			return fmt.Errorf("failed to match refs: %w", err)
 		}
 		for _, ref := range reploymentRefs {
-			resolvedRef, err := tc.State.ResolveLink(ctx, ref)
+			resolvedRef, err := w.Tracker.State.ResolveLink(ctx, ref)
 			if err != nil {
 				return fmt.Errorf("failed to resolve ref: %w", err)
 			}
 
 			var run models.Run
-			if err := tc.State.Get(ctx, resolvedRef, &run); err != nil {
+			if err := w.Tracker.State.Get(ctx, resolvedRef, &run); err != nil {
 				return fmt.Errorf("failed to get run: %w", err)
 			}
 			refsToDeployment[ref] = run
@@ -79,7 +88,7 @@ Example:
 			}
 			releaseRef := pr.SetSubPathType(refs.SubPathTypeNone).SetSubPath("").SetFragment("")
 			var releaseInfo librelease.ReleaseInfo
-			if err := tc.State.Get(ctx, releaseRef.String(), &releaseInfo); err != nil {
+			if err := w.Tracker.State.Get(ctx, releaseRef.String(), &releaseInfo); err != nil {
 				return fmt.Errorf("failed to get release info (%v): %w", releaseRef.String(), err)
 			}
 			releaseToDeployment[releaseRef.String()] = releaseInfo

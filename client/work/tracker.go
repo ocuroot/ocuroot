@@ -2,7 +2,6 @@ package work
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -23,26 +22,26 @@ import (
 	librelease "github.com/ocuroot/ocuroot/lib/release"
 )
 
-func (w *Worker) InitWorkerFromStateRepo(ctx context.Context, ref refs.Ref, wd, storeRootPath string) (*Worker, error) {
+func (w *Worker) InitTrackerFromStateRepo(ctx context.Context, ref refs.Ref, wd, storeRootPath string) error {
 	fs, err := refstore.NewFSRefStore(storeRootPath)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create fs ref store: %w", err)
+		return fmt.Errorf("failed to create fs ref store: %w", err)
 	}
 
 	readOnlyStore := refstore.NewReadOnlyStore(fs)
 	repoRefs, err := readOnlyStore.Match(ctx, "**/-/repo.ocu.star/@")
 	if err != nil {
-		return nil, fmt.Errorf("failed to match repo refs: %w", err)
+		return fmt.Errorf("failed to match repo refs: %w", err)
 	}
 	if len(repoRefs) == 0 {
-		return nil, errors.New("no repos registered in store")
+		return fmt.Errorf("no repos registered in store")
 	}
 
 	w.Tracker.State = readOnlyStore
+	w.RepoName = "" // Should always be empty to force clones
 
 	var errorsByRepo = make(map[string]error)
 	for _, repoRef := range repoRefs {
-		// TODO: Handle cleanup
 		resolvedRepoRef, err := readOnlyStore.ResolveLink(ctx, repoRef)
 		if err != nil {
 			errorsByRepo[repoRef] = err
@@ -53,17 +52,40 @@ func (w *Worker) InitWorkerFromStateRepo(ctx context.Context, ref refs.Ref, wd, 
 			errorsByRepo[repoRef] = err
 			continue
 		}
-		wOut, _, err := w.CopyInRepoClone(ctx, ref, repoRefParsed.Repo, repoRefParsed.Release.String())
-		if err == nil {
-			return wOut, nil
+		be, err := w.RepoConfigFromState(ctx, repoRefParsed.Repo)
+		if err != nil {
+			return fmt.Errorf("failed to get repo config: %w", err)
 		}
-		errorsByRepo[repoRef] = err
+
+		if ref.IsRelative() && !ref.IsEmpty() && !ref.Global {
+			return fmt.Errorf("relative refs not supported for state repo (%v)", ref)
+		}
+
+		state, intent, err := release.NewRefStore(
+			be.Store,
+			ref.Repo,
+			"",
+		)
+		if err != nil {
+			return fmt.Errorf("failed to create ref store: %w", err)
+		}
+
+		w.Tracker = release.TrackerConfig{
+			Commit:      "",
+			RepoPath:    "",
+			Ref:         ref,
+			State:       state,
+			Intent:      intent,
+			StoreConfig: be.Store,
+		}
+
+		return nil
 	}
 
-	return nil, fmt.Errorf("failed to init worker from state repo\n%v", errorsByRepo)
+	return fmt.Errorf("failed to init tracker from state repo\n%v", errorsByRepo)
 }
 
-func (w *Worker) InitTrackerFromSourceRepo(ctx context.Context, ref refs.Ref, wd, repoRootPath string) error {
+func (w *Worker) InitTrackerFromSourceRepo(ctx context.Context, ref refs.Ref, wd, repoRootPath string, saveConfig bool) error {
 	re := tuiwork.GetRepoEvent(repoRootPath, ref, w.Tui, tuiwork.WorkStatusRunning)
 	w.Tui.UpdateTask(re)
 	tLog := tuiwork.TuiLoggerForRepo(w.Tui, repoRootPath, ref)
@@ -150,9 +172,11 @@ func (w *Worker) InitTrackerFromSourceRepo(ctx context.Context, ref refs.Ref, wd
 		StoreConfig: be.Store,
 	}
 
-	err = saveRepoConfig(ctx, tc, data)
-	if err != nil {
-		return fmt.Errorf("failed to save repo config: %w", err)
+	if saveConfig && tc.Ref.Repo != "" {
+		err = saveRepoConfig(ctx, tc, repoRootPath, w.RepoName, commit, data)
+		if err != nil {
+			return fmt.Errorf("failed to save repo config: %w", err)
+		}
 	}
 
 	w.Tracker = tc
@@ -280,16 +304,13 @@ func (w *Worker) TrackerForExistingRelease(ctx context.Context) (*librelease.Rel
 	return tracker, nil
 }
 
-func saveRepoConfig(ctx context.Context, tc release.TrackerConfig, data []byte) (err error) {
+func saveRepoConfig(ctx context.Context, tc release.TrackerConfig, repoPath, repoName, commit string, data []byte) (err error) {
 	// Write the repo file to the state stores for later use
-	repoRef := tc.Ref.
-		SetFilename("repo.ocu.star").
-		SetRelease(tc.Commit).
-		SetSubPathType(refs.SubPathTypeNone).
-		SetSubPath("").
-		SetFragment("")
-
-	r, err := gittools.Open(tc.RepoPath)
+	repoRef, err := refs.Parse(fmt.Sprintf("%s/-/repo.ocu.star/@%s", repoName, commit))
+	if err != nil {
+		return fmt.Errorf("failed to parse repo ref: %w", err)
+	}
+	r, err := gittools.Open(repoPath)
 	if err != nil {
 		return fmt.Errorf("failed to open repo: %w", err)
 	}

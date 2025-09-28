@@ -53,7 +53,7 @@ func (n *NonTTYTui) GetTaskByID(id string) (Task, bool) {
 func (n *NonTTYTui) UpdateTask(ev TaskEvent) {
 	description, show := ev.Description()
 	if show {
-		fmt.Println(description)
+		fmt.Fprintln(os.Stderr, description)
 	}
 
 	n.tasks[ev.Task().ID()] = ev.Task()
@@ -89,7 +89,7 @@ func StartWorkTui() Tui {
 	var tuiDone = make(chan struct{})
 	go func() {
 		if _, err := p.Run(); err != nil {
-			fmt.Printf("TUI error: %v", err)
+			fmt.Fprintf(os.Stderr, "TUI error: %v", err)
 			os.Exit(1)
 		}
 

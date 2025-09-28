@@ -45,11 +45,6 @@ func NewWorker(ctx context.Context, ref refs.Ref) (*Worker, error) {
 		workTui.Cleanup()
 		return nil, err
 	}
-	if errors.Is(err, client.ErrRootNotFound) {
-		workTui.Cleanup()
-		return nil, errors.New("a repo.ocu.star file is required in the root of your project")
-	}
-
 	storeRootPath, err = client.FindStateStoreRoot(wd)
 	if err != nil && !errors.Is(err, client.ErrRootNotFound) {
 		workTui.Cleanup()
@@ -66,18 +61,17 @@ func NewWorker(ctx context.Context, ref refs.Ref) (*Worker, error) {
 	}
 
 	if repoRootPath != "" {
-		err := w.InitTrackerFromSourceRepo(ctx, ref, wd, repoRootPath)
+		err := w.InitTrackerFromSourceRepo(ctx, ref, wd, repoRootPath, true)
 		if err != nil {
 			workTui.Cleanup()
 			return nil, fmt.Errorf("failed to init tracker: %w", err)
 		}
 	} else {
-		wOut, err := w.InitWorkerFromStateRepo(ctx, ref, wd, storeRootPath)
+		err = w.InitTrackerFromStateRepo(ctx, ref, wd, storeRootPath)
 		if err != nil {
 			workTui.Cleanup()
-			return nil, fmt.Errorf("failed to init worker from state repo: %w", err)
+			return nil, fmt.Errorf("failed to init tracker from state repo: %w", err)
 		}
-		w = wOut
 	}
 
 	w.Tracker.State = tuiwork.WatchForStateUpdates(ctx, w.Tracker.State, workTui)

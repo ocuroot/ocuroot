@@ -86,7 +86,7 @@ func newRefStoreFromBackend(
 		}
 
 		store, err = refstore.NewGitRefStore(
-			filepath.Join(client.HomeDir(), "state", repoURL),
+			filepath.Join(client.HomeDir(), "state", client.GitURLToRefPath(storeConfig.Git.RemoteURL)),
 			storeConfig.Git.RemoteURL,
 			storeConfig.Git.Branch,
 			refstore.GitRefStoreConfig{

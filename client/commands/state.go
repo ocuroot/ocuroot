@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 
+	"github.com/charmbracelet/log"
 	"github.com/ocuroot/ocuroot/client/release"
 	"github.com/ocuroot/ocuroot/client/state"
 	"github.com/ocuroot/ocuroot/client/work"
@@ -27,26 +28,36 @@ var StateGetCmd = &cobra.Command{
 	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx := cmd.Context()
-		tc, err := getTrackerConfig(ctx, cmd, args)
+
+		ref, err := GetRef(cmd, args)
 		if err != nil {
-			return fmt.Errorf("failed to get tracker config: %w", err)
+			log.Error("Failed to get ref", "error", err)
+			return fmt.Errorf("failed to get ref: %w", err)
 		}
-		ref := tc.Ref
-		state := tc.State
 
 		cmd.SilenceUsage = true
 
-		var v any
-		err = state.Get(cmd.Context(), ref.String(), &v)
+		w, err := work.NewWorker(ctx, ref)
 		if err != nil {
+			log.Error("Failed to create worker", "error", err)
+			return fmt.Errorf("failed to create worker: %w", err)
+		}
+		w.Cleanup()
+
+		var v any
+		err = w.Tracker.State.Get(cmd.Context(), w.Tracker.Ref.String(), &v)
+		if err != nil {
+			log.Error("Failed to get state", "ref", w.Tracker.Ref.String(), "error", err)
 			return fmt.Errorf("failed to get state: %w", err)
 		}
 
 		jv, err := json.MarshalIndent(v, "", "  ")
 		if err != nil {
+			log.Error("Failed to marshal state", "error", err)
 			return fmt.Errorf("failed to marshal state: %w", err)
 		}
 
+		log.Info("Returning state", "value", string(jv))
 		fmt.Println(string(jv))
 		return nil
 	},
@@ -59,11 +70,17 @@ var StateMatchCmd = &cobra.Command{
 	Args:  cobra.RangeArgs(0, 1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx := cmd.Context()
-		tc, err := getTrackerConfig(ctx, cmd, args)
+
+		ref, err := GetRef(cmd, args)
 		if err != nil {
-			return fmt.Errorf("failed to get tracker config: %w", err)
+			return fmt.Errorf("failed to get ref: %w", err)
 		}
-		state := tc.State
+
+		w, err := work.NewWorker(ctx, ref)
+		if err != nil {
+			return fmt.Errorf("failed to create worker: %w", err)
+		}
+		w.Cleanup()
 
 		glob := ""
 		if len(args) > 0 {
@@ -77,7 +94,7 @@ var StateMatchCmd = &cobra.Command{
 
 		cmd.SilenceUsage = true
 
-		refs, err := state.MatchOptions(cmd.Context(), refstore.MatchOptions{
+		refs, err := w.Tracker.State.MatchOptions(cmd.Context(), refstore.MatchOptions{
 			NoLinks: noLinks,
 		}, glob)
 		if err != nil {
@@ -98,18 +115,21 @@ var StateDiffCmd = &cobra.Command{
 	Long:  `Diff intent with current state.`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx := cmd.Context()
-		tc, err := getTrackerConfig(ctx, cmd, args)
+
+		ref, err := GetRef(cmd, args)
 		if err != nil {
-			return fmt.Errorf("failed to get tracker config: %w", err)
+			return fmt.Errorf("failed to get ref: %w", err)
 		}
+
+		w, err := work.NewWorker(ctx, ref)
+		if err != nil {
+			return fmt.Errorf("failed to create worker: %w", err)
+		}
+		w.Cleanup()
 
 		cmd.SilenceUsage = true
 
-		worker := &work.Worker{
-			Tracker: tc,
-		}
-
-		diffs, err := worker.Diff(ctx, work.IndentifyWorkRequest{
+		diffs, err := w.Diff(ctx, work.IndentifyWorkRequest{
 			GitFilter: work.GitFilterCurrentCommitOnly,
 		})
 		if err != nil {
@@ -131,16 +151,25 @@ var StateDeleteIntentCmd = &cobra.Command{
 	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx := cmd.Context()
-		tc, err := getTrackerConfig(ctx, cmd, args)
+
+		ref, err := GetRef(cmd, args)
 		if err != nil {
-			return fmt.Errorf("failed to get tracker config: %w", err)
+			return fmt.Errorf("failed to get ref: %w", err)
 		}
-		ref := tc.Ref
-		intent := tc.Intent
+
+		w, err := work.NewWorker(ctx, ref)
+		if err != nil {
+			return fmt.Errorf("failed to create worker: %w", err)
+		}
+		w.Cleanup()
 
 		cmd.SilenceUsage = true
 
-		if err := intent.Delete(ctx, ref.String()); err != nil {
+		intent := w.Tracker.Intent
+
+		cmd.SilenceUsage = true
+
+		if err := intent.Delete(ctx, w.Tracker.Ref.String()); err != nil {
 			return fmt.Errorf("failed to delete intent: %w", err)
 		}
 
@@ -169,12 +198,20 @@ Set value to '-' to pass the value from stdin.
 			return fmt.Errorf("unsupported format: %s", format)
 		}
 
-		tc, err := getTrackerConfig(ctx, cmd, args)
+		ref, err := GetRef(cmd, args)
 		if err != nil {
-			return fmt.Errorf("failed to get tracker config: %w", err)
+			return fmt.Errorf("failed to get ref: %w", err)
 		}
-		ref := tc.Ref
-		intent := tc.Intent
+
+		w, err := work.NewWorker(ctx, ref)
+		if err != nil {
+			return fmt.Errorf("failed to create worker: %w", err)
+		}
+		w.Cleanup()
+
+		cmd.SilenceUsage = true
+
+		intent := w.Tracker.Intent
 
 		// Subsequent failures should not output usage information.
 		cmd.SilenceUsage = true
@@ -202,7 +239,7 @@ Set value to '-' to pass the value from stdin.
 			}
 		}
 
-		if err := intent.Set(ctx, ref.String(), value); err != nil {
+		if err := intent.Set(ctx, w.Tracker.Ref.String(), value); err != nil {
 			return fmt.Errorf("failed to set intent: %w", err)
 		}
 
@@ -259,13 +296,20 @@ var StateViewCmd = &cobra.Command{
 	Args:  cobra.ExactArgs(0),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx := cmd.Context()
-		tc, err := getTrackerConfig(ctx, cmd, args)
+		ref, err := GetRef(cmd, args)
 		if err != nil {
-			return fmt.Errorf("failed to get tracker config: %w", err)
+			return fmt.Errorf("failed to get ref: %w", err)
 		}
+
+		w, err := work.NewWorker(ctx, ref)
+		if err != nil {
+			return fmt.Errorf("failed to create worker: %w", err)
+		}
+		w.Cleanup()
+
 		cmd.SilenceUsage = true
 
-		if err := state.View(cmd.Context(), tc.State, tc.Intent); err != nil {
+		if err := state.View(cmd.Context(), w.Tracker.State, w.Tracker.Intent); err != nil {
 			return fmt.Errorf("failed to view state: %w", err)
 		}
 		return nil

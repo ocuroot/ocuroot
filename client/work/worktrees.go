@@ -21,7 +21,11 @@ import (
 
 func (w *Worker) WorkerForWork(ctx context.Context, todo Work) (*Worker, func(), error) {
 	if todo.Ref.Repo != w.RepoName {
-		return w.CopyInRepoClone(ctx, todo.Ref, todo.Ref.Repo, todo.Commit)
+		wOut, cleanup, err := w.CopyInRepoClone(ctx, todo.Ref, todo.Ref.Repo, todo.Commit)
+		if err != nil {
+			return nil, nil, fmt.Errorf("worker from clone: %w", err)
+		}
+		return wOut, cleanup, nil
 	}
 	// No-op if the same repo and the same commit
 	if todo.Commit == w.Tracker.Commit {
@@ -35,12 +39,17 @@ func (w *Worker) CopyInRepoClone(ctx context.Context, ref refs.Ref, repoName, co
 		return nil, nil, fmt.Errorf("failed to mkdir: %w", err)
 	}
 
+	log.Info("Cloning repo", "ref", ref, "repoName", repoName, "commit", commit)
+
 	var repoInfo models.RepoConfig
 	repoRef := fmt.Sprintf("%v/-/repo.ocu.star/@", repoName)
+	log.Info("Getting repo info", "repoRef", repoRef)
 	err := w.Tracker.State.Get(ctx, repoRef, &repoInfo)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to get repo info for %s: %w", repoRef, err)
 	}
+
+	log.Info("Repo info", "remotes", repoInfo.Remotes, "source", string(repoInfo.Source))
 
 	be, err := w.RepoConfigFromState(ctx, repoName)
 	if err != nil {
@@ -62,11 +71,13 @@ func (w *Worker) CopyInRepoClone(ctx context.Context, ref refs.Ref, repoName, co
 	var repo *gittools.Repo
 	var remoteToError = make(map[string]error)
 	for _, remote := range remotes {
+		log.Info("Attempting clone", "remote", remote, "repoCloneDir", repoCloneDir)
 		repo, err = gittools.NewClient().Clone(remote, repoCloneDir)
 		if err != nil {
 			log.Error("failed to clone repo", "remote", remote, "repoCloneDir", repoCloneDir, "err", err)
 			remoteToError[remote] = err
 		} else {
+			log.Info("Clone successful")
 			break
 		}
 	}
@@ -76,7 +87,8 @@ func (w *Worker) CopyInRepoClone(ctx context.Context, ref refs.Ref, repoName, co
 
 	err = repo.Checkout(commit)
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to checkout commit: %w", err)
+		log.Error("failed to checkout commit", "commit", commit, "repoCloneDir", repoCloneDir, "err", err)
+		return nil, nil, fmt.Errorf("failed to checkout commit: %w\nin repoDir: %v", err, repoCloneDir)
 	}
 
 	wc := *w
@@ -87,7 +99,8 @@ func (w *Worker) CopyInRepoClone(ctx context.Context, ref refs.Ref, repoName, co
 
 	// Initialize tracker as needed
 	if newWorker.Tracker.Intent == nil || newWorker.Tracker.State == nil {
-		err := newWorker.InitTrackerFromSourceRepo(ctx, ref, repoCloneDir, repoCloneDir)
+		// We don't save the repo config here since it should already exist
+		err := newWorker.InitTrackerFromSourceRepo(ctx, ref, repoCloneDir, repoCloneDir, false)
 		if err != nil {
 			return nil, nil, fmt.Errorf("failed to init tracker from source repo: %w", err)
 		}

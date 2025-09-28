@@ -1,6 +1,6 @@
 ocuroot("0.3.0")
 
-repo_alias("cascade_repo2")
+repo_alias("repo2")
 
 env_vars = host.env()
 

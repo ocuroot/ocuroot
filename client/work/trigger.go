@@ -78,7 +78,7 @@ func (w *Worker) RepoConfigFromState(ctx context.Context, repo string) (*local.B
 		return nil, fmt.Errorf("failed to resolve config ref (%v): %w", configRef, err)
 	}
 
-	log.Info("Triggering work for repo", "ref", configWithCommit)
+	log.Info("Loading repo config from state", "ref", configWithCommit)
 	var repoConfig models.RepoConfig
 	if err := w.Tracker.State.Get(ctx, configWithCommit, &repoConfig); err != nil {
 		return nil, fmt.Errorf("failed to get repo config (%v): %w", configWithCommit, err)
