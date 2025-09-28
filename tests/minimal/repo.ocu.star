@@ -1,5 +1,3 @@
-ocuroot("0.3.0")
-
 repo_alias("minimal/repo")
 
 store.set(
