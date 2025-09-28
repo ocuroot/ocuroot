@@ -299,10 +299,6 @@ finally it will trigger work for other commits ('ocuroot work trigger').
 			}
 
 			log.Info("Identified work", "todo", toJSON(todo))
-			if len(todo) == 0 {
-				return nil
-			}
-
 			if dryRun {
 				worker.Cleanup()
 
@@ -311,6 +307,10 @@ finally it will trigger work for other commits ('ocuroot work trigger').
 					return fmt.Errorf("failed to marshal todo: %w", err)
 				}
 				fmt.Println(string(todoJSON))
+				return nil
+			}
+
+			if len(todo) == 0 {
 				return nil
 			}
 
