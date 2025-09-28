@@ -113,6 +113,27 @@ func (w *Worker) Diff(ctx context.Context, req IndentifyWorkRequest) ([]Work, er
 		}
 	}
 
+	if req.IntentChanges == nil {
+		return out, nil
+	}
+
+	var resolvedIntentChanges = make(map[string]struct{})
+	for ref := range req.IntentChanges {
+		resolvedRef, err := state.ResolveLink(ctx, ref)
+		if err != nil {
+			return nil, fmt.Errorf("failed to resolve intent ref: %w", err)
+		}
+		resolvedIntentChanges[resolvedRef] = struct{}{}
+	}
+
+	var filteredWork []Work
+	for _, w := range out {
+		if _, exists := resolvedIntentChanges[w.Ref.String()]; exists {
+			filteredWork = append(filteredWork, w)
+		}
+	}
+	out = filteredWork
+
 	return out, nil
 }
 

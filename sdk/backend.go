@@ -55,6 +55,7 @@ type RefsBackend interface {
 type RepoBackend interface {
 	Alias(ctx context.Context, alias string) error
 	Trigger(ctx context.Context, fn *starlark.Function)
+	Remotes(ctx context.Context, remotes []string) error
 }
 
 type EnvironmentBackend interface {

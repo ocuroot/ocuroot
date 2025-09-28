@@ -4,7 +4,7 @@ export OCU_REPO_COMMIT_OVERRIDE=${OCU_REPO_COMMIT_OVERRIDE:-commitid}
 export OCUROOT_HOME=$(pwd)/$(dirname "$0")/.ocuroot
 
 source $(dirname "$0")/../test_helpers.sh
-source $(dirname "$0")/test_helpers.sh
+source $(dirname "$0")/../git_helpers.sh
 
 test_gitstate() {
     # Call the init function to create repositories and set environment variables

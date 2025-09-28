@@ -72,6 +72,28 @@ func (r Ref) IsRelative() bool {
 	return r.Repo == "" || r.Repo == "." || r.Filename == "." || r.Release == "."
 }
 
+func (r Ref) IsEmpty() bool {
+	if r.Repo != "" && r.Repo != "." {
+		return false
+	}
+	if r.Filename != "" && r.Filename != "." {
+		return false
+	}
+	if r.HasRelease() {
+		return false
+	}
+	if r.SubPathType != "" {
+		return false
+	}
+	if r.SubPath != "" {
+		return false
+	}
+	if r.Fragment != "" {
+		return false
+	}
+	return true
+}
+
 func (r Ref) Valid() error {
 	if r.Global {
 		if r.Filename != "" {

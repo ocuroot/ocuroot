@@ -244,6 +244,52 @@ delete_environment_comprehensive() {
     echo ""
 }
 
+delete_environment_cascade() {
+    echo "delete_environment_cascade"
+    echo "--------------------------"
+
+    setup_test
+
+    echo "=== Releasing environments ==="
+    ocuroot release new environments.ocu.star
+    assert_equal "0" "$?" "Failed to release environments"
+
+    echo "=== Releasing package1 ==="
+    ocuroot release new package1.ocu.star
+    assert_equal "0" "$?" "Failed to release package1"
+
+    echo "=== Releasing package2 ==="
+    ocuroot release new package2.ocu.star
+    assert_equal "0" "$?" "Failed to release package2"
+
+    check_ref_exists "package1.ocu.star/@/deploy/production2"
+    check_ref_exists "package2.ocu.star/@/deploy/production2"
+
+    check_file_exists "./.deploys/production2/package1.txt"
+    check_file_exists "./.deploys/production2/package2.txt"
+
+    echo "=== Deleting environment ==="
+    ocuroot state delete "@/environment/production2"
+
+    echo "=== Apply deletion with cascade ==="
+    ocuroot state apply "@/environment/production2" --cascade
+
+    check_ref_does_not_exist "@/environment/production2"    
+
+    check_ref_does_not_exist "package1.ocu.star/@/deploy/production2"
+
+    check_file_exists "./.deploys/staging/package1.txt"
+    check_file_exists "./.deploys/staging/package2.txt"
+    check_file_exists "./.deploys/production/package1.txt"
+    check_file_exists "./.deploys/production/package2.txt"
+
+    check_file_does_not_exist "./.deploys/production2/package1.txt"
+    check_file_does_not_exist "./.deploys/production2/package2.txt"
+
+    echo "Test passed"
+    echo ""
+}
+
 setup_test() {
     rm -rf .store
     rm -rf .ocuroot
@@ -258,4 +304,6 @@ create_environment_omnibus
 delete_environment
 delete_environment_omnibus
 delete_environment_comprehensive
+delete_environment_cascade
+
 popd > /dev/null

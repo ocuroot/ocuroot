@@ -63,7 +63,7 @@ func GetRepoURL(repoRootPath string) (string, error) {
 		return "", fmt.Errorf("failed to get repo URL: %w", err)
 	}
 	repoURL = strings.TrimRight(repoURL, "\n")
-	repoURL = gitURLToRefPath(repoURL)
+	repoURL = GitURLToRefPath(repoURL)
 	return repoURL, nil
 }
 
@@ -97,7 +97,7 @@ func GetRepoCommit(repoRootPath string) (string, error) {
 	return commit, nil
 }
 
-func gitURLToRefPath(gitURL string) string {
+func GitURLToRefPath(gitURL string) string {
 	gitURL = strings.TrimSuffix(gitURL, ".git")
 
 	if strings.HasPrefix(gitURL, "git@") {

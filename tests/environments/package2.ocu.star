@@ -13,7 +13,6 @@ def down(environment):
     shell("rm -f ./.deploys/{}/package2.txt".format(environment["name"]))
     return done()
 
-
 phase(
     "deploy",
     tasks=[

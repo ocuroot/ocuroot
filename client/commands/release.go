@@ -44,6 +44,7 @@ var NewReleaseCmd = &cobra.Command{
 		defer span.End()
 
 		force := cmd.Flag("force").Changed
+		cascade := cmd.Flag("cascade").Changed
 
 		ref, err := GetRef(cmd, args)
 		if err != nil {
@@ -108,6 +109,12 @@ var NewReleaseCmd = &cobra.Command{
 		)
 		if err != nil {
 			return err
+		}
+
+		if cascade {
+			if err := worker.Cascade(ctx); err != nil {
+				return err
+			}
 		}
 
 		worker.Cleanup()
@@ -298,9 +305,10 @@ func checkFinalReleaseState(
 }
 
 func init() {
-	ReleaseCmd.AddCommand(NewReleaseCmd)
-
 	NewReleaseCmd.Flags().BoolP("force", "f", false, "Create a new release even if there are existing releases for this commit")
+	NewReleaseCmd.Flags().Bool("cascade", false, "Create a new release and cascade follow on work for dependant releases")
+
+	ReleaseCmd.AddCommand(NewReleaseCmd)
 
 	ReleaseCmd.AddCommand(ContinueReleaseCmd)
 	ReleaseCmd.AddCommand(RetryReleaseCmd)

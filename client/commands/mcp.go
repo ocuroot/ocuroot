@@ -19,6 +19,7 @@ import (
 	"github.com/ocuroot/ocuroot/client"
 	"github.com/ocuroot/ocuroot/client/local"
 	"github.com/ocuroot/ocuroot/client/release"
+	"github.com/ocuroot/ocuroot/client/work"
 	"github.com/ocuroot/ocuroot/refs"
 	"github.com/ocuroot/ocuroot/sdk"
 	"github.com/ocuroot/ocuroot/sdk/starlarkerrors"
@@ -109,14 +110,15 @@ func previewHandler(ctx context.Context, request mcp.CallToolRequest) (*mcp.Call
 	fmt.Println("repo: ", repoRootPath)
 	fmt.Println("ref: ", ref)
 
-	tc, err := getTrackerConfig(ctx, nil, nil)
+	w, err := work.NewWorker(ctx, ref)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to create worker: %w", err)
 	}
+	defer w.Cleanup()
 
 	backend, _ := local.NewBackend(ref)
 	backend.Environments = &release.EnvironmentBackend{
-		State: tc.State,
+		State: w.Tracker.State,
 	}
 
 	config, err := local.ExecutePackage(ctx, repoRootPath, ref, backend)

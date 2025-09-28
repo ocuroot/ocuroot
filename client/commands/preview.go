@@ -5,6 +5,7 @@ import (
 	"os"
 
 	"github.com/ocuroot/ocuroot/client/preview"
+	"github.com/ocuroot/ocuroot/client/work"
 	"github.com/spf13/cobra"
 )
 
@@ -19,17 +20,24 @@ var PreviewCmd = &cobra.Command{
 	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx := cmd.Context()
-		tc, err := getTrackerConfig(ctx, cmd, args)
+
+		ref, err := GetRef(cmd, args)
 		if err != nil {
-			return err
+			return fmt.Errorf("failed to get ref: %w", err)
 		}
 
-		if tc.Ref.HasRelease() {
+		w, err := work.NewWorker(ctx, ref)
+		if err != nil {
+			return fmt.Errorf("failed to create worker: %w", err)
+		}
+		w.Cleanup()
+
+		if w.Tracker.Ref.HasRelease() {
 			return fmt.Errorf("a release should not be specified for a preview")
 		}
 
 		// Clean the ref
-		tc.Ref = tc.Ref.SetRelease("preview")
+		w.Tracker.Ref = w.Tracker.Ref.SetRelease("preview")
 
 		packagePath := args[0]
 		if _, err := os.Stat(packagePath); err != nil {
@@ -40,7 +48,7 @@ var PreviewCmd = &cobra.Command{
 		}
 
 		// Start web server
-		preview.StartPreviewServer(tc, previewPort)
+		preview.StartPreviewServer(w.Tracker, previewPort)
 		return nil
 	},
 }

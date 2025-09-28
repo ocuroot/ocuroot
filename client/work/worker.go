@@ -4,9 +4,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"os"
 	"reflect"
 
 	"github.com/charmbracelet/log"
+	"github.com/ocuroot/ocuroot/client"
 	"github.com/ocuroot/ocuroot/client/release"
 	"github.com/ocuroot/ocuroot/client/tui"
 	"github.com/ocuroot/ocuroot/client/tui/tuiwork"
@@ -22,23 +24,71 @@ func NewWorker(ctx context.Context, ref refs.Ref) (*Worker, error) {
 
 	w := &Worker{
 		Tui: workTui,
+
+		StateChanges:  make(map[string]struct{}),
+		IntentChanges: make(map[string]struct{}),
 	}
 
-	err := w.InitTracker(ctx, ref)
+	wd, err := os.Getwd()
 	if err != nil {
 		workTui.Cleanup()
-		return nil, fmt.Errorf("failed to init tracker: %w", err)
+		return nil, err
+	}
+
+	var (
+		repoRootPath  string
+		storeRootPath string
+	)
+
+	repoRootPath, err = client.FindRepoRoot(wd)
+	if err != nil && !errors.Is(err, client.ErrRootNotFound) {
+		workTui.Cleanup()
+		return nil, err
+	}
+	storeRootPath, err = client.FindStateStoreRoot(wd)
+	if err != nil && !errors.Is(err, client.ErrRootNotFound) {
+		workTui.Cleanup()
+		return nil, err
+	}
+
+	if repoRootPath != "" && storeRootPath != "" {
+		if len(repoRootPath) >= len(storeRootPath) {
+			storeRootPath = ""
+		}
+		if len(storeRootPath) > len(repoRootPath) {
+			repoRootPath = ""
+		}
+	}
+
+	if repoRootPath != "" {
+		err := w.InitTrackerFromSourceRepo(ctx, ref, wd, repoRootPath, true)
+		if err != nil {
+			workTui.Cleanup()
+			return nil, fmt.Errorf("failed to init tracker: %w", err)
+		}
+	} else {
+		err = w.InitTrackerFromStateRepo(ctx, ref, wd, storeRootPath)
+		if err != nil {
+			workTui.Cleanup()
+			return nil, fmt.Errorf("failed to init tracker from state repo: %w", err)
+		}
 	}
 
 	w.Tracker.State = tuiwork.WatchForStateUpdates(ctx, w.Tracker.State, workTui)
+	w.RecordStateUpdates(ctx)
 
 	return w, nil
 }
 
 type Worker struct {
-	Tracker release.TrackerConfig
+	Tracker     release.TrackerConfig
+	RepoName    string
+	RepoRemotes []string
 
 	Tui tui.Tui
+
+	StateChanges  map[string]struct{}
+	IntentChanges map[string]struct{}
 }
 
 type GitFilter int
@@ -52,6 +102,12 @@ const (
 type IndentifyWorkRequest struct {
 	// Filter work based on the repo and commit required
 	GitFilter GitFilter
+
+	// Filter work based on upstream changes that impact it
+	// This allows work to apply a release to continue through
+	// other releases with dependencies, for example
+	IntentChanges map[string]struct{}
+	StateChanges  map[string]struct{}
 }
 
 func (w *Worker) Cleanup() {
