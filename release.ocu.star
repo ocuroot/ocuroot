@@ -25,7 +25,7 @@ phase(
 def increment_version(ctx):
     prerelease = next_prerelease_version(ctx.inputs.prev_prerelease, ctx.inputs.prev_version)
 
-    create_draft_release(ctx.inputs.prev_version, prerelease)
+    create_prerelease(ctx.inputs.prev_version, prerelease)
 
     return done(
         outputs={
@@ -34,7 +34,7 @@ def increment_version(ctx):
         tags=[prerelease],
     )
 
-def create_draft_release(previous_version, version):
+def create_prerelease(previous_version, version):
     # Generate release notes from the git log
     commit_summaries = host.shell("git log v{}..$(git rev-parse HEAD) --pretty='%h %s'".format(previous_version)).stdout
     release_notes = "## Commit summaries\n\n{commit_summaries}".format(
@@ -44,7 +44,7 @@ def create_draft_release(previous_version, version):
     # Get the current commit to GH knows what to tag
     target = host.shell("git rev-parse --abbrev-ref HEAD").stdout.strip()
 
-    host.shell("gh release create v{version} --target {target} --draft --title \"v{version}\" --notes \"$RELEASE_NOTES\"".format(
+    host.shell("gh release create v{version} --target {target} -p --latest=false --title \"v{version}\" --notes \"$RELEASE_NOTES\"".format(
         version=version,
         target=target,
     ), env={"RELEASE_NOTES": release_notes})
