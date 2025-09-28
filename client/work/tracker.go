@@ -23,20 +23,47 @@ import (
 	librelease "github.com/ocuroot/ocuroot/lib/release"
 )
 
-func (w *Worker) InitTracker(ctx context.Context, ref refs.Ref) error {
-	wd, err := os.Getwd()
+func (w *Worker) InitWorkerFromStateRepo(ctx context.Context, ref refs.Ref, wd, storeRootPath string) (*Worker, error) {
+	fs, err := refstore.NewFSRefStore(storeRootPath)
 	if err != nil {
-		return err
+		return nil, fmt.Errorf("failed to create fs ref store: %w", err)
 	}
 
-	repoRootPath, err := client.FindRepoRoot(wd)
-	if err != nil && !errors.Is(err, client.ErrRootNotFound) {
-		return err
+	readOnlyStore := refstore.NewReadOnlyStore(fs)
+	repoRefs, err := readOnlyStore.Match(ctx, "**/-/repo.ocu.star/@")
+	if err != nil {
+		return nil, fmt.Errorf("failed to match repo refs: %w", err)
 	}
-	if errors.Is(err, client.ErrRootNotFound) {
-		return errors.New("a repo.ocu.star file is required in the root of your project")
+	if len(repoRefs) == 0 {
+		return nil, errors.New("no repos registered in store")
 	}
 
+	w.Tracker.State = readOnlyStore
+
+	var errorsByRepo = make(map[string]error)
+	for _, repoRef := range repoRefs {
+		// TODO: Handle cleanup
+		resolvedRepoRef, err := readOnlyStore.ResolveLink(ctx, repoRef)
+		if err != nil {
+			errorsByRepo[repoRef] = err
+			continue
+		}
+		repoRefParsed, err := refs.Parse(resolvedRepoRef)
+		if err != nil {
+			errorsByRepo[repoRef] = err
+			continue
+		}
+		wOut, _, err := w.CopyInRepoClone(ctx, ref, repoRefParsed.Repo, repoRefParsed.Release.String())
+		if err == nil {
+			return wOut, nil
+		}
+		errorsByRepo[repoRef] = err
+	}
+
+	return nil, fmt.Errorf("failed to init worker from state repo\n%v", errorsByRepo)
+}
+
+func (w *Worker) InitTrackerFromSourceRepo(ctx context.Context, ref refs.Ref, wd, repoRootPath string) error {
 	re := tuiwork.GetRepoEvent(repoRootPath, ref, w.Tui, tuiwork.WorkStatusRunning)
 	w.Tui.UpdateTask(re)
 	tLog := tuiwork.TuiLoggerForRepo(w.Tui, repoRootPath, ref)

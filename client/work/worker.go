@@ -4,9 +4,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"os"
 	"reflect"
 
 	"github.com/charmbracelet/log"
+	"github.com/ocuroot/ocuroot/client"
 	"github.com/ocuroot/ocuroot/client/release"
 	"github.com/ocuroot/ocuroot/client/tui"
 	"github.com/ocuroot/ocuroot/client/tui/tuiwork"
@@ -27,10 +29,55 @@ func NewWorker(ctx context.Context, ref refs.Ref) (*Worker, error) {
 		IntentChanges: make(map[string]struct{}),
 	}
 
-	err := w.InitTracker(ctx, ref)
+	wd, err := os.Getwd()
 	if err != nil {
 		workTui.Cleanup()
-		return nil, fmt.Errorf("failed to init tracker: %w", err)
+		return nil, err
+	}
+
+	var (
+		repoRootPath  string
+		storeRootPath string
+	)
+
+	repoRootPath, err = client.FindRepoRoot(wd)
+	if err != nil && !errors.Is(err, client.ErrRootNotFound) {
+		workTui.Cleanup()
+		return nil, err
+	}
+	if errors.Is(err, client.ErrRootNotFound) {
+		workTui.Cleanup()
+		return nil, errors.New("a repo.ocu.star file is required in the root of your project")
+	}
+
+	storeRootPath, err = client.FindStateStoreRoot(wd)
+	if err != nil && !errors.Is(err, client.ErrRootNotFound) {
+		workTui.Cleanup()
+		return nil, err
+	}
+
+	if repoRootPath != "" && storeRootPath != "" {
+		if len(repoRootPath) >= len(storeRootPath) {
+			storeRootPath = ""
+		}
+		if len(storeRootPath) > len(repoRootPath) {
+			repoRootPath = ""
+		}
+	}
+
+	if repoRootPath != "" {
+		err := w.InitTrackerFromSourceRepo(ctx, ref, wd, repoRootPath)
+		if err != nil {
+			workTui.Cleanup()
+			return nil, fmt.Errorf("failed to init tracker: %w", err)
+		}
+	} else {
+		wOut, err := w.InitWorkerFromStateRepo(ctx, ref, wd, storeRootPath)
+		if err != nil {
+			workTui.Cleanup()
+			return nil, fmt.Errorf("failed to init worker from state repo: %w", err)
+		}
+		w = wOut
 	}
 
 	w.Tracker.State = tuiwork.WatchForStateUpdates(ctx, w.Tracker.State, workTui)

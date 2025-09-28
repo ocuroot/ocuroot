@@ -21,7 +21,7 @@ import (
 
 func (w *Worker) WorkerForWork(ctx context.Context, todo Work) (*Worker, func(), error) {
 	if todo.Ref.Repo != w.RepoName {
-		return w.CopyInRepoClone(ctx, todo)
+		return w.CopyInRepoClone(ctx, todo.Ref, todo.Ref.Repo, todo.Commit)
 	}
 	// No-op if the same repo and the same commit
 	if todo.Commit == w.Tracker.Commit {
@@ -30,19 +30,19 @@ func (w *Worker) WorkerForWork(ctx context.Context, todo Work) (*Worker, func(),
 	return w.CopyInWorktree(ctx, todo)
 }
 
-func (w *Worker) CopyInRepoClone(ctx context.Context, todo Work) (*Worker, func(), error) {
+func (w *Worker) CopyInRepoClone(ctx context.Context, ref refs.Ref, repoName, commit string) (*Worker, func(), error) {
 	if err := os.MkdirAll(repoCloneBaseDir(), 0755); err != nil {
 		return nil, nil, fmt.Errorf("failed to mkdir: %w", err)
 	}
 
 	var repoInfo models.RepoConfig
-	repoRef := fmt.Sprintf("%v/-/repo.ocu.star/@", todo.Ref.Repo)
+	repoRef := fmt.Sprintf("%v/-/repo.ocu.star/@", repoName)
 	err := w.Tracker.State.Get(ctx, repoRef, &repoInfo)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to get repo info for %s: %w", repoRef, err)
 	}
 
-	be, err := w.RepoConfigFromState(ctx, todo.Ref.Repo)
+	be, err := w.RepoConfigFromState(ctx, repoName)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to get repo config: %w", err)
 	}
@@ -74,18 +74,24 @@ func (w *Worker) CopyInRepoClone(ctx context.Context, todo Work) (*Worker, func(
 		return nil, nil, fmt.Errorf("all remotes exhausted trying to clone repo\n%v", remoteToError)
 	}
 
-	err = repo.Checkout(todo.Commit)
+	err = repo.Checkout(commit)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to checkout commit: %w", err)
 	}
 
-	newWorker := &Worker{
-		Tracker: w.Tracker,
-		Tui:     w.Tui,
-	}
-	newWorker.Tracker.Commit = todo.Commit
+	wc := *w
+	newWorker := &wc
+	newWorker.Tracker.Commit = commit
 	newWorker.Tracker.RepoPath = repoCloneDir
-	newWorker.Tracker.Ref = todo.Ref
+	newWorker.Tracker.Ref = ref
+
+	// Initialize tracker as needed
+	if newWorker.Tracker.Intent == nil || newWorker.Tracker.State == nil {
+		err := newWorker.InitTrackerFromSourceRepo(ctx, ref, repoCloneDir, repoCloneDir)
+		if err != nil {
+			return nil, nil, fmt.Errorf("failed to init tracker from source repo: %w", err)
+		}
+	}
 
 	// Check that the worktree is as expected
 	wtr, err := gittools.Open(repoCloneDir)
@@ -97,8 +103,8 @@ func (w *Worker) CopyInRepoClone(ctx context.Context, todo Work) (*Worker, func(
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to get head: %w\n%v", err, string(stderr))
 	}
-	if strings.TrimSpace(string(head)) != todo.Commit {
-		return nil, nil, fmt.Errorf("commit in worktree does not match expected commit: %s != %s", string(head), todo.Commit)
+	if strings.TrimSpace(string(head)) != commit {
+		return nil, nil, fmt.Errorf("commit in worktree does not match expected commit: %s != %s", string(head), commit)
 	}
 
 	return newWorker, func() {
