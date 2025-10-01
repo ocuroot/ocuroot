@@ -251,7 +251,7 @@ func (w *Worker) ExecuteWorkInCleanWorktrees(ctx context.Context, todos []Work) 
 		defer cleanup()
 
 		for _, t := range workGroups[g] {
-			if t.WorkType == WorkTypeRun {
+			if t.WorkType == WorkTypeRun || t.WorkType == WorkTypeOp {
 				if err := newWorker.ExecuteWork(ctx, []Work{t}); err != nil {
 					return fmt.Errorf("failed to execute work: %w", err)
 				}

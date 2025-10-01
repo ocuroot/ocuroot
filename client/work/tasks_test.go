@@ -29,7 +29,7 @@ func TestReadyRuns(t *testing.T) {
 	// Create test data for different scenarios
 	releaseRef := mustParseRef("github.com/example/repo/-/release1")
 	releaseWithCommitRef := mustParseRef("github.com/example/repo/-/release1/@abc123")
-	
+
 	// Create release information in state store
 	releaseInfo := librelease.ReleaseInfo{
 		Commit: "abc123",
@@ -222,7 +222,7 @@ func TestReadyRuns(t *testing.T) {
 		},
 	}
 
-	readyWork, err := worker.ReadyRuns(ctx, IndentifyWorkRequest{})
+	readyWork, err := worker.ReadyRuns(ctx, IdentifyWorkRequest{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -317,7 +317,7 @@ func TestReadyRunsRepoFiltering(t *testing.T) {
 	// Create runs for multiple repos to test filtering
 	targetRepo := "github.com/example/repo"
 	otherRepo := "github.com/other/repo"
-	
+
 	// Create release information for both repos
 	targetReleaseRef := mustParseRef(targetRepo + "/-/release1")
 	targetReleaseWithCommitRef := mustParseRef(targetRepo + "/-/release1/@abc123")
@@ -328,7 +328,7 @@ func TestReadyRunsRepoFiltering(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	
+
 	otherReleaseRef := mustParseRef(otherRepo + "/-/release1")
 	otherReleaseWithCommitRef := mustParseRef(otherRepo + "/-/release1/@def456")
 	otherReleaseInfo := librelease.ReleaseInfo{
@@ -338,11 +338,11 @@ func TestReadyRunsRepoFiltering(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	
+
 	// Target repo runs (should be included)
 	targetRun1 := mustParseRef(targetRepo + "/-/release1/@abc123/deploy/production/1")
 	targetRun2 := mustParseRef(targetRepo + "/-/release1/@abc123/task/backup/1")
-	
+
 	// Other repo runs (should be filtered out)
 	otherRun1 := mustParseRef(otherRepo + "/-/release1/@def456/deploy/staging/1")
 	otherRun2 := mustParseRef(otherRepo + "/-/release1/@def456/task/cleanup/1")
@@ -365,7 +365,7 @@ func TestReadyRunsRepoFiltering(t *testing.T) {
 		} else {
 			releaseRef = otherReleaseRef
 		}
-		
+
 		runData := models.Run{
 			Type:    models.RunTypeUp,
 			Release: releaseRef,
@@ -378,12 +378,12 @@ func TestReadyRunsRepoFiltering(t *testing.T) {
 				},
 			},
 		}
-		
+
 		err = stateStore.Set(ctx, run.ref.String(), runData)
 		if err != nil {
 			t.Fatal(err)
 		}
-		
+
 		err = stateStore.Set(ctx, run.ref.String()+"/status/"+run.status, run.status)
 		if err != nil {
 			t.Fatal(err)
@@ -397,15 +397,15 @@ func TestReadyRunsRepoFiltering(t *testing.T) {
 		},
 	}
 
-	allRuns, err := worker.ReadyRuns(ctx, IndentifyWorkRequest{GitFilter: GitFilterNone})
+	allRuns, err := worker.ReadyRuns(ctx, IdentifyWorkRequest{GitFilter: GitFilterNone})
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	// Test with repo filtering
 	worker.Tracker.Ref = mustParseRef(targetRepo + "/-/release1")
-	
-	filteredRuns, err := worker.ReadyRuns(ctx, IndentifyWorkRequest{GitFilter: GitFilterCurrentRepoOnly})
+
+	filteredRuns, err := worker.ReadyRuns(ctx, IdentifyWorkRequest{GitFilter: GitFilterCurrentRepoOnly})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -432,7 +432,7 @@ func TestReadyRunsRepoFiltering(t *testing.T) {
 		t.Error("Should not have runs from other repo")
 	}
 
-	t.Logf("Repo filtering test completed: target repo runs = %d, other repo runs = %d", 
+	t.Logf("Repo filtering test completed: target repo runs = %d, other repo runs = %d",
 		filteredByRepo[targetRepo], filteredByRepo[otherRepo])
 }
 
@@ -462,13 +462,13 @@ func TestReadyRunsCommitFiltering(t *testing.T) {
 		// Target repo, target commit (should be included)
 		{mustParseRef(targetRepo + "/-/release1/@" + targetCommit + "/deploy/production/1"), targetCommit, "pending"},
 		{mustParseRef(targetRepo + "/-/release1/@" + targetCommit + "/task/backup/1"), targetCommit, "paused"},
-		
+
 		// Target repo, different commit (should be filtered out)
 		{mustParseRef(targetRepo + "/-/release2/@" + otherCommit + "/deploy/staging/1"), otherCommit, "pending"},
-		
+
 		// Other repo, target commit (should be filtered out - repo filtering)
 		{mustParseRef(otherRepo + "/-/release1/@" + targetCommit + "/deploy/test/1"), targetCommit, "pending"},
-		
+
 		// Other repo, other commit (should be filtered out)
 		{mustParseRef(otherRepo + "/-/release2/@" + otherCommit + "/task/cleanup/1"), otherCommit, "pending"},
 	}
@@ -497,12 +497,12 @@ func TestReadyRunsCommitFiltering(t *testing.T) {
 				},
 			},
 		}
-		
+
 		err = stateStore.Set(ctx, run.ref.String(), runData)
 		if err != nil {
 			t.Fatal(err)
 		}
-		
+
 		err = stateStore.Set(ctx, run.ref.String()+"/status/"+run.status, run.status)
 		if err != nil {
 			t.Fatal(err)
@@ -518,19 +518,19 @@ func TestReadyRunsCommitFiltering(t *testing.T) {
 	}
 
 	// Test without filtering
-	allRuns, err := worker.ReadyRuns(ctx, IndentifyWorkRequest{GitFilter: GitFilterNone})
+	allRuns, err := worker.ReadyRuns(ctx, IdentifyWorkRequest{GitFilter: GitFilterNone})
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	// Test with repo filtering only
-	repoFilteredRuns, err := worker.ReadyRuns(ctx, IndentifyWorkRequest{GitFilter: GitFilterCurrentRepoOnly})
+	repoFilteredRuns, err := worker.ReadyRuns(ctx, IdentifyWorkRequest{GitFilter: GitFilterCurrentRepoOnly})
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	// Test with commit filtering (should imply repo filtering)
-	commitFilteredRuns, err := worker.ReadyRuns(ctx, IndentifyWorkRequest{GitFilter: GitFilterCurrentCommitOnly})
+	commitFilteredRuns, err := worker.ReadyRuns(ctx, IdentifyWorkRequest{GitFilter: GitFilterCurrentCommitOnly})
 	if err != nil {
 		t.Fatal(err)
 	}

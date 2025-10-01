@@ -99,7 +99,7 @@ const (
 	GitFilterCurrentCommitOnly
 )
 
-type IndentifyWorkRequest struct {
+type IdentifyWorkRequest struct {
 	// Filter work based on the repo and commit required
 	GitFilter GitFilter
 
@@ -114,7 +114,7 @@ func (w *Worker) Cleanup() {
 	w.Tui.Cleanup()
 }
 
-func (w *Worker) IdentifyWork(ctx context.Context, req IndentifyWorkRequest) ([]Work, error) {
+func (w *Worker) IdentifyWork(ctx context.Context, req IdentifyWorkRequest) ([]Work, error) {
 	var out []Work
 
 	diffs, err := w.Diff(ctx, req)

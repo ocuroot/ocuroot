@@ -98,7 +98,12 @@ var NewReleaseCmd = &cobra.Command{
 				if err := worker.ApplyIntent(ctx, pr); err != nil {
 					return err
 				}
+			}
 
+			if cascade {
+				if err := worker.Cascade(ctx); err != nil {
+					return err
+				}
 			}
 			return nil
 		}

@@ -11,7 +11,7 @@ import (
 	"github.com/ocuroot/ocuroot/store/models"
 )
 
-func (w *Worker) Diff(ctx context.Context, req IndentifyWorkRequest) ([]Work, error) {
+func (w *Worker) Diff(ctx context.Context, req IdentifyWorkRequest) ([]Work, error) {
 	// Cannot diff without both stores
 	if w.Tracker.Intent == nil {
 		return nil, nil

@@ -39,13 +39,13 @@ var WorkContinueCmd = &cobra.Command{
 		}
 		defer worker.Cleanup()
 
-		todo, err := worker.ReadyRuns(ctx, work.IndentifyWorkRequest{
+		todo, err := worker.ReadyRuns(ctx, work.IdentifyWorkRequest{
 			GitFilter: work.GitFilterCurrentCommitOnly,
 		})
 		if err != nil {
 			return fmt.Errorf("failed to identify work: %w", err)
 		}
-		reconcilableDeployments, err := worker.ReconcilableDeployments(ctx, work.IndentifyWorkRequest{
+		reconcilableDeployments, err := worker.ReconcilableDeployments(ctx, work.IdentifyWorkRequest{
 			GitFilter: work.GitFilterCurrentCommitOnly,
 		})
 		if err != nil {
@@ -108,7 +108,7 @@ finally it will trigger work for other commits ('ocuroot work trigger').
 		defer worker.Cleanup()
 
 		for {
-			todo, err := worker.IdentifyWork(ctx, work.IndentifyWorkRequest{
+			todo, err := worker.IdentifyWork(ctx, work.IdentifyWorkRequest{
 				GitFilter: work.GitFilterCurrentCommitOnly,
 			})
 			if err != nil {
@@ -141,7 +141,7 @@ finally it will trigger work for other commits ('ocuroot work trigger').
 		}
 
 		log.Info("Starting trigger work")
-		todo, err := worker.IdentifyWork(ctx, work.IndentifyWorkRequest{})
+		todo, err := worker.IdentifyWork(ctx, work.IdentifyWorkRequest{})
 		if err != nil {
 			return fmt.Errorf("failed to identify work: %w", err)
 		}
@@ -193,7 +193,7 @@ var WorkTriggerCommand = &cobra.Command{
 			return nil
 		}
 
-		todo, err := worker.IdentifyWork(ctx, work.IndentifyWorkRequest{})
+		todo, err := worker.IdentifyWork(ctx, work.IdentifyWorkRequest{})
 		if err != nil {
 			return fmt.Errorf("failed to identify work: %w", err)
 		}
@@ -236,7 +236,7 @@ var WorkOpsCmd = &cobra.Command{
 		}
 		defer worker.Cleanup()
 
-		todo, err := worker.Ops(ctx, work.IndentifyWorkRequest{
+		todo, err := worker.Ops(ctx, work.IdentifyWorkRequest{
 			GitFilter: work.GitFilterCurrentCommitOnly,
 		})
 		if err != nil {
@@ -293,7 +293,7 @@ finally it will trigger work for other commits ('ocuroot work trigger').
 		defer worker.Cleanup()
 
 		for {
-			todo, err := worker.IdentifyWork(ctx, work.IndentifyWorkRequest{})
+			todo, err := worker.IdentifyWork(ctx, work.IdentifyWorkRequest{})
 			if err != nil {
 				return fmt.Errorf("failed to identify work: %w", err)
 			}

@@ -9,8 +9,9 @@ import (
 )
 
 func (w *Worker) Cascade(ctx context.Context) error {
+	log.Info("Cascading work", "StateChanges", w.StateChanges, "IntentChanges", w.IntentChanges)
 	for {
-		followOn, err := w.IdentifyWork(ctx, IndentifyWorkRequest{
+		followOn, err := w.IdentifyWork(ctx, IdentifyWorkRequest{
 			IntentChanges: w.IntentChanges,
 			StateChanges:  w.StateChanges,
 		})
@@ -19,9 +20,11 @@ func (w *Worker) Cascade(ctx context.Context) error {
 		}
 
 		if len(followOn) == 0 {
+			log.Info("No follow on work")
 			break
 		}
 
+		log.Info("Executing follow on work", "count", len(followOn))
 		if err := w.ExecuteWorkInCleanWorktrees(ctx, followOn); err != nil {
 			return err
 		}

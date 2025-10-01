@@ -14,7 +14,9 @@ import (
 	"github.com/ocuroot/ocuroot/store/models"
 )
 
-func (w *Worker) ReadyRuns(ctx context.Context, req IndentifyWorkRequest) ([]Work, error) {
+func (w *Worker) ReadyRuns(ctx context.Context, req IdentifyWorkRequest) ([]Work, error) {
+	log.Info("Getting ready runs")
+
 	var out []Work
 
 	state := w.Tracker.State
@@ -30,30 +32,13 @@ func (w *Worker) ReadyRuns(ctx context.Context, req IndentifyWorkRequest) ([]Wor
 		err         error
 	)
 
-	if req.StateChanges == nil {
-		outstanding, err = state.Match(
-			ctx,
-			prefix+"/@*/{deploy,task}/*/*/status/pending",
-			prefix+"/@*/{deploy,task}/*/*/status/paused",
-		)
-		if err != nil {
-			return nil, fmt.Errorf("failed to match refs: %w", err)
-		}
-	} else {
-		potentialMatches := make([]string, 0, len(req.StateChanges))
-		for ref := range req.StateChanges {
-			if strings.Contains(ref, "/status/pending") || strings.Contains(ref, "/status/paused") {
-				potentialMatches = append(potentialMatches, ref)
-			}
-		}
-
-		outstanding, err = state.Match(
-			ctx,
-			potentialMatches...,
-		)
-		if err != nil {
-			return nil, fmt.Errorf("failed to match refs: %w", err)
-		}
+	outstanding, err = state.Match(
+		ctx,
+		prefix+"/@*/{deploy,task}/*/*/status/pending",
+		prefix+"/@*/{deploy,task}/*/*/status/paused",
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to match refs: %w", err)
 	}
 
 	for _, ref := range outstanding {
@@ -67,6 +52,14 @@ func (w *Worker) ReadyRuns(ctx context.Context, req IndentifyWorkRequest) ([]Wor
 		commit, valid, err := w.CheckCommit(ctx, runRef, req)
 		if err != nil {
 			return nil, fmt.Errorf("failed to check commit: %w", err)
+		}
+		if !valid {
+			continue
+		}
+
+		valid, err = w.CheckRun(ctx, runRef, req)
+		if err != nil {
+			return nil, fmt.Errorf("failed to check run: %w", err)
 		}
 		if !valid {
 			continue
@@ -95,7 +88,62 @@ func (w *Worker) ReadyRuns(ctx context.Context, req IndentifyWorkRequest) ([]Wor
 	return out, nil
 }
 
-func (w *Worker) CheckCommit(ctx context.Context, ref string, req IndentifyWorkRequest) (string, bool, error) {
+func (w *Worker) CheckRun(ctx context.Context, ref string, req IdentifyWorkRequest) (bool, error) {
+	if req.StateChanges == nil {
+		return true, nil
+	}
+
+	runRef, err := refs.Reduce(ref, release.GlobRun)
+	if err != nil {
+		return false, fmt.Errorf("failed to reduce ref: %w", err)
+	}
+
+	// Always attempt to execute runs we created
+	if _, exists := req.StateChanges[runRef]; exists {
+		return true, nil
+	}
+
+	var run models.Run
+	if err := w.Tracker.State.Get(ctx, runRef, &run); err != nil {
+		return false, fmt.Errorf("failed to get function state at %s: %w", runRef, err)
+	}
+	if len(run.Functions) == 0 {
+		return false, fmt.Errorf("no functions in run")
+	}
+	lastFunction := run.Functions[len(run.Functions)-1]
+
+	// Attempt to execute runs whose dependencies we updated
+	for _, dep := range lastFunction.Dependencies {
+		resolvedDep, err := w.Tracker.State.ResolveLink(ctx, dep.String())
+		if err != nil {
+			return false, fmt.Errorf("failed to resolve dependency %q: %w", dep.String(), err)
+		}
+		if _, exists := req.StateChanges[resolvedDep]; exists {
+			return true, nil
+		}
+	}
+
+	// Attempt to execute runs whose inputs we updated
+	for _, input := range lastFunction.Inputs {
+		if input.Ref != nil {
+			resolvedInput, err := w.Tracker.State.ResolveLink(ctx, input.Ref.String())
+			if err != nil {
+				return false, fmt.Errorf("failed to resolve input %q: %w", input.Ref.String(), err)
+			}
+			parsedInput, err := refs.Parse(resolvedInput)
+			if err != nil {
+				return false, fmt.Errorf("failed to parse input %q: %w", resolvedInput, err)
+			}
+			if _, exists := req.StateChanges[parsedInput.SetFragment("").String()]; exists {
+				return true, nil
+			}
+		}
+	}
+
+	return false, nil
+}
+
+func (w *Worker) CheckCommit(ctx context.Context, ref string, req IdentifyWorkRequest) (string, bool, error) {
 	resolvedRef, err := w.Tracker.State.ResolveLink(ctx, ref)
 	if err != nil {
 		return "", false, fmt.Errorf("failed to resolve ref: %w", err)
@@ -120,7 +168,7 @@ func (w *Worker) CheckCommit(ctx context.Context, ref string, req IndentifyWorkR
 	return r.Commit, valid, nil
 }
 
-func (w *Worker) ReconcilableDeployments(ctx context.Context, req IndentifyWorkRequest) ([]Work, error) {
+func (w *Worker) ReconcilableDeployments(ctx context.Context, req IdentifyWorkRequest) ([]Work, error) {
 	var out []Work
 
 	log.Info("Getting reconcilable deployments")
@@ -160,7 +208,7 @@ func (w *Worker) ReconcilableDeployments(ctx context.Context, req IndentifyWorkR
 	return out, nil
 }
 
-func (w *Worker) Ops(ctx context.Context, req IndentifyWorkRequest) ([]Work, error) {
+func (w *Worker) Ops(ctx context.Context, req IdentifyWorkRequest) ([]Work, error) {
 	var out []Work
 
 	state := w.Tracker.State
@@ -209,7 +257,7 @@ func (w *Worker) Ops(ctx context.Context, req IndentifyWorkRequest) ([]Work, err
 	return out, nil
 }
 
-func (w *Worker) reconcileDeployment(ctx context.Context, ref string, req IndentifyWorkRequest) (*refs.Ref, error) {
+func (w *Worker) reconcileDeployment(ctx context.Context, ref string, req IdentifyWorkRequest) (*refs.Ref, error) {
 	store := w.Tracker.State
 	var deployment models.Task
 	if err := store.Get(ctx, ref, &deployment); err != nil {

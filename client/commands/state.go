@@ -129,7 +129,7 @@ var StateDiffCmd = &cobra.Command{
 
 		cmd.SilenceUsage = true
 
-		diffs, err := w.Diff(ctx, work.IndentifyWorkRequest{
+		diffs, err := w.Diff(ctx, work.IdentifyWorkRequest{
 			GitFilter: work.GitFilterCurrentCommitOnly,
 		})
 		if err != nil {

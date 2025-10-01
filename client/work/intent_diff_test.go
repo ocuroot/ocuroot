@@ -117,7 +117,7 @@ func TestIntentDiffCustomRefs(t *testing.T) {
 		},
 	}
 
-	work, err := worker.Diff(ctx, IndentifyWorkRequest{})
+	work, err := worker.Diff(ctx, IdentifyWorkRequest{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -214,7 +214,7 @@ func TestIntentDiffRepoFiltering(t *testing.T) {
 
 	// Different repo: github.com/other/repo (should be filtered out)
 	err = stateStore.Set(ctx, "github.com/other/repo/-/service/@/custom/config", map[string]interface{}{
-		"env": "production",
+		"env":      "production",
 		"replicas": 3,
 	})
 	if err != nil {
@@ -222,7 +222,7 @@ func TestIntentDiffRepoFiltering(t *testing.T) {
 	}
 
 	err = stateStore.Set(ctx, "github.com/other/repo/-/cache/@/custom/settings", map[string]interface{}{
-		"ttl": 3600,
+		"ttl":  3600,
 		"size": "1GB",
 	})
 	if err != nil {
@@ -258,7 +258,7 @@ func TestIntentDiffRepoFiltering(t *testing.T) {
 
 	// Other repo changes (should be filtered out when filtering is enabled)
 	err = intentStore.Set(ctx, "github.com/other/repo/-/service/@/custom/config", map[string]interface{}{
-		"env": "staging", // Updated environment
+		"env":      "staging", // Updated environment
 		"replicas": 2,
 	})
 	if err != nil {
@@ -266,7 +266,7 @@ func TestIntentDiffRepoFiltering(t *testing.T) {
 	}
 
 	err = intentStore.Set(ctx, "github.com/other/repo/-/monitoring/@/custom/alerts", map[string]interface{}{
-		"enabled": true,
+		"enabled":   true,
 		"threshold": 0.8,
 	})
 	if err != nil {
@@ -290,15 +290,15 @@ func TestIntentDiffRepoFiltering(t *testing.T) {
 		},
 	}
 
-	allWork, err := worker.Diff(ctx, IndentifyWorkRequest{GitFilter: GitFilterNone})
+	allWork, err := worker.Diff(ctx, IdentifyWorkRequest{GitFilter: GitFilterNone})
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	// Test 2: Filter to current repo only
 	worker.Tracker.Ref = mustParseRef("github.com/example/repo/-/release1")
-	
-	filteredWork, err := worker.Diff(ctx, IndentifyWorkRequest{GitFilter: GitFilterCurrentRepoOnly})
+
+	filteredWork, err := worker.Diff(ctx, IdentifyWorkRequest{GitFilter: GitFilterCurrentRepoOnly})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -363,4 +363,3 @@ func TestIntentDiffRepoFiltering(t *testing.T) {
 
 	t.Logf("Repo filtering test completed successfully")
 }
-
