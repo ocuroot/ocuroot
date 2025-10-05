@@ -227,16 +227,11 @@ func (c *configLoader) packageBuiltins(backend Backend) starlark.Value {
 func (c *configLoader) httpBuiltins(backend Backend) starlark.Value {
 	httpBuiltins := starlark.StringDict{}
 	if httpBackend := backend.Http; httpBackend != nil {
-		httpBuiltins["get"] = JSONBuiltin("http.get", func(ctx context.Context, req HTTPGetRequest) (HTTPResponse, error) {
-			return httpBackend.Get(ctx, req)
-		})
-
-		httpBuiltins["post"] = JSONBuiltin("http.post", func(ctx context.Context, req HTTPPostRequest) (HTTPResponse, error) {
-			return httpBackend.Post(ctx, req)
+		httpBuiltins["req"] = JSONBuiltin("http.req", func(ctx context.Context, req HTTPRequest) (HTTPResponse, error) {
+			return httpBackend.Req(ctx, req)
 		})
 	} else {
-		httpBuiltins["get"] = unimplementedFunction("http.get")
-		httpBuiltins["post"] = unimplementedFunction("http.post")
+		httpBuiltins["req"] = unimplementedFunction("http.req")
 	}
 	return starlarkstruct.FromStringDict(starlark.String("http"), httpBuiltins)
 }

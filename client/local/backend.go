@@ -121,47 +121,8 @@ func (e *EnvironmentBackend) Register(ctx context.Context, env sdk.Environment) 
 type HTTPBackend struct {
 }
 
-// Get implements sdk.HTTPBackend.
-func (h *HTTPBackend) Get(ctx context.Context, req sdk.HTTPGetRequest) (sdk.HTTPResponse, error) {
-	_, span := tracer.Start(ctx, "http get")
-	defer span.End()
-
-	span.SetAttributes(
-		attribute.String("url", req.URL),
-	)
-
-	client := &http.Client{}
-	httpReq, err := http.NewRequest("GET", req.URL, nil)
-	if err != nil {
-		return sdk.HTTPResponse{}, err
-	}
-	for k, a := range req.Headers {
-		for _, v := range a {
-			httpReq.Header.Set(k, v)
-		}
-	}
-	resp, err := client.Do(httpReq)
-	if err != nil {
-		return sdk.HTTPResponse{}, err
-	}
-	defer resp.Body.Close()
-	if resp.StatusCode < 200 || resp.StatusCode > 299 {
-		return sdk.HTTPResponse{}, fmt.Errorf("non-2xx response code from %s: %d", req.URL, resp.StatusCode)
-	}
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return sdk.HTTPResponse{}, err
-	}
-	return sdk.HTTPResponse{
-		Body:       string(body),
-		Headers:    resp.Header,
-		StatusCode: resp.StatusCode,
-		StatusText: resp.Status,
-	}, nil
-}
-
 // Post implements sdk.HTTPBackend.
-func (h *HTTPBackend) Post(ctx context.Context, req sdk.HTTPPostRequest) (sdk.HTTPResponse, error) {
+func (h *HTTPBackend) Req(ctx context.Context, req sdk.HTTPRequest) (sdk.HTTPResponse, error) {
 	_, span := tracer.Start(ctx, "http post")
 	defer span.End()
 
@@ -170,7 +131,7 @@ func (h *HTTPBackend) Post(ctx context.Context, req sdk.HTTPPostRequest) (sdk.HT
 	)
 
 	client := &http.Client{}
-	httpReq, err := http.NewRequest("POST", req.URL, strings.NewReader(req.Body))
+	httpReq, err := http.NewRequest(req.Method, req.URL, strings.NewReader(req.Body))
 	if err != nil {
 		return sdk.HTTPResponse{}, err
 	}
@@ -185,7 +146,11 @@ func (h *HTTPBackend) Post(ctx context.Context, req sdk.HTTPPostRequest) (sdk.HT
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode < 200 || resp.StatusCode > 299 {
-		return sdk.HTTPResponse{}, fmt.Errorf("non-2xx response code from %s: %d", req.URL, resp.StatusCode)
+		bodyBytes, err := io.ReadAll(resp.Body)
+		if err != nil {
+			return sdk.HTTPResponse{}, fmt.Errorf("failed to read response body: %w", err)
+		}
+		return sdk.HTTPResponse{}, fmt.Errorf("non-2xx response code from %s: %d (%s)\n%v", req.URL, resp.StatusCode, resp.Status, string(bodyBytes))
 	}
 	respBody, err := io.ReadAll(resp.Body)
 	if err != nil {

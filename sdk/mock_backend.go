@@ -38,11 +38,7 @@ func (m *mockEnvironmentBackend) Register(ctx context.Context, env Environment) 
 type mockHTTPBackend struct {
 }
 
-func (m *mockHTTPBackend) Get(ctx context.Context, req HTTPGetRequest) (HTTPResponse, error) {
-	return HTTPResponse{}, nil
-}
-
-func (m *mockHTTPBackend) Post(ctx context.Context, req HTTPPostRequest) (HTTPResponse, error) {
+func (m *mockHTTPBackend) Req(ctx context.Context, req HTTPRequest) (HTTPResponse, error) {
 	return HTTPResponse{}, nil
 }
 

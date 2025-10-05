@@ -117,20 +117,15 @@ type HTTPResponse struct {
 	StatusText string              `json:"status_text"`
 }
 
-type HTTPGetRequest struct {
-	URL     string              `json:"url"`
-	Headers map[string][]string `json:"headers"`
-}
-
-type HTTPPostRequest struct {
+type HTTPRequest struct {
+	Method  string              `json:"method"`
 	URL     string              `json:"url"`
 	Body    string              `json:"body"`
 	Headers map[string][]string `json:"headers"`
 }
 
 type HTTPBackend interface {
-	Get(ctx context.Context, req HTTPGetRequest) (HTTPResponse, error)
-	Post(ctx context.Context, req HTTPPostRequest) (HTTPResponse, error)
+	Req(ctx context.Context, req HTTPRequest) (HTTPResponse, error)
 }
 
 type SecretsBackend interface {
