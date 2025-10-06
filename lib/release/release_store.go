@@ -147,7 +147,7 @@ func (w *releaseStore) InitDeploymentDown(ctx context.Context, env string) error
 		}
 	}()
 
-	ref, fnRun, fs, err := w.sdTaskToDownRun(ctx, env, entrypoint, *downFunc)
+	ref, fnRun, fs, err := w.sdkTaskToDownRun(ctx, env, entrypoint, *downFunc)
 	if err != nil {
 		return fmt.Errorf("failed to get run: %w", err)
 	}
@@ -486,7 +486,7 @@ func (r *releaseStore) sdkTaskToRunAndFunction(ctx context.Context, task sdk.Tas
 	return runRef, mRun, fs, nil
 }
 
-func (r *releaseStore) sdTaskToDownRun(
+func (r *releaseStore) sdkTaskToDownRun(
 	ctx context.Context,
 	environment string,
 	fn *models.Function,
@@ -506,15 +506,12 @@ func (r *releaseStore) sdTaskToDownRun(
 		Inputs: make(map[string]sdk.InputDescriptor),
 	}
 
-	for name, input := range fn.Inputs {
-		i := sdk.InputDescriptor{
-			Value: input.Value,
-		}
-		if input.Value == nil {
-			i.Value = input.Default
-		}
-		fs.Inputs[name] = i
+	// Populate inputs to resolve and reevaluate any refs
+	populatedInputs, err := PopulateInputs(ctx, r.Store, fn.Inputs)
+	if err != nil {
+		return refs.Ref{}, models.Run{}, nil, fmt.Errorf("failed to populate inputs: %w", err)
 	}
+	fs.Inputs = populatedInputs
 
 	runRefString, err := refstore.IncrementPath(ctx, r.Store, fmt.Sprintf("%s/", taskRef.String()))
 	if err != nil {
