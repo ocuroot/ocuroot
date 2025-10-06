@@ -145,13 +145,6 @@ func (h *HTTPBackend) Req(ctx context.Context, req sdk.HTTPRequest) (sdk.HTTPRes
 		return sdk.HTTPResponse{}, err
 	}
 	defer resp.Body.Close()
-	if resp.StatusCode < 200 || resp.StatusCode > 299 {
-		bodyBytes, err := io.ReadAll(resp.Body)
-		if err != nil {
-			return sdk.HTTPResponse{}, fmt.Errorf("failed to read response body: %w", err)
-		}
-		return sdk.HTTPResponse{}, fmt.Errorf("non-2xx response code from %s: %d (%s)\n%v", req.URL, resp.StatusCode, resp.Status, string(bodyBytes))
-	}
 	respBody, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return sdk.HTTPResponse{}, err
