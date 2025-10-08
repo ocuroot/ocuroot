@@ -1,12 +1,16 @@
 package commands
 
 import (
-	"bufio"
 	"context"
 	"fmt"
 	"os"
 	"strings"
 
+	"github.com/charmbracelet/bubbles/spinner"
+	"github.com/charmbracelet/bubbles/textinput"
+	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
+	"github.com/charmbracelet/log"
 	"github.com/ocuroot/ocuroot/client/release"
 	"github.com/ocuroot/ocuroot/client/work"
 	"github.com/ocuroot/ocuroot/refs"
@@ -204,11 +208,8 @@ func runStarlarkReplWithFile(ctx context.Context, filePath string) error {
 	}
 
 	fmt.Println("Starting Starlark REPL with Ocuroot SDK")
-	fmt.Println("Type Ctrl+D to exit (Ctrl+C will interrupt the current operation)")
-	fmt.Println("Type 'help()' to see available SDK modules")
-	fmt.Printf("Loaded repo: %s\n", w.Tracker.Ref.Repo)
-	fmt.Printf("Loaded file: %s\n", filePath)
-	fmt.Printf("Available user functions: %d\n", len(config.GlobalFuncs()))
+	fmt.Println("Ctrl+C or Escape to exit")
+	fmt.Println("Type 'help()' to see available globals")
 	fmt.Println()
 
 	// Use the combined globals for REPL that includes user-defined functions
@@ -244,59 +245,13 @@ func createGlobalsWithUserFunctions(ctx context.Context, backend sdk.Backend, sd
 
 // runCustomREPLWithGlobals implements a REPL that uses pre-loaded globals
 func runCustomREPLWithGlobals(globals starlark.StringDict) error {
-	// Create a scanner for reading input
-	scanner := bufio.NewScanner(os.Stdin)
-
-	for {
-		fmt.Print(">>> ")
-		if !scanner.Scan() {
-			// EOF (Ctrl+D)
-			fmt.Println()
-			break
-		}
-
-		line := strings.TrimSpace(scanner.Text())
-		if line == "" {
-			continue
-		}
-
-		// Handle special commands
-		if line == "exit" || line == "quit" {
-			break
-		}
-
-		// Create a new thread for this evaluation
-		thread := &starlark.Thread{
-			Name: "repl",
-			Print: func(thread *starlark.Thread, msg string) {
-				fmt.Println(msg)
-			},
-		}
-
-		opts := syntax.FileOptions{}
-		opts.LoadBindsGlobally = true
-
-		// Parse the expression first
-		expr, err := opts.ParseExpr("<stdin>", line, syntax.RetainComments)
-		if err != nil {
-			fmt.Printf("Parse error: %s\n", err)
-			continue
-		}
-
-		// Try to evaluate the expression
-		result, err := starlark.EvalExprOptions(&opts, thread, expr, globals)
-		if err != nil {
-			fmt.Printf("Error: %s\n", err)
-			continue
-		}
-
-		// Print the result if it's not None
-		if result != starlark.None {
-			fmt.Println(result)
-		}
+	m := newReplModel(globals)
+	p := tea.NewProgram(m)
+	m.p = p
+	if _, err := p.Run(); err != nil {
+		log.Fatal(err)
 	}
-
-	return scanner.Err()
+	return nil
 }
 
 func init() {
@@ -304,3 +259,176 @@ func init() {
 	AddRefFlags(ReplCmd, true)
 	ReplCmd.Flags().StringP("command", "c", "", "Execute a single command and exit (non-interactive mode)")
 }
+
+var _ tea.Model = &replModel{}
+
+func newReplModel(globals starlark.StringDict) *replModel {
+	ti := textinput.New()
+	ti.Placeholder = "Enter your statement"
+	ti.Focus()
+	ti.CharLimit = 256
+	ti.Width = 80
+	ti.ShowSuggestions = true
+
+	var suggestions []string
+	for g := range globals {
+		suggestions = append(suggestions, g)
+	}
+	ti.SetSuggestions(suggestions)
+
+	return &replModel{
+		textInput: ti,
+		globals:   globals,
+		spinner:   spinner.New(),
+	}
+}
+
+type replModel struct {
+	p *tea.Program
+
+	spinner spinner.Model
+	command string
+	output  string
+
+	running bool
+
+	textInput textinput.Model
+
+	globals starlark.StringDict
+}
+
+// Init implements tea.Model.
+func (r *replModel) Init() tea.Cmd {
+	return textinput.Blink
+}
+
+func (r *replModel) execute(line string) tea.Msg {
+	r.command = line
+	r.running = true
+	r.output = ""
+	if line == "help()" {
+		for name, g := range r.globals {
+			switch gt := g.(type) {
+			case *starlark.Function:
+				r.p.Send(execLine(fmt.Sprintf("%s: %s\n", name, gt)))
+			default:
+				r.p.Send(execLine(fmt.Sprintf("%s: %s\n", name, gt)))
+			}
+		}
+		r.running = false
+		return nil
+	}
+
+	// Create a new thread for this evaluation
+	thread := &starlark.Thread{
+		Name: "repl",
+		Print: func(thread *starlark.Thread, msg string) {
+			r.p.Send(execLine(msg))
+		},
+	}
+
+	opts := syntax.FileOptions{}
+	opts.LoadBindsGlobally = true
+
+	// Parse the expression first
+	expr, err := opts.ParseExpr("<stdin>", line, syntax.RetainComments)
+	if err != nil {
+		r.p.Send(execError(err))
+		return nil
+	}
+
+	// Try to evaluate the expression
+	go func() {
+		result, err := starlark.EvalExprOptions(&opts, thread, expr, r.globals)
+		if err != nil {
+			r.p.Send(execError(err))
+			return
+		}
+
+		// Print the result if it's not None
+		if result != starlark.None {
+			r.p.Send(execLine(result.String()))
+		}
+
+		r.p.Send(execFinished{})
+	}()
+
+	return r.spinner.Tick
+}
+
+// Update implements tea.Model.
+func (r *replModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	var cmd tea.Cmd
+
+	switch msg := msg.(type) {
+	case execLine:
+		r.output += string(msg) + "\n"
+		return r, nil
+	case execError:
+		r.running = false
+		r.output += msg.Error() + "\n"
+		return r, tea.Println(r.renderResult())
+	case execFinished:
+		r.running = false
+		return r, tea.Println(r.renderResult())
+	case spinner.TickMsg:
+		r.spinner, cmd = r.spinner.Update(msg)
+		return r, cmd
+	case tea.KeyMsg:
+		switch msg.Type {
+		case tea.KeyEnter:
+			if !r.running {
+				r.execute(r.textInput.Value())
+				r.textInput.Reset()
+				return r, r.spinner.Tick
+			}
+		case tea.KeyCtrlC, tea.KeyEsc:
+			return r, tea.Quit
+		}
+	}
+
+	if r.running {
+		return r, nil
+	}
+	r.textInput, cmd = r.textInput.Update(msg)
+	return r, cmd
+}
+
+func (r *replModel) renderResult() string {
+	out := strings.Builder{}
+	if r.running {
+		out.WriteString(r.spinner.View())
+	} else {
+		out.WriteString(">")
+	}
+	out.WriteString(" ")
+	out.WriteString(r.command)
+	out.WriteString("\n")
+
+	// Add a purple, rectangular border
+	var style = lipgloss.NewStyle().
+		Padding(1).
+		BorderStyle(lipgloss.NormalBorder()).
+		BorderForeground(lipgloss.Color("34"))
+	out.WriteString(style.Render(strings.TrimSpace(r.output)))
+
+	return out.String()
+}
+
+// View implements tea.Model.
+func (r *replModel) View() string {
+	out := strings.Builder{}
+	if r.running {
+		out.WriteString(r.renderResult())
+	} else {
+		out.WriteString(r.textInput.View())
+	}
+
+	return out.String()
+}
+
+type execLine string
+
+type execFinished struct{}
+
+type execError error

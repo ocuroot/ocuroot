@@ -1,8 +1,9 @@
 module github.com/ocuroot/ocuroot
 
-go 1.24.2
+go 1.25
 
 require (
+	github.com/Masterminds/semver/v3 v3.4.0
 	github.com/a-h/templ v0.3.943
 	github.com/charmbracelet/bubbles v0.21.0
 	github.com/charmbracelet/bubbletea v1.3.6
@@ -18,6 +19,7 @@ require (
 	github.com/ocuroot/gittools v0.0.11
 	github.com/ocuroot/ui v0.0.18
 	github.com/oklog/ulid/v2 v2.1.1
+	github.com/ricochet2200/go-disk-usage/du v0.0.0-20210707232629-ac9918953285
 	github.com/spf13/cobra v1.9.1
 	github.com/spf13/pflag v1.0.7
 	github.com/stretchr/testify v1.11.0
@@ -30,7 +32,7 @@ require (
 )
 
 require (
-	github.com/Masterminds/semver/v3 v3.4.0 // indirect
+	github.com/atotto/clipboard v0.1.4 // indirect
 	github.com/aymanbagabas/go-osc52/v2 v2.0.1 // indirect
 	github.com/bahlo/generic-list-go v0.2.0 // indirect
 	github.com/buger/jsonparser v1.1.1 // indirect
@@ -55,7 +57,6 @@ require (
 	github.com/muesli/cancelreader v0.2.2 // indirect
 	github.com/muesli/termenv v0.16.0 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
-	github.com/ricochet2200/go-disk-usage/du v0.0.0-20210707232629-ac9918953285 // indirect
 	github.com/rivo/uniseg v0.4.7 // indirect
 	github.com/spf13/cast v1.9.2 // indirect
 	github.com/wk8/go-ordered-map/v2 v2.1.8 // indirect
