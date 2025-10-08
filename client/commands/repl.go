@@ -330,30 +330,51 @@ func (r *replModel) execute(line string) tea.Msg {
 	opts := syntax.FileOptions{}
 	opts.LoadBindsGlobally = true
 
-	// Parse the expression first
-	expr, err := opts.ParseExpr("<stdin>", line, syntax.RetainComments)
-	if err != nil {
-		r.p.Send(execError(err))
-		return nil
+	readline := func() ([]byte, error) {
+		return []byte(line + "\n"), nil
 	}
 
 	// Try to evaluate the expression
 	go func() {
-		result, err := starlark.EvalExprOptions(&opts, thread, expr, r.globals)
+		f, err := opts.ParseCompoundStmt("<stdin>", readline)
 		if err != nil {
 			r.p.Send(execError(err))
 			return
 		}
 
-		// Print the result if it's not None
-		if result != starlark.None {
-			r.p.Send(execLine(result.String()))
+		if expr := soleExpr(f); expr != nil {
+			// eval
+			v, err := starlark.EvalExprOptions(f.Options, thread, expr, r.globals)
+			if err != nil {
+				r.p.Send(execError(err))
+				return
+			}
+
+			// store the result in "_" variable to hold the value of last expression, similar to Python REPL
+			r.globals["_"] = v
+
+			// print
+			if v != starlark.None {
+				r.p.Send(execLine(v.String()))
+			}
+		} else if err := starlark.ExecREPLChunk(f, thread, r.globals); err != nil {
+			r.p.Send(execError(err))
+			return
 		}
 
 		r.p.Send(execFinished{})
 	}()
 
 	return r.spinner.Tick
+}
+
+func soleExpr(f *syntax.File) syntax.Expr {
+	if len(f.Stmts) == 1 {
+		if stmt, ok := f.Stmts[0].(*syntax.ExprStmt); ok {
+			return stmt.X
+		}
+	}
+	return nil
 }
 
 // Update implements tea.Model.
