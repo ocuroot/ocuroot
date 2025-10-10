@@ -276,10 +276,14 @@ func newReplModel(globals starlark.StringDict) *replModel {
 	}
 	ti.SetSuggestions(suggestions)
 
+	s := spinner.New()
+	s.Spinner = spinner.Dot
+	s.Style = lipgloss.NewStyle().Foreground(lipgloss.Color("205"))
+
 	return &replModel{
 		textInput: ti,
 		globals:   globals,
-		spinner:   spinner.New(),
+		spinner:   s,
 	}
 }
 
@@ -425,6 +429,10 @@ func (r *replModel) renderResult() string {
 	out.WriteString(" ")
 	out.WriteString(r.command)
 	out.WriteString("\n")
+
+	if len(r.output) == 0 {
+		return out.String()
+	}
 
 	// Add a purple, rectangular border
 	var style = lipgloss.NewStyle().
