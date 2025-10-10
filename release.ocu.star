@@ -5,14 +5,14 @@ initial_version="0.3.10"
 
 load("./versions.ocu.star", "next_prerelease_version")
 
-def unit_test(ctx):
+def unit_test():
     print("Running unit tests")
     host.shell("go test ./...")
     return done()
 
 task(unit_test, name="unit_test")
 
-def endtoend(ctx):
+def endtoend():
     print("Running end-to-end tests")
     host.shell("make e2e")
     return done()
