@@ -15,7 +15,55 @@ var (
 	ErrRootNotFound = errors.New("root not found")
 )
 
-func FindRepoRoot(path string) (string, error) {
+type RepoInfo struct {
+	Root     string
+	IsSource bool
+}
+
+func (r RepoInfo) GetReleaseConfigFiles() ([]string, error) {
+	files := []string{}
+	err := filepath.Walk(r.Root, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+		if !info.IsDir() && strings.HasSuffix(info.Name(), "ocu.star") && info.Name() != "repo.ocu.star" {
+			files = append(files, path)
+		}
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	return files, nil
+
+}
+
+func GetRepoInfo(path string) (RepoInfo, error) {
+	sourceRoot, err := FindSourceRepoRoot(path)
+	if err != nil && !errors.Is(err, ErrRootNotFound) {
+		return RepoInfo{}, err
+	}
+	stateRoot, err := FindStateStoreRoot(path)
+	if err != nil && !errors.Is(err, ErrRootNotFound) {
+		return RepoInfo{}, err
+	}
+
+	if sourceRoot == "" && stateRoot == "" {
+		return RepoInfo{}, ErrRootNotFound
+	}
+
+	root := sourceRoot
+	if len(stateRoot) >= len(sourceRoot) {
+		root = stateRoot
+	}
+
+	return RepoInfo{
+		Root:     root,
+		IsSource: sourceRoot == root,
+	}, nil
+}
+
+func FindSourceRepoRoot(path string) (string, error) {
 	return findRoot(path, "repo.ocu.star")
 }
 

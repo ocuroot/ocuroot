@@ -40,7 +40,7 @@ func NewWorker(ctx context.Context, ref refs.Ref) (*Worker, error) {
 		storeRootPath string
 	)
 
-	repoRootPath, err = client.FindRepoRoot(wd)
+	repoRootPath, err = client.FindSourceRepoRoot(wd)
 	if err != nil && !errors.Is(err, client.ErrRootNotFound) {
 		workTui.Cleanup()
 		return nil, err

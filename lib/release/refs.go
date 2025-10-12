@@ -2,6 +2,7 @@ package release
 
 import (
 	"context"
+	"strings"
 
 	libglob "github.com/gobwas/glob"
 	"github.com/ocuroot/ocuroot/refs"
@@ -22,6 +23,10 @@ var (
 	GlobCustom      = libglob.MustCompile("**/@*/custom/*", '/')
 	GlobEnvironment = libglob.MustCompile("@*/environment/*", '/')
 )
+
+func ReduceToReleaseConfig(ref string) string {
+	return strings.Split(ref, "@")[0]
+}
 
 func ReduceToTaskRef(ref refs.Ref) (refs.Ref, error) {
 	wr, err := refs.Reduce(ref.String(), GlobTask)
