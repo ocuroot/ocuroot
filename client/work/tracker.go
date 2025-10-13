@@ -246,7 +246,7 @@ func (w *Worker) TrackerForNewRelease(ctx context.Context) (*librelease.ReleaseT
 		if len(outputs.Environments) > 0 {
 			return nil, outputs.Environments, nil
 		}
-		return nil, nil, fmt.Errorf("package not found")
+		return nil, nil, nil
 	}
 
 	tracker, err := librelease.NewReleaseTracker(ctx, config, config.Package, tc.Ref, tc.Intent, tc.State)
