@@ -87,6 +87,7 @@ type Next struct {
 
 type Done struct {
 	Outputs map[string]any `json:"outputs"`
+	Watch   []string       `json:"watch"`
 	Tags    []string       `json:"tags"`
 }
 

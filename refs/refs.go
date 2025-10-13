@@ -119,8 +119,8 @@ const (
 	SubPathTypeCustom      SubPathType = "custom"
 	SubPathTypeEnvironment SubPathType = "environment"
 	SubPathTypeCommit      SubPathType = "commit"
-
-	SubPathTypeOp SubPathType = "op"
+	SubPathTypePush        SubPathType = "push"
+	SubPathTypeOp          SubPathType = "op"
 )
 
 func (s SubPathType) Valid() error {
@@ -130,6 +130,7 @@ func (s SubPathType) Valid() error {
 		SubPathTypeCustom,
 		SubPathTypeEnvironment,
 		SubPathTypeCommit,
+		SubPathTypePush,
 		SubPathTypeOp:
 		return nil
 	default:

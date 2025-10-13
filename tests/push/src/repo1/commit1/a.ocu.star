@@ -4,7 +4,8 @@ def up(environment):
     return done(
         outputs={
             "message": read("a.txt"),
-        }
+        },
+        watch=["a.txt"],
     )
 
 def down(environment):

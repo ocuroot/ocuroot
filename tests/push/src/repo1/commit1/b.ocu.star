@@ -4,7 +4,8 @@ def up(environment, message):
     return done(
         outputs={
             "message": message,
-        }
+        },
+        watch=["b.ocu.star"],
     )
 
 def down(environment, message):

@@ -70,6 +70,8 @@ type Worker struct {
 
 	StateChanges  map[string]struct{}
 	IntentChanges map[string]struct{}
+
+	Index *models.PushIndex
 }
 
 type GitFilter int

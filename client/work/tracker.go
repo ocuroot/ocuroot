@@ -2,6 +2,7 @@ package work
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -171,6 +172,7 @@ func (w *Worker) InitTrackerFromSourceRepo(ctx context.Context, ref refs.Ref, wd
 		Intent:      intent,
 		StoreConfig: be.Store,
 	}
+	w.Tracker = tc
 
 	if saveConfig && tc.Ref.Repo != "" {
 		err = saveRepoConfig(ctx, tc, repoRootPath, w.RepoName, commit, data)
@@ -179,7 +181,18 @@ func (w *Worker) InitTrackerFromSourceRepo(ctx context.Context, ref refs.Ref, wd
 		}
 	}
 
-	w.Tracker = tc
+	// Load the most recent push index
+	err = w.Tracker.State.Get(
+		ctx,
+		fmt.Sprintf(
+			"%v/-/repo.ocu.star/@/push/index",
+			w.RepoName,
+		),
+		&w.Index,
+	)
+	if err != nil && !errors.Is(err, refstore.ErrRefNotFound) {
+		return fmt.Errorf("failed to get push index: %w", err)
+	}
 
 	return nil
 }
