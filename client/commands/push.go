@@ -1,8 +1,8 @@
 package commands
 
 import (
-	"encoding/json"
 	"fmt"
+	"strings"
 
 	"github.com/ocuroot/ocuroot/client/work"
 	"github.com/spf13/cobra"
@@ -36,12 +36,13 @@ var PushCmd = &cobra.Command{
 				return err
 			}
 
-			workJSON, err := json.MarshalIndent(work, "", "  ")
-			if err != nil {
-				return err
+			var files []string
+			for _, w := range work {
+				files = append(files, w.Ref.Filename)
 			}
+
 			worker.Cleanup()
-			fmt.Println(string(workJSON))
+			fmt.Println(strings.Join(files, "\n"))
 
 			return nil
 		}
