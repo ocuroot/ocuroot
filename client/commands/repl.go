@@ -11,6 +11,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/charmbracelet/log"
+	"github.com/charmbracelet/x/term"
 	"github.com/ocuroot/ocuroot/client/release"
 	"github.com/ocuroot/ocuroot/client/work"
 	"github.com/ocuroot/ocuroot/refs"
@@ -263,11 +264,17 @@ func init() {
 var _ tea.Model = &replModel{}
 
 func newReplModel(globals starlark.StringDict) *replModel {
+	// Get the terminal width
+	terminalWidth, _, err := term.GetSize(uintptr(os.Stdout.Fd()))
+	if err != nil {
+		terminalWidth = 80
+	}
+
 	ti := textinput.New()
 	ti.Placeholder = "Enter your statement"
 	ti.Focus()
 	ti.CharLimit = 256
-	ti.Width = 80
+	ti.Width = terminalWidth - 4
 	ti.ShowSuggestions = true
 
 	var suggestions []string
@@ -281,9 +288,10 @@ func newReplModel(globals starlark.StringDict) *replModel {
 	s.Style = lipgloss.NewStyle().Foreground(lipgloss.Color("205"))
 
 	return &replModel{
-		textInput: ti,
-		globals:   globals,
-		spinner:   s,
+		textInput:     ti,
+		globals:       globals,
+		spinner:       s,
+		terminalWidth: terminalWidth,
 	}
 }
 
@@ -299,6 +307,8 @@ type replModel struct {
 	textInput textinput.Model
 
 	globals starlark.StringDict
+
+	terminalWidth int
 }
 
 // Init implements tea.Model.
@@ -434,11 +444,11 @@ func (r *replModel) renderResult() string {
 		return out.String()
 	}
 
-	// Add a purple, rectangular border
+	// Add a green rectangular border
 	var style = lipgloss.NewStyle().
 		Padding(1).
 		BorderStyle(lipgloss.NormalBorder()).
-		BorderForeground(lipgloss.Color("34"))
+		BorderForeground(lipgloss.Color("34")).Width(r.terminalWidth - 4)
 	out.WriteString(style.Render(strings.TrimSpace(r.output)))
 
 	return out.String()
