@@ -13,9 +13,10 @@ type Work struct {
 type WorkType string
 
 const (
-	WorkTypeCreate WorkType = "create"
-	WorkTypeDelete WorkType = "delete"
-	WorkTypeUpdate WorkType = "update"
-	WorkTypeRun    WorkType = "run"
-	WorkTypeOp     WorkType = "op"
+	WorkTypeCreate  WorkType = "create"
+	WorkTypeDelete  WorkType = "delete"
+	WorkTypeUpdate  WorkType = "update"
+	WorkTypeRun     WorkType = "run"
+	WorkTypeRelease WorkType = "release"
+	WorkTypeOp      WorkType = "op"
 )

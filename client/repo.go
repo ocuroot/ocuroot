@@ -18,8 +18,12 @@ var (
 type RepoInfo struct {
 	Root     string
 	IsSource bool
+	Commit   string
 }
 
+// GetReleaseConfigFiles returns a list of all *.ocu.star files under the repo
+// root, with the exception of /repo.ocu.star.
+// All file paths are relative to the repo root.
 func (r RepoInfo) GetReleaseConfigFiles() ([]string, error) {
 	files := []string{}
 	err := filepath.Walk(r.Root, func(path string, info os.FileInfo, err error) error {
@@ -27,7 +31,9 @@ func (r RepoInfo) GetReleaseConfigFiles() ([]string, error) {
 			return err
 		}
 		if !info.IsDir() && strings.HasSuffix(info.Name(), "ocu.star") && info.Name() != "repo.ocu.star" {
-			files = append(files, path)
+			fp := strings.TrimPrefix(path, r.Root)
+			fp = strings.TrimPrefix(fp, "/")
+			files = append(files, fp)
 		}
 		return nil
 	})
@@ -35,7 +41,6 @@ func (r RepoInfo) GetReleaseConfigFiles() ([]string, error) {
 		return nil, err
 	}
 	return files, nil
-
 }
 
 func GetRepoInfo(path string) (RepoInfo, error) {
@@ -57,9 +62,15 @@ func GetRepoInfo(path string) (RepoInfo, error) {
 		root = stateRoot
 	}
 
+	commit, err := GetRepoCommit(root)
+	if err != nil {
+		return RepoInfo{}, err
+	}
+
 	return RepoInfo{
 		Root:     root,
 		IsSource: sourceRoot == root,
+		Commit:   commit,
 	}, nil
 }
 

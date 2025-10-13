@@ -34,40 +34,20 @@ func NewWorker(ctx context.Context, ref refs.Ref) (*Worker, error) {
 		workTui.Cleanup()
 		return nil, err
 	}
-
-	var (
-		repoRootPath  string
-		storeRootPath string
-	)
-
-	repoRootPath, err = client.FindSourceRepoRoot(wd)
-	if err != nil && !errors.Is(err, client.ErrRootNotFound) {
-		workTui.Cleanup()
-		return nil, err
-	}
-	storeRootPath, err = client.FindStateStoreRoot(wd)
-	if err != nil && !errors.Is(err, client.ErrRootNotFound) {
+	w.RepoInfo, err = client.GetRepoInfo(wd)
+	if err != nil {
 		workTui.Cleanup()
 		return nil, err
 	}
 
-	if repoRootPath != "" && storeRootPath != "" {
-		if len(repoRootPath) >= len(storeRootPath) {
-			storeRootPath = ""
-		}
-		if len(storeRootPath) > len(repoRootPath) {
-			repoRootPath = ""
-		}
-	}
-
-	if repoRootPath != "" {
-		err := w.InitTrackerFromSourceRepo(ctx, ref, wd, repoRootPath, true)
+	if w.RepoInfo.IsSource {
+		err := w.InitTrackerFromSourceRepo(ctx, ref, wd, w.RepoInfo.Root, true)
 		if err != nil {
 			workTui.Cleanup()
 			return nil, fmt.Errorf("failed to init tracker: %w", err)
 		}
 	} else {
-		err = w.InitTrackerFromStateRepo(ctx, ref, wd, storeRootPath)
+		err = w.InitTrackerFromStateRepo(ctx, ref, wd, w.RepoInfo.Root)
 		if err != nil {
 			workTui.Cleanup()
 			return nil, fmt.Errorf("failed to init tracker from state repo: %w", err)
@@ -84,6 +64,7 @@ type Worker struct {
 	Tracker     release.TrackerConfig
 	RepoName    string
 	RepoRemotes []string
+	RepoInfo    client.RepoInfo
 
 	Tui tui.Tui
 
@@ -159,6 +140,15 @@ func (w *Worker) ExecuteWork(ctx context.Context, todos []Work) error {
 		if t.WorkType == WorkTypeOp {
 			if err := w.runOp(ctx, t.Ref.String()); err != nil {
 				return fmt.Errorf("failed to run op (%s): %w", t.Ref.String(), err)
+			}
+		}
+	}
+
+	log.Info("Executing releases")
+	for _, t := range todos {
+		if t.WorkType == WorkTypeRelease {
+			if err := w.startRelease(ctx, t.Ref); err != nil {
+				return fmt.Errorf("failed to start release (%s): %w", t.Ref.String(), err)
 			}
 		}
 	}
