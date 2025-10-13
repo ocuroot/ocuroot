@@ -188,6 +188,9 @@ func (h *HostBackend) Shell(ctx context.Context, req sdk.HostShellRequest, outpu
 		shell = req.Shell
 	}
 	cmd := exec.Command(shell, "-c", req.Cmd)
+	if h.WorkingDirectory != "" {
+		cmd.Dir = h.WorkingDirectory
+	}
 	if req.Dir != "" {
 		cmd.Dir = req.Dir
 	}
@@ -197,10 +200,6 @@ func (h *HostBackend) Shell(ctx context.Context, req sdk.HostShellRequest, outpu
 	}
 	for k, v := range req.Env {
 		cmd.Env = append(cmd.Env, fmt.Sprintf("%s=%s", k, v))
-	}
-
-	if h.WorkingDirectory != "" {
-		cmd.Dir = h.WorkingDirectory
 	}
 
 	var stdout, stderr, combined bytes.Buffer
