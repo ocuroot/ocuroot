@@ -118,12 +118,35 @@ func (w *Worker) GetChangedFiles(ctx context.Context) ([]string, error) {
 	}
 
 	changedFiles := strings.Split(string(out), "\n")
+
+	if len(w.RepoInfo.UncommittedChanges) > 0 {
+		changedFiles = append(changedFiles, w.RepoInfo.UncommittedChanges...)
+	}
+
+	// Deduplicate changedFiles
+	seen := make(map[string]struct{}, len(changedFiles))
+	for _, file := range changedFiles {
+		seen[file] = struct{}{}
+	}
+	changedFiles = make([]string, 0, len(seen))
+	for file := range seen {
+		changedFiles = append(changedFiles, file)
+	}
+	sort.Strings(changedFiles)
+
 	return changedFiles, nil
 }
 
 func (w *Worker) Push(ctx context.Context) error {
 	if !w.RepoInfo.IsSource {
 		return fmt.Errorf("state repos currently not supported")
+	}
+
+	if len(w.RepoInfo.UncommittedChanges) > 0 {
+		return fmt.Errorf(
+			"you have uncommitted changes, please commit or stash them before running push\n\nChanged files:\n%v",
+			strings.Join(w.RepoInfo.UncommittedChanges, "\n"),
+		)
 	}
 
 	pushWork, err := w.PushWork(ctx)

@@ -36,7 +36,17 @@ test_push_command() {
 
     # Apply second commit
     cp ../../src/repo1/commit2/* "./"
+
+    # Uncommitted files should fail the push
+    ocuroot push
+    assert_not_equal "0" "$?" "Should have failed to push"
+
     git add .
+
+    # Staged changes should fail the push
+    ocuroot push
+    assert_not_equal "0" "$?" "Should have failed to push"
+
     git commit -m "Update message"
     git remote -v
     git push

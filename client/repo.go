@@ -11,38 +11,6 @@ import (
 	"github.com/ocuroot/ocuroot/refs/refstore"
 )
 
-var (
-	ErrRootNotFound = errors.New("root not found")
-)
-
-type RepoInfo struct {
-	Root     string
-	IsSource bool
-	Commit   string
-}
-
-// GetReleaseConfigFiles returns a list of all *.ocu.star files under the repo
-// root, with the exception of /repo.ocu.star.
-// All file paths are relative to the repo root.
-func (r RepoInfo) GetReleaseConfigFiles() ([]string, error) {
-	files := []string{}
-	err := filepath.Walk(r.Root, func(path string, info os.FileInfo, err error) error {
-		if err != nil {
-			return err
-		}
-		if !info.IsDir() && strings.HasSuffix(info.Name(), "ocu.star") && info.Name() != "repo.ocu.star" {
-			fp := strings.TrimPrefix(path, r.Root)
-			fp = strings.TrimPrefix(fp, "/")
-			files = append(files, fp)
-		}
-		return nil
-	})
-	if err != nil {
-		return nil, err
-	}
-	return files, nil
-}
-
 func GetRepoInfo(path string) (RepoInfo, error) {
 	sourceRoot, err := FindSourceRepoRoot(path)
 	if err != nil && !errors.Is(err, ErrRootNotFound) {
@@ -67,11 +35,76 @@ func GetRepoInfo(path string) (RepoInfo, error) {
 		return RepoInfo{}, err
 	}
 
+	uncomittedChanges, err := uncomittedFiles(root)
+	if err != nil {
+		return RepoInfo{}, err
+	}
+
 	return RepoInfo{
-		Root:     root,
-		IsSource: sourceRoot == root,
-		Commit:   commit,
+		Root:               root,
+		IsSource:           sourceRoot == root,
+		Commit:             commit,
+		UncommittedChanges: uncomittedChanges,
 	}, nil
+}
+
+var (
+	ErrRootNotFound = errors.New("root not found")
+)
+
+type RepoInfo struct {
+	Root     string
+	IsSource bool
+	Commit   string
+
+	UncommittedChanges []string
+}
+
+// GetReleaseConfigFiles returns a list of all *.ocu.star files under the repo
+// root, with the exception of /repo.ocu.star.
+// All file paths are relative to the repo root.
+func (r RepoInfo) GetReleaseConfigFiles() ([]string, error) {
+	files := []string{}
+	err := filepath.Walk(r.Root, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+		if !info.IsDir() && strings.HasSuffix(info.Name(), "ocu.star") && info.Name() != "repo.ocu.star" {
+			fp := strings.TrimPrefix(path, r.Root)
+			fp = strings.TrimPrefix(fp, "/")
+			files = append(files, fp)
+		}
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	return files, nil
+}
+
+func uncomittedFiles(repoRootPath string) ([]string, error) {
+	repo, err := gittools.Open(repoRootPath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to open repo: %w", err)
+	}
+	// Use git status --porcelain to detect any uncommitted or unstaged changes
+	stdout, _, err := repo.Client.Exec("status", "--porcelain")
+	if err != nil {
+		return nil, fmt.Errorf("failed to check repo status: %w", err)
+	}
+	// If there's any output, the repo has uncommitted or unstaged changes
+	var out []string
+	for _, line := range strings.Split(string(stdout), "\n") {
+		if line == "" {
+			continue
+		}
+		sections := strings.Split(line, " ")
+		if len(sections) < 2 {
+			continue
+		}
+		out = append(out, sections[len(sections)-1])
+	}
+	return out, nil
 }
 
 func FindSourceRepoRoot(path string) (string, error) {

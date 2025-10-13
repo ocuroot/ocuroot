@@ -1,6 +1,9 @@
 package commands
 
 import (
+	"encoding/json"
+	"fmt"
+
 	"github.com/ocuroot/ocuroot/client/work"
 	"github.com/spf13/cobra"
 )
@@ -16,16 +19,39 @@ var PushCmd = &cobra.Command{
 			return err
 		}
 
+		dryRun, err := cmd.Flags().GetBool("dryrun")
+		if err != nil {
+			return err
+		}
+
 		worker, err := work.NewWorker(ctx, ref)
 		if err != nil {
 			return err
 		}
 		defer worker.Cleanup()
 
+		if dryRun {
+			work, err := worker.PushWork(ctx)
+			if err != nil {
+				return err
+			}
+
+			workJSON, err := json.MarshalIndent(work, "", "  ")
+			if err != nil {
+				return err
+			}
+			worker.Cleanup()
+			fmt.Println(string(workJSON))
+
+			return nil
+		}
+
 		return worker.Push(ctx)
 	},
 }
 
 func init() {
+
+	PushCmd.Flags().BoolP("dryrun", "n", false, "List releases that would be executed")
 	RootCmd.AddCommand(PushCmd)
 }
