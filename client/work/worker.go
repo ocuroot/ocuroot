@@ -19,10 +19,16 @@ import (
 	librelease "github.com/ocuroot/ocuroot/lib/release"
 )
 
-func NewWorker(ctx context.Context, ref refs.Ref) (*Worker, error) {
+func NewWorker(ctx context.Context, ref refs.Ref) (w *Worker, err error) {
 	workTui := tui.StartWorkTui()
 
-	w := &Worker{
+	defer func() {
+		if err != nil {
+			workTui.Cleanup()
+		}
+	}()
+
+	w = &Worker{
 		Tui: workTui,
 
 		StateChanges:  make(map[string]struct{}),
@@ -31,25 +37,21 @@ func NewWorker(ctx context.Context, ref refs.Ref) (*Worker, error) {
 
 	wd, err := os.Getwd()
 	if err != nil {
-		workTui.Cleanup()
 		return nil, err
 	}
 	w.RepoInfo, err = client.GetRepoInfo(wd)
 	if err != nil {
-		workTui.Cleanup()
 		return nil, err
 	}
 
 	if w.RepoInfo.IsSource {
 		err := w.InitTrackerFromSourceRepo(ctx, ref, wd, w.RepoInfo.Root, true)
 		if err != nil {
-			workTui.Cleanup()
 			return nil, fmt.Errorf("failed to init tracker: %w", err)
 		}
 	} else {
 		err = w.InitTrackerFromStateRepo(ctx, ref, wd, w.RepoInfo.Root)
 		if err != nil {
-			workTui.Cleanup()
 			return nil, fmt.Errorf("failed to init tracker from state repo: %w", err)
 		}
 	}
