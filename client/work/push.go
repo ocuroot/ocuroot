@@ -53,12 +53,14 @@ func (w *Worker) PushWork(ctx context.Context) ([]Work, error) {
 		for _, f := range changedFiles {
 			changeIndex[f] = struct{}{}
 
-			// Release any net-new config files
+			// Release any changed config files
 			if strings.HasSuffix(f, ".ocu.star") {
 				fileSet[f] = struct{}{}
 			}
 		}
 
+		// TODO: This is a bit inefficient, and probably needs to
+		// use a more trie-like structure
 		for f, cfg := range w.Index.ReleaseConfigs {
 			// Always release if there are no watch files
 			if len(cfg.WatchFiles) == 0 {
@@ -66,16 +68,13 @@ func (w *Worker) PushWork(ctx context.Context) ([]Work, error) {
 				continue
 			}
 
-			// Always re-release if the release config file has changed
-			if _, ok := changeIndex[f]; ok {
-				fileSet[f] = struct{}{}
-				continue
-			}
 			// Otherwise, re-release if any of the watch files have changed
 			for _, watchFile := range cfg.WatchFiles {
-				if _, ok := changeIndex[watchFile]; ok {
-					fileSet[f] = struct{}{}
-					break
+				for _, changedFile := range changedFiles {
+					if strings.HasPrefix(changedFile, watchFile) {
+						fileSet[f] = struct{}{}
+						break
+					}
 				}
 			}
 		}
@@ -114,6 +113,7 @@ func (w *Worker) GetChangedFiles(ctx context.Context) ([]string, error) {
 	cmd.Dir = w.RepoInfo.Root
 	out, err := cmd.Output()
 	if err != nil {
+		log.Error("Failed to get changed files", "error", err, "command", cmd.String())
 		return nil, err
 	}
 
