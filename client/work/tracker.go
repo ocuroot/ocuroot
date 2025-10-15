@@ -80,6 +80,19 @@ func (w *Worker) InitTrackerFromStateRepo(ctx context.Context, ref refs.Ref, wd,
 			StoreConfig: be.Store,
 		}
 
+		// Load the most recent push index
+		// For intent repos this will just contain the commit
+		if w.RepoInfo.Type == client.RepoTypeIntent {
+			err = w.Tracker.State.Get(
+				ctx,
+				intentCommitRecordRef,
+				&w.Index,
+			)
+			if err != nil && !errors.Is(err, refstore.ErrRefNotFound) {
+				return fmt.Errorf("failed to get push index: %w", err)
+			}
+		}
+
 		return nil
 	}
 

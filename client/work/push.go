@@ -3,7 +3,9 @@ package work
 import (
 	"context"
 	"fmt"
+	"os"
 	"os/exec"
+	"path"
 	"sort"
 	"strings"
 
@@ -17,6 +19,20 @@ import (
 const intentCommitRecordRef = "@/push/intent_commit"
 
 func (w *Worker) PushWork(ctx context.Context) ([]Work, error) {
+	if w.Index == nil {
+		// Add all configs to the index
+		w.Index = &models.PushIndex{
+			Commit:         w.RepoInfo.Commit,
+			PreviousCommit: "",
+		}
+	} else {
+		log.Info("Using push index", "index", w.Index)
+		if w.Index.Commit != w.RepoInfo.Commit {
+			w.Index.PreviousCommit = w.Index.Commit
+			w.Index.Commit = w.RepoInfo.Commit
+		}
+	}
+
 	if w.RepoInfo.Type == client.RepoTypeState {
 		return nil, fmt.Errorf("state repos currently not supported")
 	}
@@ -37,21 +53,9 @@ func (w *Worker) pushWorkFromSourceRepo(ctx context.Context) ([]Work, error) {
 		files []string
 		err   error
 	)
-	if w.Index == nil {
-		// Add all configs to the index
-		w.Index = &models.PushIndex{
-			Commit:         w.RepoInfo.Commit,
-			PreviousCommit: "",
-			ReleaseConfigs: make(map[string]models.ReleaseConfig),
-		}
-	} else {
-		log.Info("Using push index", "index", w.Index)
-		if w.Index.Commit != w.RepoInfo.Commit {
-			w.Index.PreviousCommit = w.Index.Commit
-			w.Index.Commit = w.RepoInfo.Commit
-		}
+	if w.Index.ReleaseConfigs == nil {
+		w.Index.ReleaseConfigs = make(map[string]models.ReleaseConfig)
 	}
-
 	if w.Index.PreviousCommit == "" {
 		log.Info("No previous commit, using all release config files")
 		files, err = w.RepoInfo.GetReleaseConfigFiles()
@@ -122,7 +126,63 @@ func (w *Worker) pushWorkFromSourceRepo(ctx context.Context) ([]Work, error) {
 }
 
 func (w *Worker) pushWorkFromIntentRepo(ctx context.Context) ([]Work, error) {
-	return nil, fmt.Errorf("intent repos currently not supported")
+	if w.Index.PreviousCommit == "" {
+		log.Info("No previous commit, will analyze all state")
+		work, err := w.Diff(ctx, IdentifyWorkRequest{})
+		if err != nil {
+			return nil, err
+		}
+		return work, nil
+	}
+	log.Info("Previous commit, will analyze changed files")
+	changes, err := w.getChangedFiles(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	var out []Work
+	for _, change := range changes {
+		r, err := refs.Parse(change)
+		if err != nil {
+			return nil, err
+		}
+		workItem := Work{
+			Commit: "",
+			Ref:    r,
+		}
+
+		_, err = os.Stat(path.Join(w.RepoInfo.Root, change))
+		if err != nil && !os.IsNotExist(err) {
+			return nil, err
+		}
+		if os.IsNotExist(err) {
+			workItem.WorkType = WorkTypeDelete
+		} else {
+			stateMatches, err := w.Tracker.State.Match(ctx, change)
+			if err != nil {
+				return nil, err
+			}
+			if len(stateMatches) == 0 {
+				workItem.WorkType = WorkTypeCreate
+			} else {
+				stateRef, err := refs.Parse(stateMatches[0])
+				if err != nil {
+					return nil, err
+				}
+				changed, err := compareIntent(ctx, w.Tracker.State, w.Tracker.Intent, r, stateRef)
+				if err != nil {
+					return nil, err
+				}
+				if changed {
+					workItem.WorkType = WorkTypeUpdate
+				}
+			}
+		}
+
+		out = append(out, workItem)
+	}
+
+	return out, nil
 }
 
 func (w *Worker) Push(ctx context.Context) error {
@@ -152,7 +212,7 @@ func (w *Worker) Push(ctx context.Context) error {
 		return err
 	}
 
-	if w.Index != nil {
+	if w.Index != nil && w.RepoInfo.Type == client.RepoTypeSource {
 		// Build up the index
 		for _, work := range pushWork {
 			watchFiles, err := w.getWatchFiles(ctx, work)
@@ -172,6 +232,13 @@ func (w *Worker) Push(ctx context.Context) error {
 		err = w.Tracker.State.Link(ctx, fmt.Sprintf("%v/-/repo.ocu.star/@/push/index", w.RepoName), fmt.Sprintf("%v/-/repo.ocu.star/@%v/push/index", w.RepoName, w.RepoInfo.Commit))
 		if err != nil {
 			return fmt.Errorf("failed to link push index: %w", err)
+		}
+	}
+
+	if w.Index != nil && w.RepoInfo.Type == client.RepoTypeIntent {
+		err = w.Tracker.State.Set(ctx, intentCommitRecordRef, w.Index)
+		if err != nil {
+			return fmt.Errorf("failed to set push index: %w", err)
 		}
 	}
 
