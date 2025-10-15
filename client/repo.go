@@ -1,12 +1,14 @@
 package client
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
 
+	"github.com/charmbracelet/log"
 	"github.com/ocuroot/gittools"
 	"github.com/ocuroot/ocuroot/refs/refstore"
 )
@@ -25,10 +27,15 @@ func GetRepoInfo(path string) (RepoInfo, error) {
 		return RepoInfo{}, ErrRootNotFound
 	}
 
-	root := sourceRoot
-	if len(stateRoot) >= len(sourceRoot) {
-		root = stateRoot
+	log.Info("Got roots", "sourceRoot", sourceRoot, "stateRoot", stateRoot)
+
+	// State roots get priority as intent/state repos can accidentaly contain source files
+	root := stateRoot
+	if len(sourceRoot) > len(stateRoot) {
+		root = sourceRoot
 	}
+
+	log.Info("Final root", "root", root)
 
 	commit, err := GetRepoCommit(root)
 	if err != nil {
@@ -40,9 +47,34 @@ func GetRepoInfo(path string) (RepoInfo, error) {
 		return RepoInfo{}, err
 	}
 
+	// If we're in a state root, we need to determine if it's an intent or state repo
+	var repoType RepoType
+	if stateRoot == root {
+		content, err := os.ReadFile(filepath.Join(root, ".ocuroot-store"))
+		if err != nil {
+			return RepoInfo{}, err
+		}
+
+		var info refstore.StoreInfo
+		err = json.Unmarshal(content, &info)
+		if err != nil {
+			return RepoInfo{}, err
+		}
+
+		if _, ok := info.Tags["state"]; ok {
+			repoType = RepoTypeState
+		} else if _, ok := info.Tags["intent"]; ok {
+			repoType = RepoTypeIntent
+		} else {
+			return RepoInfo{}, fmt.Errorf("unknown repo type")
+		}
+	} else {
+		repoType = RepoTypeSource
+	}
+
 	return RepoInfo{
 		Root:               root,
-		IsSource:           sourceRoot == root,
+		Type:               repoType,
 		Commit:             commit,
 		UncommittedChanges: uncomittedChanges,
 	}, nil
@@ -52,10 +84,18 @@ var (
 	ErrRootNotFound = errors.New("root not found")
 )
 
+type RepoType string
+
+const (
+	RepoTypeSource RepoType = "source"
+	RepoTypeState  RepoType = "state"
+	RepoTypeIntent RepoType = "intent"
+)
+
 type RepoInfo struct {
-	Root     string
-	IsSource bool
-	Commit   string
+	Root   string
+	Type   RepoType
+	Commit string
 
 	UncommittedChanges []string
 }

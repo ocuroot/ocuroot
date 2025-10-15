@@ -24,7 +24,7 @@ import (
 )
 
 func (w *Worker) InitTrackerFromStateRepo(ctx context.Context, ref refs.Ref, wd, storeRootPath string) error {
-	fs, err := refstore.NewFSRefStore(storeRootPath)
+	fs, err := refstore.NewFSRefStore(storeRootPath, stateTags)
 	if err != nil {
 		return fmt.Errorf("failed to create fs ref store: %w", err)
 	}

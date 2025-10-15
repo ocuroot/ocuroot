@@ -27,6 +27,10 @@ type WithOtel struct {
 	transactionMessage string
 }
 
+func (w *WithOtel) Info() StoreInfo {
+	return w.Store.Info()
+}
+
 // AddDependency implements Store.
 func (w *WithOtel) AddDependency(ctx context.Context, ref string, dependency string) error {
 	span := trace.SpanFromContext(ctx)

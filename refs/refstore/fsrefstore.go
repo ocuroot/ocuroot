@@ -12,24 +12,25 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/charmbracelet/log"
 	libglob "github.com/gobwas/glob"
 	"github.com/ocuroot/ocuroot/refs"
 )
 
-func NewFSRefStore(basePath string) (*FSStateStore, error) {
+func NewFSRefStore(basePath string, tags map[string]struct{}) (*FSStateStore, error) {
+	log.Info("Initializing FSRefStore", "basePath", basePath, "tags", tags)
+	log.Info("Stack", "stack", string(debug.Stack()))
 	f := &FSStateStore{
 		BasePath: basePath,
 	}
 
 	var info StoreInfo
 	infoFile := filepath.Join(f.BasePath, storeInfoFile)
-	if infoBytes, err := os.ReadFile(infoFile); err != nil {
-		if !errors.Is(err, fs.ErrNotExist) {
-			return nil, fmt.Errorf("failed to read store info file: %v", err)
-		}
 
-		info = StoreInfo{Version: stateVersion}
-		infoBytes, err = json.Marshal(info)
+	if _, err := os.Stat(infoFile); errors.Is(err, fs.ErrNotExist) {
+		log.Info("Creating store info file", "infoFile", infoFile)
+		info = StoreInfo{Version: stateVersion, Tags: tags}
+		infoBytes, err := json.Marshal(info)
 		if err != nil {
 			return nil, fmt.Errorf("failed to marshal store info: %v", err)
 		}
@@ -42,19 +43,41 @@ func NewFSRefStore(basePath string) (*FSStateStore, error) {
 		if err := os.WriteFile(infoFile, infoBytes, 0644); err != nil {
 			return nil, fmt.Errorf("failed to write store info file: %v", err)
 		}
-	} else if err := json.Unmarshal(infoBytes, &info); err != nil {
-		return nil, fmt.Errorf("failed to unmarshal store info: %v", err)
+	} else {
+		log.Info("Reading store info file", "infoFile", infoFile)
+		infoBytes, err := os.ReadFile(infoFile)
+		if err != nil {
+			return nil, fmt.Errorf("failed to read store info file: %v", err)
+		}
+		if err := json.Unmarshal(infoBytes, &info); err != nil {
+			return nil, fmt.Errorf("failed to unmarshal store info: %v", err)
+		}
+
+		// Backwards compatibility: Update tags if not currently set
+		if info.Version == 2 {
+			info.Version = 3
+			info.Tags = tags
+			infoBytes, err := json.Marshal(info)
+			if err != nil {
+				return nil, fmt.Errorf("failed to marshal store info: %v", err)
+			}
+
+			if err := os.WriteFile(infoFile, infoBytes, 0644); err != nil {
+				return nil, fmt.Errorf("failed to write store info file: %v", err)
+			}
+		}
 	}
 
 	if info.Version != stateVersion {
 		return nil, fmt.Errorf("incompatible store version: expected %d, got %d", stateVersion, info.Version)
 	}
 
+	f.info = info
 	return f, nil
 }
 
 const (
-	stateVersion  = 2
+	stateVersion  = 3
 	storeInfoFile = ".ocuroot-store"
 	// Prefix files with @ to avoid conflicts with valid refs
 	contentFile     = "@object.json"
@@ -70,10 +93,6 @@ var _ PathResolver = (*FSStateStore)(nil)
 type PathResolver interface {
 	ActualPath(ref string) (string, error)
 	ActualDependencyPaths(ctx context.Context, ref string, dependency string) (string, string)
-}
-
-type StoreInfo struct {
-	Version int `json:"version"`
 }
 
 type StorageKind string
@@ -94,6 +113,12 @@ type StorageObject struct {
 
 type FSStateStore struct {
 	BasePath string
+
+	info StoreInfo
+}
+
+func (f *FSStateStore) Info() StoreInfo {
+	return f.info
 }
 
 func (f *FSStateStore) StartTransaction(ctx context.Context, message string) error {

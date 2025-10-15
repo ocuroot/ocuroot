@@ -8,12 +8,31 @@ import (
 	"strings"
 
 	"github.com/charmbracelet/log"
+	"github.com/ocuroot/ocuroot/client"
 	"github.com/ocuroot/ocuroot/client/tui/tuiwork"
 	"github.com/ocuroot/ocuroot/refs"
 	"github.com/ocuroot/ocuroot/store/models"
 )
 
+const intentCommitRecordRef = "@/push/intent_commit"
+
 func (w *Worker) PushWork(ctx context.Context) ([]Work, error) {
+	if w.RepoInfo.Type == client.RepoTypeState {
+		return nil, fmt.Errorf("state repos currently not supported")
+	}
+
+	if w.RepoInfo.Type == client.RepoTypeIntent {
+		return w.pushWorkFromIntentRepo(ctx)
+	}
+
+	if w.RepoInfo.Type == client.RepoTypeSource {
+		return w.pushWorkFromSourceRepo(ctx)
+	}
+
+	return nil, fmt.Errorf("unknown repo type: %v", w.RepoInfo.Type)
+}
+
+func (w *Worker) pushWorkFromSourceRepo(ctx context.Context) ([]Work, error) {
 	var (
 		files []string
 		err   error
@@ -40,7 +59,7 @@ func (w *Worker) PushWork(ctx context.Context) ([]Work, error) {
 			return nil, err
 		}
 	} else {
-		changedFiles, err := w.GetChangedFiles(ctx)
+		changedFiles, err := w.getChangedFiles(ctx)
 		if err != nil {
 			return nil, err
 		}
@@ -62,13 +81,7 @@ func (w *Worker) PushWork(ctx context.Context) ([]Work, error) {
 		// TODO: This is a bit inefficient, and probably needs to
 		// use a more trie-like structure
 		for f, cfg := range w.Index.ReleaseConfigs {
-			// Always release if there are no watch files
-			if len(cfg.WatchFiles) == 0 {
-				fileSet[f] = struct{}{}
-				continue
-			}
-
-			// Otherwise, re-release if any of the watch files have changed
+			// Re-release if any of the watch files have changed
 			for _, watchFile := range cfg.WatchFiles {
 				for _, changedFile := range changedFiles {
 					if strings.HasPrefix(changedFile, watchFile) {
@@ -108,40 +121,11 @@ func (w *Worker) PushWork(ctx context.Context) ([]Work, error) {
 	return out, nil
 }
 
-func (w *Worker) GetChangedFiles(ctx context.Context) ([]string, error) {
-	cmd := exec.Command("git", "diff", "--name-only", w.Index.PreviousCommit, w.Index.Commit)
-	cmd.Dir = w.RepoInfo.Root
-	out, err := cmd.Output()
-	if err != nil {
-		log.Error("Failed to get changed files", "error", err, "command", cmd.String())
-		return nil, err
-	}
-
-	changedFiles := strings.Split(string(out), "\n")
-
-	if len(w.RepoInfo.UncommittedChanges) > 0 {
-		changedFiles = append(changedFiles, w.RepoInfo.UncommittedChanges...)
-	}
-
-	// Deduplicate changedFiles
-	seen := make(map[string]struct{}, len(changedFiles))
-	for _, file := range changedFiles {
-		seen[file] = struct{}{}
-	}
-	changedFiles = make([]string, 0, len(seen))
-	for file := range seen {
-		changedFiles = append(changedFiles, file)
-	}
-	sort.Strings(changedFiles)
-
-	return changedFiles, nil
+func (w *Worker) pushWorkFromIntentRepo(ctx context.Context) ([]Work, error) {
+	return nil, fmt.Errorf("intent repos currently not supported")
 }
 
 func (w *Worker) Push(ctx context.Context) error {
-	if !w.RepoInfo.IsSource {
-		return fmt.Errorf("state repos currently not supported")
-	}
-
 	if len(w.RepoInfo.UncommittedChanges) > 0 {
 		return fmt.Errorf(
 			"you have uncommitted changes, please commit or stash them before running push\n\nChanged files:\n%v",
@@ -192,6 +176,35 @@ func (w *Worker) Push(ctx context.Context) error {
 	}
 
 	return nil
+}
+
+func (w *Worker) getChangedFiles(ctx context.Context) ([]string, error) {
+	cmd := exec.Command("git", "diff", "--name-only", w.Index.PreviousCommit, w.Index.Commit)
+	cmd.Dir = w.RepoInfo.Root
+	out, err := cmd.Output()
+	if err != nil {
+		log.Error("Failed to get changed files", "error", err, "command", cmd.String())
+		return nil, err
+	}
+
+	changedFiles := strings.Split(string(out), "\n")
+
+	if len(w.RepoInfo.UncommittedChanges) > 0 {
+		changedFiles = append(changedFiles, w.RepoInfo.UncommittedChanges...)
+	}
+
+	// Deduplicate changedFiles
+	seen := make(map[string]struct{}, len(changedFiles))
+	for _, file := range changedFiles {
+		seen[file] = struct{}{}
+	}
+	changedFiles = make([]string, 0, len(seen))
+	for file := range seen {
+		changedFiles = append(changedFiles, file)
+	}
+	sort.Strings(changedFiles)
+
+	return changedFiles, nil
 }
 
 func (w *Worker) getWatchFiles(ctx context.Context, work Work) ([]string, error) {

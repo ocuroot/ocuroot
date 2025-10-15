@@ -8,6 +8,8 @@ import (
 var ErrRefNotFound = errors.New("ref not found")
 
 type Store interface {
+	Info() StoreInfo
+
 	StartTransaction(ctx context.Context, message string) error
 	CommitTransaction(ctx context.Context) error
 
@@ -33,6 +35,12 @@ type Store interface {
 	GetDependants(ctx context.Context, ref string) ([]string, error)
 
 	Close() error
+}
+
+type StoreInfo struct {
+	Version int `json:"version"`
+
+	Tags map[string]struct{}
 }
 
 type MatchOptions struct {

@@ -15,6 +15,10 @@ func NewReadOnlyStore(store Store) Store {
 	return &ReadOnlyStore{store: store}
 }
 
+func (r *ReadOnlyStore) Info() StoreInfo {
+	return r.store.Info()
+}
+
 // AddDependency implements RefStore.
 func (r *ReadOnlyStore) AddDependency(ctx context.Context, ref string, dependency string) error {
 	return ErrReadOnly

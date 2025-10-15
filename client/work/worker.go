@@ -44,7 +44,7 @@ func NewWorker(ctx context.Context, ref refs.Ref) (w *Worker, err error) {
 		return nil, err
 	}
 
-	if w.RepoInfo.IsSource {
+	if w.RepoInfo.Type == client.RepoTypeSource {
 		err := w.InitTrackerFromSourceRepo(ctx, ref, wd, w.RepoInfo.Root, true)
 		if err != nil {
 			return nil, fmt.Errorf("failed to init tracker: %w", err)
