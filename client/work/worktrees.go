@@ -219,7 +219,7 @@ func (w *Worker) ExecuteWorkInCleanWorktrees(ctx context.Context, todos []Work) 
 	log.Info("Starting release work in clean trees")
 	workGroups := make(map[string][]Work)
 	for _, t := range todos {
-		if t.WorkType != WorkTypeRun && t.WorkType != WorkTypeOp {
+		if t.WorkType != WorkTypeRun && t.WorkType != WorkTypeOp && t.WorkType != WorkTypeRelease {
 			continue
 		}
 		if t.Commit == "" {
@@ -251,7 +251,7 @@ func (w *Worker) ExecuteWorkInCleanWorktrees(ctx context.Context, todos []Work) 
 		defer cleanup()
 
 		for _, t := range workGroups[g] {
-			if t.WorkType == WorkTypeRun || t.WorkType == WorkTypeOp {
+			if t.WorkType == WorkTypeRun || t.WorkType == WorkTypeOp || t.WorkType == WorkTypeRelease {
 				if err := newWorker.ExecuteWork(ctx, []Work{t}); err != nil {
 					return fmt.Errorf("failed to execute work: %w", err)
 				}

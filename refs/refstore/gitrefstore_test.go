@@ -26,6 +26,7 @@ func TestGitRefStore(t *testing.T) {
 
 	store, err := NewGitRefStore(
 		localPath,
+		map[string]struct{}{},
 		remotePath,
 		"store",
 		GitRefStoreConfig{
@@ -66,7 +67,7 @@ func TestGitRefStoreWithTransaction(t *testing.T) {
 
 	localPath := filepath.Join(tempDir, "local_repo")
 
-	store, err := NewGitRefStore(localPath, remotePath, "main", GitRefStoreConfig{
+	store, err := NewGitRefStore(localPath, map[string]struct{}{}, remotePath, "main", GitRefStoreConfig{
 		GitRepoConfig: GitRepoConfig{
 			CreateBranch: true,
 		},
@@ -106,7 +107,7 @@ func TestGitRefStoreTransaction(t *testing.T) {
 
 	localPath := filepath.Join(tempDir, "local_repo")
 
-	store, err := NewGitRefStore(localPath, remotePath, "main", GitRefStoreConfig{
+	store, err := NewGitRefStore(localPath, map[string]struct{}{}, remotePath, "main", GitRefStoreConfig{
 		GitRepoConfig: GitRepoConfig{
 			CreateBranch: true,
 		},
@@ -167,7 +168,7 @@ func TestGitRefStoreAddSupportFiles(t *testing.T) {
 
 	localPath := filepath.Join(tempDir, "local_repo")
 
-	store, err := NewGitRefStore(localPath, remotePath, "main", GitRefStoreConfig{
+	store, err := NewGitRefStore(localPath, map[string]struct{}{}, remotePath, "main", GitRefStoreConfig{
 		GitRepoConfig: GitRepoConfig{
 			CreateBranch: true,
 		},

@@ -20,11 +20,11 @@ func TestIntentDiffCustomRefs(t *testing.T) {
 	os.MkdirAll("./testdata/state", 0755)
 	os.MkdirAll("./testdata/intent", 0755)
 
-	stateStore, err := refstore.NewFSRefStore("./testdata/state")
+	stateStore, err := refstore.NewFSRefStore("./testdata/state", stateTags)
 	if err != nil {
 		t.Fatal(err)
 	}
-	intentStore, err := refstore.NewFSRefStore("./testdata/intent")
+	intentStore, err := refstore.NewFSRefStore("./testdata/intent", intentTags)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -183,11 +183,11 @@ func TestIntentDiffRepoFiltering(t *testing.T) {
 	os.MkdirAll("./testdata/repo_filter_state", 0755)
 	os.MkdirAll("./testdata/repo_filter_intent", 0755)
 
-	stateStore, err := refstore.NewFSRefStore("./testdata/repo_filter_state")
+	stateStore, err := refstore.NewFSRefStore("./testdata/repo_filter_state", stateTags)
 	if err != nil {
 		t.Fatal(err)
 	}
-	intentStore, err := refstore.NewFSRefStore("./testdata/repo_filter_intent")
+	intentStore, err := refstore.NewFSRefStore("./testdata/repo_filter_intent", intentTags)
 	if err != nil {
 		t.Fatal(err)
 	}

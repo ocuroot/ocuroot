@@ -52,6 +52,10 @@ func (s *stateListener) updateIfMatches(ctx context.Context, ref string, inTrans
 	}
 }
 
+func (s *stateListener) Info() StoreInfo {
+	return s.store.Info()
+}
+
 // AddDependency implements RefStore.
 func (s *stateListener) AddDependency(ctx context.Context, ref string, dependency string) error {
 	return s.store.AddDependency(ctx, ref, dependency)

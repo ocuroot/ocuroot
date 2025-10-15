@@ -23,6 +23,7 @@ type GitRefStoreConfig struct {
 
 func NewGitRefStore(
 	baseDir string,
+	tags map[string]struct{},
 	remote string,
 	branch string,
 	cfg GitRefStoreConfig,
@@ -49,6 +50,7 @@ func NewGitRefStore(
 
 	fsStore, err := NewFSRefStore(
 		filepath.Join(r.RepoPath(), cfg.PathPrefix),
+		tags,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create state store: %w", err)
@@ -101,6 +103,10 @@ var _ Store = (*GitRefStore)(nil)
 func getStatePath(baseDir, remote string) (string, error) {
 	p := GitURLToValidPath(remote)
 	return filepath.Join(baseDir, "state", p), nil
+}
+
+func (g *GitRefStore) Info() StoreInfo {
+	return g.s.Info()
 }
 
 func (g *GitRefStore) StartTransaction(ctx context.Context, message string) error {

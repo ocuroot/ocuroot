@@ -31,8 +31,9 @@ type Run struct {
 	Type    RunType  `json:"type"`
 	Release refs.Ref `json:"release"`
 
-	Functions []*Function    `json:"functions"`
-	Outputs   map[string]any `json:"output"`
+	Functions  []*Function    `json:"functions"`
+	Outputs    map[string]any `json:"output"`
+	WatchFiles []string       `json:"watch_files"`
 }
 
 type Function struct {
@@ -49,4 +50,17 @@ type Environment struct {
 type RepoConfig struct {
 	Remotes []gittools.Remote
 	Source  []byte `json:"source"`
+}
+
+// PushIndex stores details about the most recent push
+// This will be used to determine if releases are needed
+type PushIndex struct {
+	Commit         string `json:"commit"`
+	PreviousCommit string `json:"previous_commit"`
+
+	ReleaseConfigs map[string]ReleaseConfig `json:"release_configs"`
+}
+
+type ReleaseConfig struct {
+	WatchFiles []string `json:"watch_files"`
 }

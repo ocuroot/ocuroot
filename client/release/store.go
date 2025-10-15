@@ -10,6 +10,15 @@ import (
 	"github.com/ocuroot/ocuroot/sdk"
 )
 
+var (
+	intentTags = map[string]struct{}{
+		"intent": {},
+	}
+	stateTags = map[string]struct{}{
+		"state": {},
+	}
+)
+
 func NewRefStore(
 	storeConfig *sdk.Store,
 	repoURL string,
@@ -38,20 +47,20 @@ func NewRefStore(
 		}
 	}
 
-	stateStore, err := newRefStoreFromBackend(&storeConfig.State, repoURL, repoPath, statePrefix)
+	stateStore, err := newRefStoreFromBackend(&storeConfig.State, stateTags, repoURL, repoPath, statePrefix)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to create state store: %w", err)
 	}
 
 	if storeConfig.Intent != nil {
-		intentStore, err := newRefStoreFromBackend(storeConfig.Intent, repoURL, repoPath, intentPrefix)
+		intentStore, err := newRefStoreFromBackend(storeConfig.Intent, intentTags, repoURL, repoPath, intentPrefix)
 		if err != nil {
 			return nil, nil, fmt.Errorf("failed to create intent store: %w", err)
 		}
 		return stateStore, intentStore, nil
 	}
 
-	intentStore, err := newRefStoreFromBackend(&storeConfig.State, repoURL, repoPath, intentPrefix)
+	intentStore, err := newRefStoreFromBackend(&storeConfig.State, intentTags, repoURL, repoPath, intentPrefix)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to create intent store: %w", err)
 	}
@@ -60,6 +69,7 @@ func NewRefStore(
 
 func newRefStoreFromBackend(
 	storeConfig *sdk.StorageBackend,
+	tags map[string]struct{},
 	repoURL string,
 	repoPath string,
 	pathPrefix string,
@@ -70,7 +80,7 @@ func newRefStoreFromBackend(
 	)
 	if storeConfig.Fs != nil {
 		statePath := filepath.Join(repoPath, storeConfig.Fs.Path, pathPrefix)
-		store, err = refstore.NewFSRefStore(statePath)
+		store, err = refstore.NewFSRefStore(statePath, tags)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create state store: %w", err)
 		}
@@ -87,6 +97,7 @@ func newRefStoreFromBackend(
 
 		store, err = refstore.NewGitRefStore(
 			filepath.Join(client.HomeDir(), "state"),
+			tags,
 			storeConfig.Git.RemoteURL,
 			storeConfig.Git.Branch,
 			refstore.GitRefStoreConfig{

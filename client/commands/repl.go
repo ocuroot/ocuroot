@@ -11,6 +11,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/charmbracelet/log"
+	"github.com/charmbracelet/x/term"
 	"github.com/ocuroot/ocuroot/client/release"
 	"github.com/ocuroot/ocuroot/client/work"
 	"github.com/ocuroot/ocuroot/refs"
@@ -263,11 +264,17 @@ func init() {
 var _ tea.Model = &replModel{}
 
 func newReplModel(globals starlark.StringDict) *replModel {
+	// Get the terminal width
+	terminalWidth, _, err := term.GetSize(uintptr(os.Stdout.Fd()))
+	if err != nil {
+		terminalWidth = 80
+	}
+
 	ti := textinput.New()
 	ti.Placeholder = "Enter your statement"
 	ti.Focus()
 	ti.CharLimit = 256
-	ti.Width = 80
+	ti.Width = terminalWidth - 4
 	ti.ShowSuggestions = true
 
 	var suggestions []string
@@ -281,24 +288,29 @@ func newReplModel(globals starlark.StringDict) *replModel {
 	s.Style = lipgloss.NewStyle().Foreground(lipgloss.Color("205"))
 
 	return &replModel{
-		textInput: ti,
-		globals:   globals,
-		spinner:   s,
+		textInput:     ti,
+		globals:       globals,
+		spinner:       s,
+		terminalWidth: terminalWidth,
 	}
 }
 
 type replModel struct {
 	p *tea.Program
 
-	spinner spinner.Model
-	command string
-	output  string
+	spinner     spinner.Model
+	command     string
+	log         string
+	returnValue any
+	errMsg      string
 
 	running bool
 
 	textInput textinput.Model
 
 	globals starlark.StringDict
+
+	terminalWidth int
 }
 
 // Init implements tea.Model.
@@ -309,7 +321,9 @@ func (r *replModel) Init() tea.Cmd {
 func (r *replModel) execute(line string) tea.Msg {
 	r.command = line
 	r.running = true
-	r.output = ""
+	r.log = ""
+	r.returnValue = nil
+	r.errMsg = ""
 	if line == "help()" {
 		for name, g := range r.globals {
 			switch gt := g.(type) {
@@ -359,7 +373,7 @@ func (r *replModel) execute(line string) tea.Msg {
 
 			// print
 			if v != starlark.None {
-				r.p.Send(execLine(v.String()))
+				r.p.Send(execReturnValue{content: v})
 			}
 		} else if err := starlark.ExecREPLChunk(f, thread, r.globals); err != nil {
 			r.p.Send(execError(err))
@@ -387,12 +401,15 @@ func (r *replModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	switch msg := msg.(type) {
 	case execLine:
-		r.output += string(msg) + "\n"
+		r.log += string(msg) + "\n"
 		return r, nil
 	case execError:
 		r.running = false
-		r.output += msg.Error() + "\n"
+		r.errMsg += msg.Error() + "\n"
 		return r, tea.Println(r.renderResult())
+	case execReturnValue:
+		r.returnValue = msg.content
+		return r, nil
 	case execFinished:
 		r.running = false
 		return r, tea.Println(r.renderResult())
@@ -423,23 +440,61 @@ func (r *replModel) renderResult() string {
 	out := strings.Builder{}
 	if r.running {
 		out.WriteString(r.spinner.View())
+	} else if r.errMsg != "" {
+		out.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color("#ff0000")).Render("*"))
 	} else {
-		out.WriteString(">")
+		out.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color("#00ff00")).Render(">"))
 	}
 	out.WriteString(" ")
 	out.WriteString(r.command)
 	out.WriteString("\n")
 
-	if len(r.output) == 0 {
-		return out.String()
-	}
-
-	// Add a purple, rectangular border
 	var style = lipgloss.NewStyle().
 		Padding(1).
-		BorderStyle(lipgloss.NormalBorder()).
-		BorderForeground(lipgloss.Color("34"))
-	out.WriteString(style.Render(strings.TrimSpace(r.output)))
+		BorderStyle(lipgloss.NormalBorder()).Width(r.terminalWidth - 4)
+
+	// Print logs with a white border
+	if len(r.log) > 0 {
+		out.WriteString(
+			style.BorderForeground(
+				lipgloss.Color("#ffffff"),
+			).Render(
+				strings.TrimSpace(r.log),
+			),
+		)
+		out.WriteString("\n")
+	}
+
+	// Print return value with a green border
+	if r.returnValue != nil {
+		out.WriteString(
+			style.BorderForeground(
+				lipgloss.Color("#00ff00"),
+			).BorderStyle(
+				lipgloss.ThickBorder(),
+			).Render(
+				strings.TrimSpace(fmt.Sprint(r.returnValue)),
+			),
+		)
+		out.WriteString("\n")
+	}
+
+	// Print error message with a red border
+	if len(r.errMsg) > 0 {
+		out.WriteString(
+			style.
+				BorderForeground(
+					lipgloss.Color("#ff0000"),
+				).
+				BorderStyle(
+					lipgloss.ThickBorder(),
+				).
+				Render(
+					strings.TrimSpace(r.errMsg),
+				),
+		)
+		out.WriteString("\n")
+	}
 
 	return out.String()
 }
@@ -454,6 +509,10 @@ func (r *replModel) View() string {
 	}
 
 	return out.String()
+}
+
+type execReturnValue struct {
+	content any
 }
 
 type execLine string

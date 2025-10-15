@@ -28,7 +28,7 @@ test_basic() {
     echo ""
 }
 
-test_basic() {
+test_missing_done() {
     echo "Test: missing done"
     echo ""
     setup_test
@@ -204,6 +204,7 @@ build_ocuroot
 pushd "$(dirname "$0")" > /dev/null
 
 test_basic
+test_missing_done
 test_two_releases
 test_deploy_intent
 test_force_deploy

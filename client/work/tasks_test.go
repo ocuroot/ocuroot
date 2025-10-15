@@ -19,7 +19,7 @@ func TestReadyRuns(t *testing.T) {
 	os.RemoveAll("./testdata/ready_runs_state")
 	os.MkdirAll("./testdata/ready_runs_state", 0755)
 
-	stateStore, err := refstore.NewFSRefStore("./testdata/ready_runs_state")
+	stateStore, err := refstore.NewFSRefStore("./testdata/ready_runs_state", stateTags)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -307,7 +307,7 @@ func TestReadyRunsRepoFiltering(t *testing.T) {
 	os.RemoveAll("./testdata/ready_runs_repo_filter")
 	os.MkdirAll("./testdata/ready_runs_repo_filter", 0755)
 
-	stateStore, err := refstore.NewFSRefStore("./testdata/ready_runs_repo_filter")
+	stateStore, err := refstore.NewFSRefStore("./testdata/ready_runs_repo_filter", stateTags)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -441,7 +441,7 @@ func TestReadyRunsCommitFiltering(t *testing.T) {
 	os.RemoveAll("./testdata/ready_runs_commit_filter")
 	os.MkdirAll("./testdata/ready_runs_commit_filter", 0755)
 
-	stateStore, err := refstore.NewFSRefStore("./testdata/ready_runs_commit_filter")
+	stateStore, err := refstore.NewFSRefStore("./testdata/ready_runs_commit_filter", stateTags)
 	if err != nil {
 		t.Fatal(err)
 	}

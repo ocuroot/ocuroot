@@ -89,7 +89,7 @@ func previewHandler(ctx context.Context, request mcp.CallToolRequest) (*mcp.Call
 		return nil, errors.New("package_file must be a string")
 	}
 
-	repoRootPath, err := client.FindRepoRoot(path.Dir(pkgFile))
+	repoRootPath, err := client.FindSourceRepoRoot(path.Dir(pkgFile))
 	if err != nil {
 		return nil, fmt.Errorf("failed to find repo root: %w", err)
 	}

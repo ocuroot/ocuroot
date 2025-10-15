@@ -29,3 +29,4 @@ e2e: test-build
 	NO_INSTALL=1 ./tests/customstate/test.sh
 	NO_INSTALL=1 ./tests/cascade/test.sh
 	NO_INSTALL=1 ./tests/sdk_version/test.sh
+	NO_INSTALL=1 ./tests/push/test.sh

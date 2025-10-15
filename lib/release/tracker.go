@@ -648,7 +648,6 @@ func (r *ReleaseTracker) Run(
 		)
 
 		if result.Done != nil {
-			run.Outputs = result.Done.Outputs
 			return result, nil
 		}
 
@@ -724,6 +723,7 @@ func (r *ReleaseTracker) saveRunState(ctx context.Context, runRef refs.Ref, run 
 	}
 
 	if result.Done != nil {
+		run.WatchFiles = result.Done.Watch
 		run.Outputs = result.Done.Outputs
 	}
 

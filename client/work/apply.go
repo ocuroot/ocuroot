@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"path"
+	"sort"
 	"strings"
 
 	"github.com/charmbracelet/log"
@@ -75,28 +76,96 @@ func applyEnvironmentIntent(ctx context.Context, ref refs.Ref, state, intent ref
 		return fmt.Errorf("failed to set state: %w", err)
 	}
 
-	// Add an operation to all deployed releases
-	deployments, err := state.Match(ctx, "**/@/deploy/*")
+	// Add an operation to releases with deployments or the latest with no deployments
+	releases, err := findReleasesForEnvironmentCheck(ctx, state)
 	if err != nil {
-		return fmt.Errorf("failed to match deployments: %w", err)
+		return fmt.Errorf("failed to find releases for environment check: %w", err)
 	}
-	for _, deployment := range deployments {
-		resolvedDeployment, err := state.ResolveLink(ctx, deployment)
-		if err != nil {
-			return fmt.Errorf("failed to resolve deployment: %w", err)
-		}
-		parsedDeployment, err := refs.Parse(resolvedDeployment)
-		if err != nil {
-			return fmt.Errorf("failed to parse deployment: %w", err)
-		}
-		parsedDeployment = parsedDeployment.SetSubPathType(refs.SubPathTypeOp).SetSubPath("check_envs")
+	for _, release := range releases {
+		log.Info("Applying environment intent to release", "release", release)
 
-		if err := state.Set(ctx, parsedDeployment.String(), models.NewMarker()); err != nil {
+		resolvedRelease, err := state.ResolveLink(ctx, release)
+		if err != nil {
+			return fmt.Errorf("failed to resolve release: %w", err)
+		}
+		parsedRelease, err := refs.Parse(resolvedRelease)
+		if err != nil {
+			return fmt.Errorf("failed to parse release: %w", err)
+		}
+		parsedRelease = parsedRelease.SetSubPathType(refs.SubPathTypeOp).SetSubPath("check_envs")
+
+		log.Info("Setting op", "ref", parsedRelease.String())
+		if err := state.Set(ctx, parsedRelease.String(), models.NewMarker()); err != nil {
 			return fmt.Errorf("failed to set operation: %w", err)
 		}
 	}
 
 	return nil
+}
+
+func findReleasesForEnvironmentCheck(ctx context.Context, state refstore.Store) ([]string, error) {
+	var releasesToCheck = make(map[string]string)
+	deployments, err := state.Match(ctx, "**/@/deploy/*")
+	if err != nil {
+		return nil, fmt.Errorf("failed to match deployments: %w", err)
+	}
+	for _, deployment := range deployments {
+		log.Info("Checking deployment", "deployment", deployment)
+		pkgName := librelease.ReduceToReleaseConfig(deployment)
+		log.Info("Package name", "pkgName", pkgName)
+
+		resolvedDeployment, err := state.ResolveLink(ctx, deployment)
+		if err != nil {
+			return nil, fmt.Errorf("failed to resolve deployment: %w", err)
+		}
+		releaseRef, err := refs.Reduce(resolvedDeployment, librelease.GlobRelease)
+		if err != nil {
+			return nil, fmt.Errorf("failed to reduce deployment: %w", err)
+		}
+		resolvedReleaseRef, err := refs.Parse(releaseRef)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse deployment: %w", err)
+		}
+
+		releasesToCheck[pkgName] = resolvedReleaseRef.String()
+	}
+
+	releases, err := state.Match(ctx, "**/@*/commit/*")
+	if err != nil {
+		return nil, fmt.Errorf("failed to match releases: %w", err)
+	}
+
+	for _, release := range releases {
+		log.Info("Checking release", "release", release)
+		pkgName := librelease.ReduceToReleaseConfig(release)
+		log.Info("Package name", "pkgName", pkgName)
+		if _, exists := releasesToCheck[pkgName]; exists {
+			continue
+		}
+
+		resolvedRelease, err := state.ResolveLink(ctx, release)
+		if err != nil {
+			return nil, fmt.Errorf("failed to resolve release: %w", err)
+		}
+		releaseRef, err := refs.Reduce(resolvedRelease, librelease.GlobRelease)
+		if err != nil {
+			return nil, fmt.Errorf("failed to reduce release: %w", err)
+		}
+		resolvedReleaseRef, err := refs.Parse(releaseRef)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse release: %w", err)
+		}
+
+		releasesToCheck[pkgName] = resolvedReleaseRef.String()
+	}
+
+	var out []string
+	for _, v := range releasesToCheck {
+		out = append(out, v)
+	}
+	sort.Strings(out)
+
+	return out, nil
 }
 
 func applyDeletedEnvironmentIntent(ctx context.Context, ref refs.Ref, state, intent refstore.Store) error {

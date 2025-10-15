@@ -23,7 +23,7 @@ def next(fn, annotation="", inputs={}):
         },
     }
 
-def done(annotation="", outputs={}, tags=[]):
+def done(annotation="", outputs={}, tags=[], watch=[]):
     """
     done marks the end of a function chain.
 
@@ -39,6 +39,7 @@ def done(annotation="", outputs={}, tags=[]):
         "done": {
             "outputs": outputs,
             "tags": tags,
+            "watch": watch,
         },
     }
 

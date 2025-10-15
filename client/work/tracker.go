@@ -2,6 +2,7 @@ package work
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -23,7 +24,7 @@ import (
 )
 
 func (w *Worker) InitTrackerFromStateRepo(ctx context.Context, ref refs.Ref, wd, storeRootPath string) error {
-	fs, err := refstore.NewFSRefStore(storeRootPath)
+	fs, err := refstore.NewFSRefStore(storeRootPath, stateTags)
 	if err != nil {
 		return fmt.Errorf("failed to create fs ref store: %w", err)
 	}
@@ -77,6 +78,19 @@ func (w *Worker) InitTrackerFromStateRepo(ctx context.Context, ref refs.Ref, wd,
 			State:       state,
 			Intent:      intent,
 			StoreConfig: be.Store,
+		}
+
+		// Load the most recent push index
+		// For intent repos this will just contain the commit
+		if w.RepoInfo.Type == client.RepoTypeIntent {
+			err = w.Tracker.State.Get(
+				ctx,
+				intentCommitRecordRef,
+				&w.Index,
+			)
+			if err != nil && !errors.Is(err, refstore.ErrRefNotFound) {
+				return fmt.Errorf("failed to get push index: %w", err)
+			}
 		}
 
 		return nil
@@ -171,6 +185,7 @@ func (w *Worker) InitTrackerFromSourceRepo(ctx context.Context, ref refs.Ref, wd
 		Intent:      intent,
 		StoreConfig: be.Store,
 	}
+	w.Tracker = tc
 
 	if saveConfig && tc.Ref.Repo != "" {
 		err = saveRepoConfig(ctx, tc, repoRootPath, w.RepoName, commit, data)
@@ -179,7 +194,18 @@ func (w *Worker) InitTrackerFromSourceRepo(ctx context.Context, ref refs.Ref, wd
 		}
 	}
 
-	w.Tracker = tc
+	// Load the most recent push index
+	err = w.Tracker.State.Get(
+		ctx,
+		fmt.Sprintf(
+			"%v/-/repo.ocu.star/@/push/index",
+			w.RepoName,
+		),
+		&w.Index,
+	)
+	if err != nil && !errors.Is(err, refstore.ErrRefNotFound) {
+		return fmt.Errorf("failed to get push index: %w", err)
+	}
 
 	return nil
 }
@@ -233,7 +259,7 @@ func (w *Worker) TrackerForNewRelease(ctx context.Context) (*librelease.ReleaseT
 		if len(outputs.Environments) > 0 {
 			return nil, outputs.Environments, nil
 		}
-		return nil, nil, fmt.Errorf("package not found")
+		return nil, nil, nil
 	}
 
 	tracker, err := librelease.NewReleaseTracker(ctx, config, config.Package, tc.Ref, tc.Intent, tc.State)

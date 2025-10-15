@@ -12,7 +12,7 @@ func TestFSRefStore(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	store, err := NewFSRefStore(tempDir)
+	store, err := NewFSRefStore(tempDir, map[string]struct{}{})
 	if err != nil {
 		t.Fatal(err)
 	}
