@@ -2,9 +2,11 @@ package commands
 
 import (
 	"fmt"
+	"sort"
 	"strings"
 
 	"github.com/charmbracelet/lipgloss"
+	"github.com/charmbracelet/lipgloss/tree"
 	"go.starlark.net/starlark"
 )
 
@@ -57,26 +59,20 @@ func renderList(list *starlark.List, indent int) string {
 		return "[]"
 	}
 
-	var sb strings.Builder
-	sb.WriteString("[\n")
-
+	typeHint := lipgloss.NewStyle().Foreground(lipgloss.Color("245")).Render("<list>")
+	t := tree.Root(typeHint)
 	iter := list.Iterate()
 	defer iter.Done()
 	var val starlark.Value
 	i := 0
 	for iter.Next(&val) {
-		isLast := i == list.Len()-1
-		prefix := getTreePrefix(indent, isLast)
-		
-		sb.WriteString(prefix)
-		sb.WriteString(renderValueWithIndent(val, indent+1))
-		sb.WriteString("\n")
+		indexStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("245"))
+		indexedVal := fmt.Sprintf("[%s] %s", indexStyle.Render(fmt.Sprintf("%d", i)), renderValueWithIndent(val, indent+1))
+		t = t.Child(indexedVal)
 		i++
 	}
 
-	sb.WriteString(strings.Repeat("  ", indent))
-	sb.WriteString("]")
-	return sb.String()
+	return t.String()
 }
 
 // renderTuple renders a tuple with tree-like structure
@@ -85,21 +81,15 @@ func renderTuple(tuple starlark.Tuple, indent int) string {
 		return "()"
 	}
 
-	var sb strings.Builder
-	sb.WriteString("(\n")
-
+	typeHint := lipgloss.NewStyle().Foreground(lipgloss.Color("245")).Render("<tuple>")
+	t := tree.Root(typeHint)
 	for i := 0; i < tuple.Len(); i++ {
-		isLast := i == tuple.Len()-1
-		prefix := getTreePrefix(indent, isLast)
-		
-		sb.WriteString(prefix)
-		sb.WriteString(renderValueWithIndent(tuple.Index(i), indent+1))
-		sb.WriteString("\n")
+		indexStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("245"))
+		indexedVal := fmt.Sprintf("[%s] %s", indexStyle.Render(fmt.Sprintf("%d", i)), renderValueWithIndent(tuple.Index(i), indent+1))
+		t = t.Child(indexedVal)
 	}
 
-	sb.WriteString(strings.Repeat("  ", indent))
-	sb.WriteString(")")
-	return sb.String()
+	return t.String()
 }
 
 // renderDict renders a dictionary with tree-like structure
@@ -108,27 +98,26 @@ func renderDict(dict *starlark.Dict, indent int) string {
 		return "{}"
 	}
 
-	var sb strings.Builder
-	sb.WriteString("{\n")
-
+	typeHint := lipgloss.NewStyle().Foreground(lipgloss.Color("245")).Render("<dict>")
+	t := tree.Root(typeHint)
 	items := dict.Items()
-	for i, item := range items {
-		isLast := i == len(items)-1
-		prefix := getTreePrefix(indent, isLast)
-		
+	
+	// Sort items by key (as strings)
+	sort.Slice(items, func(i, j int) bool {
+		return items[i].Index(0).String() < items[j].Index(0).String()
+	})
+	
+	for _, item := range items {
 		key := item.Index(0)
 		val := item.Index(1)
-		
-		sb.WriteString(prefix)
-		sb.WriteString(renderValueWithIndent(key, indent+1))
-		sb.WriteString(": ")
-		sb.WriteString(renderValueWithIndent(val, indent+1))
-		sb.WriteString("\n")
+
+		keyVal := fmt.Sprintf("%s: %s",
+			renderValueWithIndent(key, indent+1),
+			renderValueWithIndent(val, indent+1))
+		t = t.Child(keyVal)
 	}
 
-	sb.WriteString(strings.Repeat("  ", indent))
-	sb.WriteString("}")
-	return sb.String()
+	return t.String()
 }
 
 // renderSet renders a set with tree-like structure
@@ -137,33 +126,22 @@ func renderSet(set *starlark.Set, indent int) string {
 		return "set([])"
 	}
 
-	var sb strings.Builder
-	sb.WriteString("set([\n")
-
+	typeHint := lipgloss.NewStyle().Foreground(lipgloss.Color("245")).Render("<set>")
+	t := tree.Root(typeHint)
 	iter := set.Iterate()
 	defer iter.Done()
 	var val starlark.Value
-	i := 0
-	length := set.Len()
 	for iter.Next(&val) {
-		isLast := i == length-1
-		prefix := getTreePrefix(indent, isLast)
-		
-		sb.WriteString(prefix)
-		sb.WriteString(renderValueWithIndent(val, indent+1))
-		sb.WriteString("\n")
-		i++
+		t = t.Child(renderValueWithIndent(val, indent+1))
 	}
 
-	sb.WriteString(strings.Repeat("  ", indent))
-	sb.WriteString("])")
-	return sb.String()
+	return t.String()
 }
 
 // renderFunction renders a Starlark function with its signature
 func renderFunction(fn *starlark.Function, indent int) string {
 	var sb strings.Builder
-	
+
 	// Function name
 	style := lipgloss.NewStyle().Foreground(lipgloss.Color("205")).Bold(true)
 	sb.WriteString(style.Render(fn.Name()))
@@ -173,7 +151,7 @@ func renderFunction(fn *starlark.Function, indent int) string {
 	params := make([]string, 0, fn.NumParams())
 	for i := 0; i < fn.NumParams(); i++ {
 		paramName, _ := fn.Param(i)
-		
+
 		// Check if this is *args or **kwargs
 		if i == fn.NumParams()-2 && fn.HasVarargs() && fn.HasKwargs() {
 			params = append(params, "*"+paramName)
@@ -197,7 +175,7 @@ func renderFunction(fn *starlark.Function, indent int) string {
 	// Add doc string only if at top level (indent 0)
 	if indent == 0 && fn.Doc() != "" {
 		sb.WriteString("\n  ")
-		docStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("240")).Italic(true)
+		docStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("245")).Italic(true)
 		sb.WriteString(docStyle.Render(fmt.Sprintf(`"""%s"""`, fn.Doc())))
 	}
 
@@ -208,11 +186,11 @@ func renderFunction(fn *starlark.Function, indent int) string {
 func renderBuiltin(b *starlark.Builtin, indent int) string {
 	style := lipgloss.NewStyle().Foreground(lipgloss.Color("33")).Bold(true)
 	name := b.Name()
-	
+
 	if recv := b.Receiver(); recv != nil {
 		return fmt.Sprintf("%s.%s(...)", recv.Type(), style.Render(name))
 	}
-	
+
 	return style.Render(name) + "(...)"
 }
 
@@ -224,48 +202,26 @@ func renderStruct(obj starlark.HasAttrs, indent int) string {
 		return obj.(starlark.Value).Type()
 	}
 
-	var sb strings.Builder
-	
-	// Show type at the top
-	typeStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("141")).Bold(true)
-	sb.WriteString(typeStyle.Render(obj.(starlark.Value).Type()))
-	sb.WriteString(" {\n")
+	// Show type at the top with type hint
+	typeName := obj.(starlark.Value).Type()
+	typeHint := lipgloss.NewStyle().Foreground(lipgloss.Color("245")).Render("<" + typeName + ">")
+	t := tree.Root(typeHint)
+
+	// Sort attribute names alphabetically
+	sortedNames := make([]string, len(attrNames))
+	copy(sortedNames, attrNames)
+	sort.Strings(sortedNames)
 
 	// Render each attribute
-	for i, name := range attrNames {
-		isLast := i == len(attrNames)-1
-		prefix := getTreePrefix(indent, isLast)
-		
-		sb.WriteString(prefix)
-		sb.WriteString(name)
-		sb.WriteString(": ")
-		
+	for _, name := range sortedNames {
 		// Try to get the attribute value
 		if val, err := obj.Attr(name); err == nil && val != nil {
-			sb.WriteString(renderValueWithIndent(val, indent+1))
+			attrStr := fmt.Sprintf("%s: %s", name, renderValueWithIndent(val, indent+1))
+			t = t.Child(attrStr)
 		} else {
-			sb.WriteString("<unavailable>")
+			t = t.Child(fmt.Sprintf("%s: <unavailable>", name))
 		}
-		sb.WriteString("\n")
 	}
 
-	sb.WriteString(strings.Repeat("  ", indent))
-	sb.WriteString("}")
-	return sb.String()
-}
-
-// getTreePrefix returns the tree-drawing prefix for the given indent level
-func getTreePrefix(indent int, isLast bool) string {
-	if indent == 0 {
-		if isLast {
-			return "  └─ "
-		}
-		return "  ├─ "
-	}
-
-	prefix := strings.Repeat("  ", indent)
-	if isLast {
-		return prefix + "└─ "
-	}
-	return prefix + "├─ "
+	return t.String()
 }
