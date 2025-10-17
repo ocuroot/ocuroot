@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/charmbracelet/log"
+	libglob "github.com/gobwas/glob"
 	"github.com/ocuroot/ocuroot/client"
 	"github.com/ocuroot/ocuroot/client/tui/tuiwork"
 	"github.com/ocuroot/ocuroot/refs"
@@ -37,15 +38,57 @@ func (w *Worker) PushWork(ctx context.Context) ([]Work, error) {
 		return nil, fmt.Errorf("state repos currently not supported")
 	}
 
+	var out []Work
+	var err error
 	if w.RepoInfo.Type == client.RepoTypeIntent {
-		return w.pushWorkFromIntentRepo(ctx)
+		out, err = w.pushWorkFromIntentRepo(ctx)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	if w.RepoInfo.Type == client.RepoTypeSource {
-		return w.pushWorkFromSourceRepo(ctx)
+		out, err = w.pushWorkFromSourceRepo(ctx)
+		if err != nil {
+			return nil, err
+		}
 	}
 
-	return nil, fmt.Errorf("unknown repo type: %v", w.RepoInfo.Type)
+	out, err = w.filterReleaseWorkByFile(out)
+	if err != nil {
+		return nil, err
+	}
+
+	return out, nil
+}
+
+func (w *Worker) filterReleaseWorkByFile(in []Work) ([]Work, error) {
+	// Filter work by ignore patterns
+	var ignoreGlobs []libglob.Glob
+	for _, ignore := range w.Settings.ReleaseIgnore {
+		g, err := libglob.Compile(ignore)
+		if err != nil {
+			return nil, fmt.Errorf("glob %v %q: %w", []rune(ignore), ignore, err)
+		}
+		ignoreGlobs = append(ignoreGlobs, g)
+	}
+
+	var filteredOut []Work
+	for _, work := range in {
+		var shouldIgnore bool
+		for _, ignore := range ignoreGlobs {
+			if ignore.Match(work.Ref.Filename) {
+				shouldIgnore = true
+				break
+			}
+		}
+		if shouldIgnore {
+			continue
+		}
+		filteredOut = append(filteredOut, work)
+	}
+
+	return filteredOut, nil
 }
 
 func (w *Worker) pushWorkFromSourceRepo(ctx context.Context) ([]Work, error) {

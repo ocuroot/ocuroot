@@ -35,7 +35,6 @@ func NewGitRefStore(
 	if err != nil {
 		return nil, fmt.Errorf("failed to create git ref store: %w", err)
 	}
-	r = GitRepoWithOtel(r)
 
 	fsStore, err := NewFSRefStore(
 		filepath.Join(r.RepoPath(), cfg.PathPrefix),
@@ -45,18 +44,19 @@ func NewGitRefStore(
 		return nil, fmt.Errorf("failed to create state store: %w", err)
 	}
 
-	g := &GitRefStore{
-		s:          fsStore,
-		g:          r,
-		pathPrefix: cfg.PathPrefix,
-		lastPull:   time.Now(),
-	}
-
 	storeInfoFile := filepath.Join(cfg.PathPrefix, storeInfoFile)
 
 	addInfoFile, err := needsCommit(r, storeInfoFile)
 	if err != nil {
 		return nil, fmt.Errorf("failed to check if info file needs commit: %w", err)
+	}
+
+	r = GitRepoWithOtel(r)
+	g := &GitRefStore{
+		s:          fsStore,
+		g:          r,
+		pathPrefix: cfg.PathPrefix,
+		lastPull:   time.Now(),
 	}
 
 	if addInfoFile {

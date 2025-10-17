@@ -17,6 +17,8 @@ type Settings struct {
 	RepoRemotes []string            `starlark:"repo_remotes" env:"OCU_CFG_repo_remotes"`
 	State       *sdk.StorageBackend `starlark:"state_store"`
 	Intent      *sdk.StorageBackend `starlark:"intent_store"`
+
+	ReleaseIgnore []string `starlark:"release_ignore" env:"OCU_CFG_release_ignore"`
 }
 
 func LoadSettings(be *local.BackendOutputs, globals starlark.StringDict, envVars []string) (Settings, error) {
@@ -196,7 +198,7 @@ func UnmarshalFromValue(v starlark.Value, out any) error {
 	case starlark.String:
 		switch out := out.(type) {
 		case *string:
-			*out = string(v)
+			*out = v.GoString()
 		default:
 			return fmt.Errorf("cannot marshal String into %T", out)
 		}
