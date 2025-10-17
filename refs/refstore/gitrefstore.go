@@ -37,17 +37,6 @@ func NewGitRefStore(
 	}
 	r = GitRepoWithOtel(r)
 
-	var addInfoFile bool
-	storeInfoFile := filepath.Join(cfg.PathPrefix, storeInfoFile)
-	infoFilePath := filepath.Join(r.RepoPath(), storeInfoFile)
-	if _, err = os.Stat(infoFilePath); err != nil {
-		if os.IsNotExist(err) {
-			addInfoFile = true
-		} else {
-			return nil, fmt.Errorf("failed to check for store info file: %w", err)
-		}
-	}
-
 	fsStore, err := NewFSRefStore(
 		filepath.Join(r.RepoPath(), cfg.PathPrefix),
 		tags,
@@ -63,6 +52,13 @@ func NewGitRefStore(
 		lastPull:   time.Now(),
 	}
 
+	storeInfoFile := filepath.Join(cfg.PathPrefix, storeInfoFile)
+
+	addInfoFile, err := needsCommit(r, storeInfoFile)
+	if err != nil {
+		return nil, fmt.Errorf("failed to check if info file needs commit: %w", err)
+	}
+
 	if addInfoFile {
 		err = g.applyFilesAsNeeded(context.Background(), []string{storeInfoFile}, "add store info file")
 		if err != nil {
@@ -71,6 +67,50 @@ func NewGitRefStore(
 	}
 
 	return g, nil
+}
+
+// needsCommit checks if a file needs to be committed to git.
+// It returns true if:
+// - The file exists in the working directory AND is not yet tracked in git, OR
+// - The file exists AND has uncommitted changes
+func needsCommit(r GitRepo, relativeFilePath string) (bool, error) {
+	wrapper, ok := r.(*GitRepoWrapper)
+	if !ok {
+		return false, fmt.Errorf("expected GitRepoWrapper, got %T", r)
+	}
+
+	infoFilePath := filepath.Join(r.RepoPath(), relativeFilePath)
+
+	// Check if file exists in working directory
+	if _, err := os.Stat(infoFilePath); err != nil {
+		if os.IsNotExist(err) {
+			// File doesn't exist, no need to add
+			return false, nil
+		}
+		return false, fmt.Errorf("failed to check file: %w", err)
+	}
+
+	// File exists, check if it's tracked in git
+	stdout, stderr, err := wrapper.g.Client.Exec("ls-files", relativeFilePath)
+	if err != nil {
+		return false, fmt.Errorf("failed to check if file is tracked: %w\n%s", err, string(stderr))
+	}
+
+	isTracked := len(strings.TrimSpace(string(stdout))) > 0
+
+	if !isTracked {
+		// File exists but not tracked - needs to be added
+		return true, nil
+	}
+
+	// File is tracked, check if it has uncommitted changes
+	stdout, stderr, err = wrapper.g.Client.Exec("diff", "--name-only", "HEAD", "--", relativeFilePath)
+	if err != nil {
+		return false, fmt.Errorf("failed to check file changes: %w\n%s", err, string(stderr))
+	}
+
+	hasChanges := len(strings.TrimSpace(string(stdout))) > 0
+	return hasChanges, nil
 }
 
 // CheckedStagedFiles uses `git add .` to validate that we have the correct set of staged files

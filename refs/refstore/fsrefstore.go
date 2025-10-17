@@ -19,7 +19,6 @@ import (
 
 func NewFSRefStore(basePath string, tags map[string]struct{}) (*FSStateStore, error) {
 	log.Info("Initializing FSRefStore", "basePath", basePath, "tags", tags)
-	log.Info("Stack", "stack", string(debug.Stack()))
 	f := &FSStateStore{
 		BasePath: basePath,
 	}
