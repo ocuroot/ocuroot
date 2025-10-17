@@ -151,7 +151,8 @@ func runSingleCommand(ctx context.Context, filePath string, command string) erro
 
 	// Print the result
 	if result != starlark.None {
-		fmt.Printf("Result: %v\n", result)
+		fmt.Println("Result:")
+		fmt.Println(RenderValue(result))
 	} else {
 		fmt.Println("Command executed successfully")
 	}
@@ -231,6 +232,14 @@ func createGlobalsWithUserFunctions(ctx context.Context, backend sdk.Backend, sd
 		// Fallback: use the key name (though it might be a full definition)
 		globals[name] = fn
 	}
+
+	globals["help"] = starlark.NewBuiltin("help", func(thread *starlark.Thread, _ *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
+		out := starlark.NewDict(len(globals))
+		for name, val := range globals {
+			out.SetKey(starlark.String(name), val)
+		}
+		return out, nil
+	})
 
 	return globals, nil
 }
@@ -315,18 +324,6 @@ func (r *replModel) execute(line string) tea.Msg {
 	r.log = ""
 	r.returnValue = nil
 	r.errMsg = ""
-	if line == "help()" {
-		for name, g := range r.globals {
-			switch gt := g.(type) {
-			case *starlark.Function:
-				r.p.Send(execLine(fmt.Sprintf("%s: %s\n", name, gt)))
-			default:
-				r.p.Send(execLine(fmt.Sprintf("%s: %s\n", name, gt)))
-			}
-		}
-		r.running = false
-		return nil
-	}
 
 	// Create a new thread for this evaluation
 	thread := &starlark.Thread{
@@ -352,21 +349,21 @@ func (r *replModel) execute(line string) tea.Msg {
 		}
 
 		if expr := soleExpr(f); expr != nil {
-			// eval
+			// Evaluate a single expression
 			v, err := starlark.EvalExprOptions(f.Options, thread, expr, r.globals)
 			if err != nil {
 				r.p.Send(execError(err))
 				return
 			}
 
-			// store the result in "_" variable to hold the value of last expression, similar to Python REPL
 			r.globals["_"] = v
 
-			// print
 			if v != starlark.None {
+				// Output the return value
 				r.p.Send(execReturnValue{content: v})
 			}
-		} else if err := starlark.ExecREPLChunk(f, thread, r.globals); err != nil {
+
+		} else if err := starlark.ExecREPLChunk(f, thread, r.globals); err != nil { // Evaluate a chunk of statements
 			r.p.Send(execError(err))
 			return
 		}
@@ -458,13 +455,21 @@ func (r *replModel) renderResult() string {
 
 	// Print return value with a green border
 	if r.returnValue != nil {
+		// Use RenderValue for pretty-printing
+		var rendered string
+		if val, ok := r.returnValue.(starlark.Value); ok {
+			rendered = RenderValue(val)
+		} else {
+			rendered = fmt.Sprint(r.returnValue)
+		}
+		
 		out.WriteString(
 			style.BorderForeground(
 				lipgloss.Color("#00ff00"),
 			).BorderStyle(
 				lipgloss.ThickBorder(),
 			).Render(
-				strings.TrimSpace(fmt.Sprint(r.returnValue)),
+				strings.TrimSpace(rendered),
 			),
 		)
 		out.WriteString("\n")
