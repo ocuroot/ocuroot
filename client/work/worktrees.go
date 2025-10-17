@@ -51,9 +51,15 @@ func (w *Worker) CopyInRepoClone(ctx context.Context, ref refs.Ref, repoName, co
 
 	log.Info("Repo info", "remotes", repoInfo.Remotes, "source", string(repoInfo.Source))
 
-	be, err := w.RepoConfigFromState(ctx, repoName)
+	globals, be, err := w.RepoConfigFromState(ctx, repoName)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to get repo config: %w", err)
+	}
+
+	// Load globals from repo into settings
+	w.Settings, err = LoadSettings(be, globals, os.Environ())
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to load settings: %w", err)
 	}
 
 	repoCloneDir := path.Join(repoCloneBaseDir(), ulid.MustNew(ulid.Now(), rand.Reader).String())

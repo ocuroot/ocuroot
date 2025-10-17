@@ -16,7 +16,7 @@ func LoadRepo(
 	filename string,
 	backend Backend,
 	print func(thread *starlark.Thread, msg string),
-) ([]byte, error) {
+) (starlark.StringDict, []byte, error) {
 	log.Debug("Loading repo", "filename", filename)
 	c := &configLoader{
 		backend:  backend,
@@ -25,18 +25,18 @@ func LoadRepo(
 
 	builtinsByVersion, err := c.LoadBuiltinsForAllVersion(ctx)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	filename, data, err := resolver.Resolve(filename)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	// First pass to check for the SDK version function
 	sdkVersion, err := IdentifySDKVersion(filename, data)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	var builtins starlark.StringDict
@@ -46,7 +46,7 @@ func LoadRepo(
 		var exists bool
 		builtins, exists = builtinsByVersion[resolvedVersion]
 		if !exists {
-			return nil, fmt.Errorf("version %s not found", sdkVersion)
+			return nil, nil, fmt.Errorf("version %s not found", sdkVersion)
 		}
 	}
 
@@ -59,7 +59,7 @@ func LoadRepo(
 		},
 	)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	loader := NewModuleLoader(resolver.Child(filename), builtinsByVersion, nil)
@@ -69,12 +69,12 @@ func LoadRepo(
 		Load:  loader.Load,
 		Print: backend.WrapPrint(print),
 	}
-	_, err = mod.Init(thread, builtins)
+	globals, err := mod.Init(thread, builtins)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
-	return data, nil
+	return globals, data, nil
 }
 
 func LoadRepoFromBytes(
@@ -84,7 +84,7 @@ func LoadRepoFromBytes(
 	data []byte,
 	backend Backend,
 	print func(thread *starlark.Thread, msg string),
-) ([]byte, error) {
+) (starlark.StringDict, []byte, error) {
 	log.Debug("Loading repo", "filename", filename)
 	c := &configLoader{
 		backend:  backend,
@@ -93,13 +93,13 @@ func LoadRepoFromBytes(
 
 	builtinsByVersion, err := c.LoadBuiltinsForAllVersion(ctx)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	// First pass to check for the SDK version function
 	sdkVersion, err := IdentifySDKVersion(filename, data)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	var builtins starlark.StringDict
@@ -109,7 +109,7 @@ func LoadRepoFromBytes(
 		var exists bool
 		builtins, exists = builtinsByVersion[resolvedVersion]
 		if !exists {
-			return nil, fmt.Errorf("version %s not found", sdkVersion)
+			return nil, nil, fmt.Errorf("version %s not found", sdkVersion)
 		}
 	}
 
@@ -122,7 +122,7 @@ func LoadRepoFromBytes(
 		},
 	)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	loader := NewModuleLoader(resolver.Child(filename), builtinsByVersion, nil)
@@ -132,10 +132,10 @@ func LoadRepoFromBytes(
 		Load:  loader.Load,
 		Print: backend.WrapPrint(print),
 	}
-	_, err = mod.Init(thread, builtins)
+	globals, err := mod.Init(thread, builtins)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
-	return data, nil
+	return globals, data, nil
 }

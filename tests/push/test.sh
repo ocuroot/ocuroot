@@ -31,8 +31,8 @@ test_push_from_source() {
 
     assert_deployed "a.ocu.star" "production"
     assert_deployed "b.ocu.star" "production"
-    assert_ref_equals "cascade/-/a.ocu.star/@/deploy/production#output/message" "Message at commit 1"
-    assert_ref_equals "cascade/-/b.ocu.star/@/deploy/production#output/message" "Message at commit 1"
+    assert_ref_equals "push/-/a.ocu.star/@/deploy/production#output/message" "Message at commit 1"
+    assert_ref_equals "push/-/b.ocu.star/@/deploy/production#output/message" "Message at commit 1"
 
     # Apply second commit
     cp ../../src/repo1/commit2/* "./"
@@ -56,12 +56,12 @@ test_push_from_source() {
 
     assert_deployed "a.ocu.star" "production"
     assert_deployed "b.ocu.star" "production"
-    assert_ref_equals "cascade/-/a.ocu.star/@/deploy/production#output/message" "Message at commit 2"
-    assert_ref_equals "cascade/-/b.ocu.star/@/deploy/production#output/message" "Message at commit 2"
+    assert_ref_equals "push/-/a.ocu.star/@/deploy/production#output/message" "Message at commit 2"
+    assert_ref_equals "push/-/b.ocu.star/@/deploy/production#output/message" "Message at commit 2"
 
-    check_ref_exists "cascade/-/repo.ocu.star/@/push/index"
+    check_ref_exists "push/-/repo.ocu.star/@/push/index"
 
-    check_ref_does_not_exist "cascade/-/b.ocu.star/@r2/deploy/production"
+    check_ref_does_not_exist "push/-/b.ocu.star/@r2/deploy/production"
 
     popd >> /dev/null
 
@@ -95,8 +95,8 @@ test_push_from_intent() {
 
     assert_deployed "a.ocu.star" "production"
     assert_deployed "b.ocu.star" "production"
-    assert_ref_equals "cascade/-/a.ocu.star/@/deploy/production#output/message" "Message at commit 1"
-    assert_ref_equals "cascade/-/b.ocu.star/@/deploy/production#output/message" "Message at commit 1"
+    assert_ref_equals "push/-/a.ocu.star/@/deploy/production#output/message" "Message at commit 1"
+    assert_ref_equals "push/-/b.ocu.star/@/deploy/production#output/message" "Message at commit 1"
 
     ocuroot state set "@/custom/test" 1
     assert_equal "0" "$?" "Failed to set state"

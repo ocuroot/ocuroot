@@ -37,7 +37,7 @@ func GetRepoInfo(path string) (RepoInfo, error) {
 
 	log.Info("Final root", "root", root)
 
-	commit, err := GetRepoCommit(root)
+	commit, err := getRepoCommit(root)
 	if err != nil {
 		return RepoInfo{}, err
 	}
@@ -199,7 +199,7 @@ func GetRepoURL(repoRootPath string) (string, error) {
 	return repoURL, nil
 }
 
-func GetRepoCommit(repoRootPath string) (string, error) {
+func getRepoCommit(repoRootPath string) (string, error) {
 	var (
 		repo *gittools.Repo
 		err  error
