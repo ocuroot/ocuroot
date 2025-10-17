@@ -53,17 +53,28 @@ func (w *Worker) InitTrackerFromStateRepo(ctx context.Context, ref refs.Ref, wd,
 			errorsByRepo[repoRef] = err
 			continue
 		}
-		be, err := w.RepoConfigFromState(ctx, repoRefParsed.Repo)
+		globals, be, err := w.RepoConfigFromState(ctx, repoRefParsed.Repo)
 		if err != nil {
 			return fmt.Errorf("failed to get repo config: %w", err)
+		}
+
+		// Load globals from repo into settings
+		w.Settings, err = LoadSettings(be, globals, os.Environ())
+		if err != nil {
+			return fmt.Errorf("failed to load settings: %w", err)
 		}
 
 		if ref.IsRelative() && !ref.IsEmpty() && !ref.Global {
 			return fmt.Errorf("relative refs not supported for state repo (%v)", ref)
 		}
 
+		storeConfig := &sdk.Store{
+			State:  *w.Settings.State,
+			Intent: w.Settings.Intent,
+		}
+
 		state, intent, err := release.NewRefStore(
-			be.Store,
+			storeConfig,
 			ref.Repo,
 			"",
 		)
@@ -77,7 +88,7 @@ func (w *Worker) InitTrackerFromStateRepo(ctx context.Context, ref refs.Ref, wd,
 			Ref:         ref,
 			State:       state,
 			Intent:      intent,
-			StoreConfig: be.Store,
+			StoreConfig: storeConfig,
 		}
 
 		// Load the most recent push index
@@ -106,7 +117,7 @@ func (w *Worker) InitTrackerFromSourceRepo(ctx context.Context, ref refs.Ref, wd
 
 	// Create a backend that is just enough for loading repo config
 	backend, be := local.BackendForRepo()
-	data, err := sdk.LoadRepo(
+	globals, data, err := sdk.LoadRepo(
 		ctx,
 		sdk.NewFSResolver(os.DirFS(repoRootPath)),
 		"repo.ocu.star",
@@ -132,9 +143,13 @@ func (w *Worker) InitTrackerFromSourceRepo(ctx context.Context, ref refs.Ref, wd
 		w.Tui.UpdateTask(re)
 		return fmt.Errorf("failed to load repo: %w", err)
 	}
+	// Load globals from repo into settings
+	w.Settings, err = LoadSettings(be, globals, os.Environ())
+	if err != nil {
+		return fmt.Errorf("failed to load settings: %w", err)
+	}
 
-	w.RepoRemotes = be.RepoRemotes
-	w.RepoName = be.RepoAlias
+	w.RepoName = w.Settings.RepoAlias
 	if w.RepoName == "" {
 		repoURL, err := client.GetRepoURL(repoRootPath)
 		if err != nil {
@@ -163,8 +178,13 @@ func (w *Worker) InitTrackerFromSourceRepo(ctx context.Context, ref refs.Ref, wd
 	re = tuiwork.GetRepoEvent(repoRootPath, ref, w.Tui, tuiwork.WorkStatusDone)
 	w.Tui.UpdateTask(re)
 
+	storeConfig := &sdk.Store{
+		State:  *w.Settings.State,
+		Intent: w.Settings.Intent,
+	}
+
 	state, intent, err := release.NewRefStore(
-		be.Store,
+		storeConfig,
 		ref.Repo,
 		repoRootPath,
 	)
@@ -172,23 +192,18 @@ func (w *Worker) InitTrackerFromSourceRepo(ctx context.Context, ref refs.Ref, wd
 		return fmt.Errorf("failed to create ref store: %w", err)
 	}
 
-	commit, err := client.GetRepoCommit(repoRootPath)
-	if err != nil {
-		return fmt.Errorf("failed to get repo commit: %w", err)
-	}
-
 	tc := release.TrackerConfig{
-		Commit:      commit,
+		Commit:      w.RepoInfo.Commit,
 		RepoPath:    repoRootPath,
 		Ref:         ref,
 		State:       state,
 		Intent:      intent,
-		StoreConfig: be.Store,
+		StoreConfig: storeConfig,
 	}
 	w.Tracker = tc
 
 	if saveConfig && tc.Ref.Repo != "" {
-		err = saveRepoConfig(ctx, tc, repoRootPath, w.RepoName, commit, data)
+		err = saveRepoConfig(ctx, tc, repoRootPath, w.RepoName, tc.Commit, data)
 		if err != nil {
 			return fmt.Errorf("failed to save repo config: %w", err)
 		}

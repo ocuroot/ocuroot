@@ -63,10 +63,9 @@ func NewWorker(ctx context.Context, ref refs.Ref) (w *Worker, err error) {
 }
 
 type Worker struct {
-	Tracker     release.TrackerConfig
-	RepoName    string
-	RepoRemotes []string
-	RepoInfo    client.RepoInfo
+	Tracker  release.TrackerConfig
+	RepoInfo client.RepoInfo
+	RepoName string
 
 	Tui tui.Tui
 
@@ -74,6 +73,8 @@ type Worker struct {
 	IntentChanges map[string]struct{}
 
 	Index *models.PushIndex
+
+	Settings Settings
 }
 
 type GitFilter int

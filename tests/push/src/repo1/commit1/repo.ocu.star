@@ -1,16 +1,15 @@
 ocuroot("0.3.0")
 
-repo_alias("cascade")
+repo_alias = "push"
 
 env_vars = host.env()
 
-store.set(
-    store.git(
-        env_vars["REPO_REMOTE"],
-        branch="state",
-    ),
-    intent=store.git(
-        env_vars["REPO_REMOTE"], 
-        branch="intent",
-    ),
+state_store = store.git(
+    env_vars["REPO_REMOTE"],
+    branch="state",
+)
+
+intent_store = store.git(
+    env_vars["REPO_REMOTE"], 
+    branch="intent",
 )

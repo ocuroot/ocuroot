@@ -28,6 +28,22 @@ test_basic() {
     echo ""
 }
 
+test_basic_with_repo_alias() {
+    echo "Test: basic"
+    echo ""
+    setup_test
+
+    echo "== release v1 =="
+    OCU_CFG_repo_alias=alternate ocuroot release new basic.ocu.star
+    assert_equal "0" "$?" "Failed to release v1"
+
+    # Ensure there was a release under the alternate name
+    check_ref_exists "alternate/-/basic.ocu.star/@r1"
+
+    echo "Test succeeded"
+    echo ""
+}
+
 test_missing_done() {
     echo "Test: missing done"
     echo ""
@@ -204,6 +220,7 @@ build_ocuroot
 pushd "$(dirname "$0")" > /dev/null
 
 test_basic
+test_basic_with_repo_alias
 test_missing_done
 test_two_releases
 test_deploy_intent

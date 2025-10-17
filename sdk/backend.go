@@ -139,15 +139,15 @@ type Store struct {
 
 type StorageBackend struct {
 	Git *struct {
-		RemoteURL    string            `json:"remote_url"`
-		Branch       string            `json:"branch"`
-		SupportFiles map[string]string `json:"support_files,omitempty"`
-		PathPrefix   string            `json:"path_prefix,omitempty"`
-		CreateBranch bool              `json:"create_branch,omitempty"`
-	} `json:"git,omitempty"`
+		RemoteURL    string            `json:"remote_url" starlark:"remote_url"`
+		Branch       string            `json:"branch" starlark:"branch"`
+		SupportFiles map[string]string `json:"support_files,omitempty" starlark:"support_files,omitempty"`
+		PathPrefix   string            `json:"path_prefix,omitempty" starlark:"path_prefix,omitempty"`
+		CreateBranch bool              `json:"create_branch,omitempty" starlark:"create_branch,omitempty"`
+	} `json:"git,omitempty" starlark:"git,omitempty"`
 	Fs *struct {
-		Path string `json:"path"`
-	} `json:"fs,omitempty"`
+		Path string `json:"path" starlark:"path"`
+	} `json:"fs,omitempty" starlark:"fs,omitempty"`
 }
 
 type StoreBackend interface {
