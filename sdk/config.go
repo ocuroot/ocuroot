@@ -16,12 +16,18 @@ import (
 
 type Config struct {
 	globalFuncs map[string]*starlark.Function
+	allGlobals  starlark.StringDict
 
 	doWorkFunc *starlark.Function
 
 	Package *Package
 
 	Backend Backend
+}
+
+// AllGlobals returns all globals from the loaded configuration
+func (c *Config) AllGlobals() starlark.StringDict {
+	return c.allGlobals
 }
 
 // GlobalFuncs returns the user-defined functions from the loaded configuration
@@ -109,6 +115,7 @@ func LoadConfig(
 	if err != nil {
 		return nil, starlarkerrors.Wrap(err)
 	}
+	out.allGlobals = globals
 
 	// Retrieve helper functions for work wrapping
 	if dw, exists := builtins["do_work"]; exists {

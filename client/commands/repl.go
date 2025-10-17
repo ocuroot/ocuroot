@@ -226,19 +226,10 @@ func createGlobalsWithUserFunctions(ctx context.Context, backend sdk.Backend, sd
 	}
 
 	// Add user-defined functions from the config
-	userFuncs := config.GlobalFuncs()
+	userFuncs := config.AllGlobals()
 	for name, fn := range userFuncs {
-		// Extract the function name from the definition string
-		// The name in the map is the full definition, but we want just the function name
-		if fn != nil {
-			// Try to extract function name from the function itself
-			if fnName := fn.Name(); fnName != "" {
-				globals[fnName] = fn
-			} else {
-				// Fallback: use the key name (though it might be a full definition)
-				globals[name] = fn
-			}
-		}
+		// Fallback: use the key name (though it might be a full definition)
+		globals[name] = fn
 	}
 
 	return globals, nil

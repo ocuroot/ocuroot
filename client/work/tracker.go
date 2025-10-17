@@ -178,6 +178,10 @@ func (w *Worker) InitTrackerFromSourceRepo(ctx context.Context, ref refs.Ref, wd
 	re = tuiwork.GetRepoEvent(repoRootPath, ref, w.Tui, tuiwork.WorkStatusDone)
 	w.Tui.UpdateTask(re)
 
+	if w.Settings.State == nil {
+		return fmt.Errorf("state not specified in repo")
+	}
+
 	storeConfig := &sdk.Store{
 		State:  *w.Settings.State,
 		Intent: w.Settings.Intent,
