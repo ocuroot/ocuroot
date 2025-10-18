@@ -141,11 +141,12 @@ phase(
 
 def release(ctx):
     version = ctx.inputs.prerelease.split("-")[0]
-    copy_release(ctx.inputs.prerelease, version)
+    revision = copy_release(ctx.inputs.prerelease, version)
 
     return done(
         outputs={
             "version": version,
+            "revision": revision,
         },
         tags=[version],
     )
@@ -163,6 +164,8 @@ def copy_release(source_tag, target_tag):
     shell("gh release download v{source} --clobber -p '*.*' -D ./.build/assets/".format(source=source_tag))
     shell("cd ./.build/assets && sha256sum * > checksums.txt")
     shell("gh release upload v{target} ./.build/assets/*.deb ./.build/assets/*.rpm ./.build/assets/*.tar.gz ./.build/assets/checksums.txt".format(target=target_tag))
+
+    return target_hash
 
 def release_inputs():
     inputs = {
