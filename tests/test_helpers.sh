@@ -67,6 +67,27 @@ check_ref_does_not_exist() {
     return 0
 }
 
+# Wait for a ref to exist with timeout
+# Usage: wait_for_ref "path/to/ref" [timeout_seconds] [error_message]
+wait_for_ref() {
+    local ref_path="$1"
+    local timeout="${2:-30}"  # Default 30 second timeout
+    local error_message="${3:-"Timeout waiting for ref $ref_path to exist"}"
+    local elapsed=0
+
+    while [ $elapsed -lt $timeout ]; do
+        ocuroot state get "$ref_path" > /dev/null 2> /dev/null
+        if [ $? -eq 0 ]; then
+            return 0
+        fi
+        sleep 5
+        elapsed=$((elapsed + 5))
+    done
+
+    echo "$error_message (waited ${elapsed}s)"
+    exit 1
+}
+
 
 check_file_exists() {
     local file_path="$1"

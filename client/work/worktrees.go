@@ -34,11 +34,42 @@ func (w *Worker) WorkerForWork(ctx context.Context, todo Work) (*Worker, func(),
 	return w.CopyInWorktree(ctx, todo)
 }
 
-func (w *Worker) CopyInRepoClone(ctx context.Context, ref refs.Ref, repoName, commit string) (*Worker, func(), error) {
+func CloneRepo(ctx context.Context, repoRemotes []string, commit string) (string, error) {
 	if err := os.MkdirAll(repoCloneBaseDir(), 0755); err != nil {
-		return nil, nil, fmt.Errorf("failed to mkdir: %w", err)
+		return "", fmt.Errorf("failed to mkdir: %w", err)
+	}
+	repoCloneDir := path.Join(repoCloneBaseDir(), ulid.MustNew(ulid.Now(), rand.Reader).String())
+
+	var (
+		repo *gittools.Repo
+		err  error
+	)
+	var remoteToError = make(map[string]error)
+	for _, remote := range repoRemotes {
+		log.Info("Attempting clone", "remote", remote, "repoCloneDir", repoCloneDir)
+		repo, err = gittools.NewClient().Clone(remote, repoCloneDir)
+		if err != nil {
+			log.Error("failed to clone repo", "remote", remote, "repoCloneDir", repoCloneDir, "err", err)
+			remoteToError[remote] = err
+		} else {
+			log.Info("Clone successful")
+			break
+		}
+	}
+	if repo == nil {
+		return "", fmt.Errorf("all remotes exhausted trying to clone repo\n%v", remoteToError)
 	}
 
+	err = repo.Checkout(commit)
+	if err != nil {
+		log.Error("failed to checkout commit", "commit", commit, "repoCloneDir", repoCloneDir, "err", err)
+		return "", fmt.Errorf("failed to checkout commit: %w\nin repoDir: %v", err, repoCloneDir)
+	}
+
+	return repoCloneDir, nil
+}
+
+func (w *Worker) CopyInRepoClone(ctx context.Context, ref refs.Ref, repoName, commit string) (*Worker, func(), error) {
 	log.Info("Cloning repo", "ref", ref, "repoName", repoName, "commit", commit)
 
 	var repoInfo models.RepoConfig
@@ -62,8 +93,6 @@ func (w *Worker) CopyInRepoClone(ctx context.Context, ref refs.Ref, repoName, co
 		return nil, nil, fmt.Errorf("failed to load settings: %w", err)
 	}
 
-	repoCloneDir := path.Join(repoCloneBaseDir(), ulid.MustNew(ulid.Now(), rand.Reader).String())
-
 	var remotes []string
 	// Add discovered fetch URLs
 	for _, r := range repoInfo.Remotes {
@@ -74,27 +103,9 @@ func (w *Worker) CopyInRepoClone(ctx context.Context, ref refs.Ref, repoName, co
 		remotes = be.RepoRemotes
 	}
 
-	var repo *gittools.Repo
-	var remoteToError = make(map[string]error)
-	for _, remote := range remotes {
-		log.Info("Attempting clone", "remote", remote, "repoCloneDir", repoCloneDir)
-		repo, err = gittools.NewClient().Clone(remote, repoCloneDir)
-		if err != nil {
-			log.Error("failed to clone repo", "remote", remote, "repoCloneDir", repoCloneDir, "err", err)
-			remoteToError[remote] = err
-		} else {
-			log.Info("Clone successful")
-			break
-		}
-	}
-	if repo == nil {
-		return nil, nil, fmt.Errorf("all remotes exhausted trying to clone repo\n%v", remoteToError)
-	}
-
-	err = repo.Checkout(commit)
+	repoCloneDir, err := CloneRepo(ctx, remotes, commit)
 	if err != nil {
-		log.Error("failed to checkout commit", "commit", commit, "repoCloneDir", repoCloneDir, "err", err)
-		return nil, nil, fmt.Errorf("failed to checkout commit: %w\nin repoDir: %v", err, repoCloneDir)
+		return nil, nil, fmt.Errorf("failed to clone repo: %w", err)
 	}
 
 	wc := *w

@@ -1,0 +1,741 @@
+package git
+
+import (
+	"bytes"
+	"context"
+	"errors"
+	"fmt"
+	"io"
+	"path"
+	"sort"
+	"strings"
+	"time"
+
+	"github.com/go-git/go-git/v6/plumbing"
+	"github.com/go-git/go-git/v6/plumbing/filemode"
+	"github.com/go-git/go-git/v6/plumbing/format/packfile"
+	"github.com/go-git/go-git/v6/plumbing/object"
+	"github.com/go-git/go-git/v6/plumbing/protocol/packp"
+	"github.com/go-git/go-git/v6/plumbing/protocol/packp/capability"
+	"github.com/go-git/go-git/v6/plumbing/transport"
+	"github.com/go-git/go-git/v6/storage/memory"
+
+	_ "github.com/go-git/go-git/v6/plumbing/transport/file"
+	_ "github.com/go-git/go-git/v6/plumbing/transport/git"
+	_ "github.com/go-git/go-git/v6/plumbing/transport/http"
+	_ "github.com/go-git/go-git/v6/plumbing/transport/ssh"
+)
+
+func NewRemoteGit(endpoint string) (RemoteGit, error) {
+	return NewRemoteGitWithUser(endpoint, nil)
+}
+
+func NewRemoteGitWithUser(endpoint string, user *GitUser) (RemoteGit, error) {
+	ep, err := transport.NewEndpoint(endpoint)
+	if err != nil {
+		return nil, err
+	}
+
+	c, err := transport.Get(ep.Protocol)
+	if err != nil {
+		return nil, err
+	}
+
+	store := memory.NewStorage()
+
+	return &remoteGitImpl{
+		transport: c,
+		ep:        ep,
+		store:     store,
+		user:      user,
+	}, nil
+}
+
+type remoteGitImpl struct {
+	transport transport.Transport
+	ep        *transport.Endpoint
+	store     *memory.Storage
+	user      *GitUser
+
+	// Cached connection for reuse
+	cachedConn transport.Connection
+}
+
+// getOrCreateConnection returns a valid connection, reusing the cached one if available
+// or creating a new one if needed. The caller should NOT close the returned connection
+// as it may be reused. Use invalidateConnection() if the connection fails.
+func (r *remoteGitImpl) getOrCreateConnection(ctx context.Context) (transport.Connection, error) {
+	// Try to reuse cached connection if it exists
+	if r.cachedConn != nil {
+		return r.cachedConn, nil
+	}
+
+	// Create new session and connection
+	sess, err := r.transport.NewSession(r.store, r.ep, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	conn, err := sess.Handshake(ctx, transport.UploadPackService, "")
+	if err != nil {
+		return nil, err
+	}
+
+	// Cache the connection for reuse
+	r.cachedConn = conn
+	return conn, nil
+}
+
+// InvalidateConnection closes and clears the cached connection
+func (r *remoteGitImpl) InvalidateConnection() {
+	if r.cachedConn != nil {
+		r.cachedConn.Close()
+		r.cachedConn = nil
+	}
+}
+
+// invalidateConnection is a private alias for backwards compatibility
+func (r *remoteGitImpl) invalidateConnection() {
+	r.InvalidateConnection()
+}
+
+// BranchRefs implements RemoteGit.
+func (r *remoteGitImpl) BranchRefs(ctx context.Context) ([]Ref, error) {
+	conn, err := r.getOrCreateConnection(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	refs, err := conn.GetRemoteRefs(ctx)
+	if err != nil {
+		// Connection might be stale, invalidate and retry once
+		r.invalidateConnection()
+		conn, err = r.getOrCreateConnection(ctx)
+		if err != nil {
+			return nil, err
+		}
+		refs, err = conn.GetRemoteRefs(ctx)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	var out []Ref
+	for _, ref := range refs {
+		if ref.Name().IsBranch() {
+			out = append(out, Ref{
+				Name: ref.Name().String(),
+				Hash: ref.Hash().String(),
+			})
+		}
+	}
+
+	return out, nil
+}
+
+// GetTree implements RemoteGit.
+func (r *remoteGitImpl) GetTree(ctx context.Context, hash string) (*TreeNode, error) {
+	hashObj, ok := plumbing.FromHex(hash)
+	if !ok {
+		return nil, fmt.Errorf("invalid hash: %v, got %v", hash, hashObj)
+	}
+
+	conn, err := r.getOrCreateConnection(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	// Build fetch request
+	fetchReq := &transport.FetchRequest{
+		Wants: []plumbing.Hash{hashObj},
+		Depth: 0,
+	}
+
+	// Only add filter if the server supports it
+	caps := conn.Capabilities()
+	if caps.Supports(capability.Filter) {
+		fetchReq.Filter = packp.FilterBlobLimit(0, packp.BlobLimitPrefixNone)
+	}
+
+	err = conn.Fetch(ctx, fetchReq)
+	if err != nil {
+		// Connection might be stale, invalidate and retry once
+		r.invalidateConnection()
+		conn, err = r.getOrCreateConnection(ctx)
+		if err != nil {
+			return nil, err
+		}
+
+		// Rebuild fetch request with new connection's capabilities
+		caps = conn.Capabilities()
+		if caps.Supports(capability.Filter) {
+			fetchReq.Filter = packp.FilterBlobLimit(0, packp.BlobLimitPrefixNone)
+		} else {
+			fetchReq.Filter = ""
+		}
+
+		err = conn.Fetch(ctx, fetchReq)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	// Get the commit object
+	commit, err := r.store.EncodedObject(plumbing.CommitObject, hashObj)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get commit object: %w", err)
+	}
+
+	// Decode the commit to get the tree hash
+	commitDecoded, err := object.DecodeCommit(r.store, commit)
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode commit: %w", err)
+	}
+
+	// Get the tree object
+	treeHash := commitDecoded.TreeHash
+	treeObj, err := r.store.EncodedObject(plumbing.TreeObject, treeHash)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get tree object: %w", err)
+	}
+
+	// Decode and build the tree structure
+	tree, err := object.DecodeTree(r.store, treeObj)
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode tree: %w", err)
+	}
+
+	return r.buildTreeNode(tree)
+}
+
+// buildTreeNode recursively builds a TreeNode from an object.Tree
+func (r *remoteGitImpl) buildTreeNode(tree *object.Tree) (*TreeNode, error) {
+	node := &TreeNode{
+		Hash:     tree.Hash.String(),
+		IsObject: false,
+		Children: make(map[string]*TreeNode),
+	}
+
+	for _, entry := range tree.Entries {
+		if entry.Mode.IsFile() {
+			// It's a blob (file)
+			node.Children[entry.Name] = &TreeNode{
+				Hash:     entry.Hash.String(),
+				IsObject: true,
+				Children: nil,
+			}
+		} else if entry.Mode == filemode.Dir {
+			// It's a subtree (directory)
+			subTreeObj, err := r.store.EncodedObject(plumbing.TreeObject, entry.Hash)
+			if err != nil {
+				return nil, fmt.Errorf("failed to get subtree %s: %w", entry.Name, err)
+			}
+
+			subTree, err := object.DecodeTree(r.store, subTreeObj)
+			if err != nil {
+				return nil, fmt.Errorf("failed to decode subtree %s: %w", entry.Name, err)
+			}
+
+			subNode, err := r.buildTreeNode(subTree)
+			if err != nil {
+				return nil, fmt.Errorf("failed to build subtree %s: %w", entry.Name, err)
+			}
+
+			node.Children[entry.Name] = subNode
+		}
+		// Skip other modes (symlinks, submodules, etc.) for now
+	}
+
+	return node, nil
+}
+
+// GetObject implements RemoteGit.
+func (r *remoteGitImpl) GetObject(ctx context.Context, hash string) ([]byte, error) {
+	hashObj, ok := plumbing.FromHex(hash)
+	if !ok {
+		return nil, fmt.Errorf("invalid hash: %v", hash)
+	}
+
+	// Try to get the blob from storage first
+	blob, err := r.store.EncodedObject(plumbing.BlobObject, hashObj)
+	if err != nil {
+		// If not in storage, fetch it
+		conn, err := r.getOrCreateConnection(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get connection: %w", err)
+		}
+
+		err = conn.Fetch(ctx, &transport.FetchRequest{
+			Wants: []plumbing.Hash{hashObj},
+			Depth: 0,
+		})
+		if err != nil {
+			// Connection might be stale, invalidate and retry once
+			r.invalidateConnection()
+			conn, err = r.getOrCreateConnection(ctx)
+			if err != nil {
+				return nil, fmt.Errorf("failed to get connection on retry: %w", err)
+			}
+
+			err = conn.Fetch(ctx, &transport.FetchRequest{
+				Wants: []plumbing.Hash{hashObj},
+				Depth: 0,
+			})
+			if err != nil {
+				return nil, fmt.Errorf("failed to fetch blob: %w", err)
+			}
+		}
+
+		// Try to get it again after fetching
+		blob, err = r.store.EncodedObject(plumbing.BlobObject, hashObj)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get blob object after fetch: %w", err)
+		}
+	}
+
+	// Read the blob contents
+	reader, err := blob.Reader()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get blob reader: %w", err)
+	}
+	defer reader.Close()
+
+	// Handle empty files
+	if blob.Size() == 0 {
+		return []byte{}, nil
+	}
+
+	// Read all content
+	content := make([]byte, blob.Size())
+	_, err = reader.Read(content)
+	if err != nil && err.Error() != "EOF" {
+		return nil, fmt.Errorf("failed to read blob content: %w", err)
+	}
+
+	return content, nil
+}
+
+// Push implements RemoteGit.
+func (r *remoteGitImpl) Push(ctx context.Context, refName string, objectsByPath map[string]string, message string) error {
+	return r.pushWithOptions(ctx, refName, objectsByPath, message, true)
+}
+
+// pushWithStaleRef is an internal helper for testing race conditions
+// It pushes using a specific old hash without fetching current refs
+func (r *remoteGitImpl) pushWithStaleRef(ctx context.Context, refName string, objectsByPath map[string]string, message string, staleOldHash plumbing.Hash) error {
+	// Build the tree from the objects
+	rootTreeHash, err := r.buildTreeFromObjects(objectsByPath)
+	if err != nil {
+		return fmt.Errorf("failed to build tree: %w", err)
+	}
+
+	if r.user == nil {
+		return errors.New("user must be set to push")
+	}
+
+	// Validate user
+	if err := r.user.Validate(); err != nil {
+		return fmt.Errorf("invalid user: %w", err)
+	}
+
+	// Use the provided stale hash as both old hash and parent
+	oldHash := staleOldHash
+	var parentHashes []plumbing.Hash
+	if !staleOldHash.IsZero() {
+		parentHashes = []plumbing.Hash{staleOldHash}
+	}
+
+	// Create a commit object with the stale parent
+	commit := &object.Commit{
+		Author: object.Signature{
+			Name:  r.user.Name,
+			Email: r.user.Email,
+			When:  time.Now(),
+		},
+		Committer: object.Signature{
+			Name:  r.user.Name,
+			Email: r.user.Email,
+			When:  time.Now(),
+		},
+		Message:      message,
+		TreeHash:     rootTreeHash,
+		ParentHashes: parentHashes,
+	}
+
+	// Encode and store the commit
+	commitObj := r.store.NewEncodedObject()
+	commitObj.SetType(plumbing.CommitObject)
+	if err := commit.Encode(commitObj); err != nil {
+		return fmt.Errorf("failed to encode commit: %w", err)
+	}
+
+	commitHash, err := r.store.SetEncodedObject(commitObj)
+	if err != nil {
+		return fmt.Errorf("failed to store commit: %w", err)
+	}
+
+	// Build push command with the stale old hash
+	cmd := &packp.Command{
+		Name: plumbing.ReferenceName(refName),
+		Old:  oldHash,
+		New:  commitHash,
+	}
+
+	// Create packfile with all objects
+	packfileReader, err := r.createPackfile(commitHash)
+	if err != nil {
+		return fmt.Errorf("failed to create packfile: %w", err)
+	}
+
+	// Create a new session for the push
+	sess, err := r.transport.NewSession(r.store, r.ep, nil)
+	if err != nil {
+		return fmt.Errorf("failed to create session: %w", err)
+	}
+
+	conn, err := sess.Handshake(ctx, transport.ReceivePackService, "")
+	if err != nil {
+		return fmt.Errorf("failed to handshake: %w", err)
+	}
+	defer conn.Close()
+
+	// Build push request
+	pushReq := &transport.PushRequest{
+		Packfile: packfileReader,
+		Commands: []*packp.Command{cmd},
+	}
+
+	// Push to remote
+	err = conn.Push(ctx, pushReq)
+	if err != nil {
+		return fmt.Errorf("failed to push: %w", err)
+	}
+
+	// Invalidate cached connection since push changes remote state
+	// This ensures subsequent operations see the updated refs
+	r.invalidateConnection()
+
+	return nil
+}
+
+// pushWithOptions is an internal helper that allows controlling whether to fetch fresh refs
+// This is used for testing race conditions
+func (r *remoteGitImpl) pushWithOptions(ctx context.Context, refName string, objectsByPath map[string]string, message string, fetchFreshRefs bool) error {
+	// Build the tree from the objects
+	rootTreeHash, err := r.buildTreeFromObjects(objectsByPath)
+	if err != nil {
+		return fmt.Errorf("failed to build tree: %w", err)
+	}
+
+	if r.user == nil {
+		return errors.New("user must be set to push")
+	}
+
+	// Validate user
+	if err := r.user.Validate(); err != nil {
+		return fmt.Errorf("invalid user: %w", err)
+	}
+
+	var oldHash plumbing.Hash = plumbing.ZeroHash
+	var parentHashes []plumbing.Hash
+
+	if fetchFreshRefs {
+		// Invalidate any cached connection to ensure we get fresh refs
+		// This is critical for detecting race conditions
+		r.invalidateConnection()
+	}
+
+	// Create a new session for receive-pack to get current refs
+	sess, err := r.transport.NewSession(r.store, r.ep, nil)
+	if err != nil {
+		return fmt.Errorf("failed to create session: %w", err)
+	}
+
+	conn, err := sess.Handshake(ctx, transport.ReceivePackService, "")
+	if err != nil {
+		return fmt.Errorf("failed to handshake: %w", err)
+	}
+	defer conn.Close()
+
+	// Get current refs to determine parent commit and old hash
+	refs, err := conn.GetRemoteRefs(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to get remote refs: %w", err)
+	}
+
+	for _, ref := range refs {
+		if ref.Name().String() == refName {
+			oldHash = ref.Hash()
+			// Set this commit as the parent of our new commit
+			parentHashes = []plumbing.Hash{oldHash}
+			break
+		}
+	}
+
+	// Create a commit object with proper parent
+	commit := &object.Commit{
+		Author: object.Signature{
+			Name:  r.user.Name,
+			Email: r.user.Email,
+			When:  time.Now(),
+		},
+		Committer: object.Signature{
+			Name:  r.user.Name,
+			Email: r.user.Email,
+			When:  time.Now(),
+		},
+		Message:      message,
+		TreeHash:     rootTreeHash,
+		ParentHashes: parentHashes, // Set parent to current HEAD
+	}
+
+	// Encode and store the commit
+	commitObj := r.store.NewEncodedObject()
+	commitObj.SetType(plumbing.CommitObject)
+	if err := commit.Encode(commitObj); err != nil {
+		return fmt.Errorf("failed to encode commit: %w", err)
+	}
+
+	commitHash, err := r.store.SetEncodedObject(commitObj)
+	if err != nil {
+		return fmt.Errorf("failed to store commit: %w", err)
+	}
+
+	// Build push command
+	cmd := &packp.Command{
+		Name: plumbing.ReferenceName(refName),
+		Old:  oldHash,
+		New:  commitHash,
+	}
+
+	// Create packfile with all objects
+	packfileReader, err := r.createPackfile(commitHash)
+	if err != nil {
+		return fmt.Errorf("failed to create packfile: %w", err)
+	}
+
+	// Build push request
+	pushReq := &transport.PushRequest{
+		Packfile: packfileReader,
+		Commands: []*packp.Command{cmd},
+	}
+
+	// Push to remote
+	err = conn.Push(ctx, pushReq)
+	if err != nil {
+		return fmt.Errorf("failed to push: %w", err)
+	}
+
+	// Invalidate cached connection since push changes remote state
+	// This ensures subsequent operations see the updated refs
+	r.invalidateConnection()
+
+	return nil
+}
+
+// dirEntry represents an entry in a directory (file or subdirectory)
+type dirEntry struct {
+	name   string
+	hash   plumbing.Hash
+	isTree bool
+}
+
+// buildTreeFromObjects creates a tree structure from a map of file paths to contents
+func (r *remoteGitImpl) buildTreeFromObjects(objectsByPath map[string]string) (plumbing.Hash, error) {
+	// Group files by directory
+	dirs := make(map[string][]dirEntry)
+
+	// Create blob objects for all files
+	for filePath, content := range objectsByPath {
+		// Create blob
+		blob := r.store.NewEncodedObject()
+		blob.SetType(plumbing.BlobObject)
+		writer, err := blob.Writer()
+		if err != nil {
+			return plumbing.ZeroHash, fmt.Errorf("failed to create blob writer: %w", err)
+		}
+
+		if _, err := writer.Write([]byte(content)); err != nil {
+			writer.Close()
+			return plumbing.ZeroHash, fmt.Errorf("failed to write blob: %w", err)
+		}
+		writer.Close()
+
+		blobHash, err := r.store.SetEncodedObject(blob)
+		if err != nil {
+			return plumbing.ZeroHash, fmt.Errorf("failed to store blob: %w", err)
+		}
+
+		// Add to directory structure
+		dir := path.Dir(filePath)
+		if dir == "." {
+			dir = ""
+		}
+		fileName := path.Base(filePath)
+
+		dirs[dir] = append(dirs[dir], dirEntry{
+			name:   fileName,
+			hash:   blobHash,
+			isTree: false,
+		})
+	}
+
+	// Build trees bottom-up
+	return r.buildTree("", dirs)
+}
+
+// buildTree recursively builds tree objects
+func (r *remoteGitImpl) buildTree(dirPath string, dirs map[string][]dirEntry) (plumbing.Hash, error) {
+	tree := &object.Tree{}
+
+	// Add entries from this directory
+	entries := dirs[dirPath]
+	for _, entry := range entries {
+		mode := filemode.Regular
+		if entry.isTree {
+			mode = filemode.Dir
+		}
+
+		tree.Entries = append(tree.Entries, object.TreeEntry{
+			Name: entry.name,
+			Mode: mode,
+			Hash: entry.hash,
+		})
+	}
+
+	// Find subdirectories and build their trees
+	prefix := dirPath
+	if prefix != "" {
+		prefix += "/"
+	}
+
+	subdirs := make(map[string]bool)
+	for dir := range dirs {
+		if dir != dirPath && strings.HasPrefix(dir, prefix) {
+			// Find immediate subdirectory
+			remainder := strings.TrimPrefix(dir, prefix)
+			subdir := strings.Split(remainder, "/")[0]
+			subdirs[subdir] = true
+		}
+	}
+
+	// Build subtrees
+	for subdir := range subdirs {
+		subdirPath := prefix + subdir
+		if dirPath == "" {
+			subdirPath = subdir
+		}
+
+		subtreeHash, err := r.buildTree(subdirPath, dirs)
+		if err != nil {
+			return plumbing.ZeroHash, err
+		}
+
+		tree.Entries = append(tree.Entries, object.TreeEntry{
+			Name: subdir,
+			Mode: filemode.Dir,
+			Hash: subtreeHash,
+		})
+	}
+
+	// Sort entries (required by git)
+	sort.Slice(tree.Entries, func(i, j int) bool {
+		return tree.Entries[i].Name < tree.Entries[j].Name
+	})
+
+	// Encode and store the tree
+	treeObj := r.store.NewEncodedObject()
+	treeObj.SetType(plumbing.TreeObject)
+	if err := tree.Encode(treeObj); err != nil {
+		return plumbing.ZeroHash, fmt.Errorf("failed to encode tree: %w", err)
+	}
+
+	treeHash, err := r.store.SetEncodedObject(treeObj)
+	if err != nil {
+		return plumbing.ZeroHash, fmt.Errorf("failed to store tree: %w", err)
+	}
+
+	return treeHash, nil
+}
+
+// createPackfile creates a packfile containing all objects needed for the commit
+func (r *remoteGitImpl) createPackfile(commitHash plumbing.Hash) (io.ReadCloser, error) {
+	// Use go-git's packfile builder
+	buf := new(bytes.Buffer)
+	encoder := packfile.NewEncoder(buf, r.store, false)
+
+	// Get all objects reachable from the commit
+	hashes := []plumbing.Hash{commitHash}
+
+	// Walk the commit to find all referenced objects
+	commit, err := object.GetCommit(r.store, commitHash)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get commit: %w", err)
+	}
+
+	// Add tree and all its contents
+	tree, err := commit.Tree()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get tree: %w", err)
+	}
+
+	walker := object.NewTreeWalker(tree, true, nil)
+	defer walker.Close()
+
+	for {
+		name, entry, err := walker.Next()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			return nil, fmt.Errorf("failed to walk tree: %w", err)
+		}
+
+		if name != "" { // Skip root
+			hashes = append(hashes, entry.Hash)
+		}
+	}
+
+	hashes = append(hashes, tree.Hash)
+
+	// Encode all objects into the packfile
+	if _, err := encoder.Encode(hashes, 0); err != nil {
+		return nil, fmt.Errorf("failed to encode packfile: %w", err)
+	}
+
+	return io.NopCloser(bytes.NewReader(buf.Bytes())), nil
+}
+
+// TagRefs implements RemoteGit.
+func (r *remoteGitImpl) TagRefs(ctx context.Context) ([]Ref, error) {
+	conn, err := r.getOrCreateConnection(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	refs, err := conn.GetRemoteRefs(ctx)
+	if err != nil {
+		// Connection might be stale, invalidate and retry once
+		r.invalidateConnection()
+		conn, err = r.getOrCreateConnection(ctx)
+		if err != nil {
+			return nil, err
+		}
+		refs, err = conn.GetRemoteRefs(ctx)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	var out []Ref
+	for _, ref := range refs {
+		if ref.Name().IsTag() {
+			out = append(out, Ref{
+				Name: ref.Name().String(),
+				Hash: ref.Hash().String(),
+			})
+		}
+	}
+
+	return out, nil
+}
