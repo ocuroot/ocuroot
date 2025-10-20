@@ -210,7 +210,7 @@ func runStarlarkReplWithFile(ctx context.Context, filePath string) error {
 	}
 
 	fmt.Println("Starting Starlark REPL with Ocuroot SDK")
-	fmt.Println("Ctrl+C or Escape to exit")
+	fmt.Println("Ctrl+C to exit")
 	fmt.Println("Type 'help()' to see available globals")
 	fmt.Println()
 
@@ -412,7 +412,7 @@ func (r *replModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				r.textInput.Reset()
 				return r, r.spinner.Tick
 			}
-		case tea.KeyCtrlC, tea.KeyEsc:
+		case tea.KeyCtrlC:
 			return r, tea.Quit
 		}
 	}
@@ -462,7 +462,7 @@ func (r *replModel) renderResult() string {
 		} else {
 			rendered = fmt.Sprint(r.returnValue)
 		}
-		
+
 		out.WriteString(
 			style.BorderForeground(
 				lipgloss.Color("#00ff00"),
