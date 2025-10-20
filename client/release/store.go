@@ -79,7 +79,10 @@ func newRefStoreFromBackend(
 		err   error
 	)
 	if storeConfig.Fs != nil {
-		statePath := filepath.Join(repoPath, storeConfig.Fs.Path, pathPrefix)
+		statePath := filepath.Join(storeConfig.Fs.Path, pathPrefix)
+		if !filepath.IsAbs(statePath) {
+			statePath = filepath.Join(repoPath, statePath)
+		}
 		store, err = refstore.NewFSRefStore(statePath, tags)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create state store: %w", err)

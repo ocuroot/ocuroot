@@ -42,6 +42,11 @@ func GetRepoInfo(path string) (RepoInfo, error) {
 		return RepoInfo{}, err
 	}
 
+	branch, err := getRepoBranch(root)
+	if err != nil {
+		return RepoInfo{}, err
+	}
+
 	uncomittedChanges, err := uncomittedFiles(root)
 	if err != nil {
 		return RepoInfo{}, err
@@ -76,6 +81,7 @@ func GetRepoInfo(path string) (RepoInfo, error) {
 		Root:               root,
 		Type:               repoType,
 		Commit:             commit,
+		Branch:             branch,
 		UncommittedChanges: uncomittedChanges,
 	}, nil
 }
@@ -96,6 +102,7 @@ type RepoInfo struct {
 	Root   string
 	Type   RepoType
 	Commit string
+	Branch string
 
 	UncommittedChanges []string
 }
@@ -199,6 +206,35 @@ func GetRepoURL(repoRootPath string) (string, error) {
 	return repoURL, nil
 }
 
+func getRepoBranch(repoRootPath string) (string, error) {
+	var (
+		repo *gittools.Repo
+		err  error
+	)
+
+	branch := os.Getenv("OCU_REPO_BRANCH_OVERRIDE")
+	if branch != "" {
+		return branch, nil
+	}
+
+	repo, err = gittools.Open(repoRootPath)
+	if err != nil {
+		return "", fmt.Errorf("failed to open repo: %w", err)
+	}
+
+	branchB, stderr, err := repo.Client.Exec("rev-parse", "--abbrev-ref", "HEAD")
+	if err != nil {
+		// This implies that there are no commits on this branch
+		if strings.Contains(string(stderr), "unknown revision or path not in the working tree.") {
+			return "null", nil
+		}
+
+		return "", fmt.Errorf("failed to get commit hash: %w\n%s", err, stderr)
+	}
+	branch = strings.TrimRight(string(branchB), "\n")
+	return branch, nil
+}
+
 func getRepoCommit(repoRootPath string) (string, error) {
 	var (
 		repo *gittools.Repo
@@ -215,7 +251,6 @@ func getRepoCommit(repoRootPath string) (string, error) {
 		return "", fmt.Errorf("failed to open repo: %w", err)
 	}
 
-	// TODO: This should be built into gittools
 	commitB, stderr, err := repo.Client.Exec("rev-parse", "HEAD")
 	if err != nil {
 		// This implies that there are no commits on this branch

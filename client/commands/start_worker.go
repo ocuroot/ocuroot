@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/charmbracelet/log"
+	"github.com/ocuroot/ocuroot/client"
 	"github.com/ocuroot/ocuroot/client/work"
 	"github.com/ocuroot/ocuroot/git"
 	"github.com/spf13/cobra"
@@ -25,7 +26,6 @@ var WorkerCmd = &cobra.Command{
 	Long:  `Start a worker that polls a git repository for new commits and processes them.`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx := cmd.Context()
-
 		// Determine repository URL
 		var repoURL string
 		if workerDev {
@@ -34,8 +34,20 @@ var WorkerCmd = &cobra.Command{
 			if err != nil {
 				return fmt.Errorf("failed to get current directory: %w", err)
 			}
+
+			repoInfo, err := client.GetRepoInfo(cwd)
+			if err != nil {
+				return fmt.Errorf("failed to get repo info: %w", err)
+			}
+
+			if workerBranch == "" {
+				workerBranch = fmt.Sprintf("refs/heads/%v", repoInfo.Branch)
+			}
 			repoURL = "file://" + cwd
+			workerInterval = time.Second // Can afford to poll very frequently when running locally
 			log.Info("Using local repository", "path", cwd)
+		} else if workerBranch == "" {
+			return fmt.Errorf("branch not specified")
 		} else {
 			return fmt.Errorf("non-dev mode not yet implemented; use --dev flag for local repo")
 		}
@@ -108,9 +120,9 @@ func commitHandler(remote string, hash string) {
 }
 
 func init() {
-	WorkerCmd.Flags().BoolVar(&workerDev, "dev", false, "Use current directory as repository")
-	WorkerCmd.Flags().DurationVar(&workerInterval, "interval", time.Minute, "Polling interval (e.g., 30s, 1m, 5m)")
-	WorkerCmd.Flags().StringVar(&workerBranch, "branch", "refs/heads/main", "Branch to poll")
+	WorkerCmd.Flags().BoolVar(&workerDev, "dev", false, "Use current directory as repository. Will monitor for commits (every 1s) and release based on changed files. Should not be used in production.")
+	WorkerCmd.Flags().DurationVar(&workerInterval, "interval", time.Minute, "Polling interval (e.g., 30s, 1m, 5m). Ignored in dev mode.")
+	WorkerCmd.Flags().StringVar(&workerBranch, "branch", "", "Branch to poll, in dev mode defaults to the currently checked out branch")
 
 	StartCmd.AddCommand(WorkerCmd)
 }
