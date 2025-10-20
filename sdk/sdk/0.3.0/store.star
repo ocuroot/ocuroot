@@ -51,8 +51,27 @@ def _fs_store(path):
         }
     }
 
+def _local_store(id):
+    """
+    Creates a local store for the given id.
+    The store is held in a shared location on your local machine and may be used for multiple repos.
+    This should not be used for production services with multiple contributors.
+    
+    Args:
+        id: The id of the store
+    
+    Returns:
+        A local store
+    """
+    return {
+        "local": {
+            "id": id,
+        }
+    }
+
 store = struct(
     set = _set_store,
     git = _git_store,
     fs = _fs_store,
+    local = _local_store,
 )

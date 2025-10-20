@@ -739,3 +739,171 @@ func (r *remoteGitImpl) TagRefs(ctx context.Context) ([]Ref, error) {
 
 	return out, nil
 }
+
+// CreateBranch implements RemoteGit.
+// Creates a new branch on the remote repository without checking it out.
+// If sourceRef is empty, creates an orphan branch with an empty initial commit.
+// If sourceRef is provided, it can be a commit hash or a branch reference name.
+func (r *remoteGitImpl) CreateBranch(ctx context.Context, branchName string, sourceRef string, message string) error {
+	if r.user == nil {
+		return errors.New("user must be set to create branch")
+	}
+
+	// Validate user
+	if err := r.user.Validate(); err != nil {
+		return fmt.Errorf("invalid user: %w", err)
+	}
+
+	// Ensure branch name is in refs/heads/ format
+	refName := branchName
+	if !strings.HasPrefix(refName, "refs/heads/") {
+		refName = "refs/heads/" + branchName
+	}
+
+	// Create a new session for receive-pack
+	sess, err := r.transport.NewSession(r.store, r.ep, nil)
+	if err != nil {
+		return fmt.Errorf("failed to create session: %w", err)
+	}
+
+	conn, err := sess.Handshake(ctx, transport.ReceivePackService, "")
+	if err != nil {
+		return fmt.Errorf("failed to handshake: %w", err)
+	}
+	defer conn.Close()
+
+	// Get current refs to check if branch already exists
+	refs, err := conn.GetRemoteRefs(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to get remote refs: %w", err)
+	}
+
+	// Check if branch already exists
+	for _, ref := range refs {
+		if ref.Name().String() == refName {
+			return fmt.Errorf("branch %s already exists", branchName)
+		}
+	}
+
+	var commitHash plumbing.Hash
+
+	if sourceRef == "" {
+		// Create an orphan branch with an empty tree
+		emptyTree := &object.Tree{}
+		treeObj := r.store.NewEncodedObject()
+		treeObj.SetType(plumbing.TreeObject)
+		if err := emptyTree.Encode(treeObj); err != nil {
+			return fmt.Errorf("failed to encode empty tree: %w", err)
+		}
+
+		treeHash, err := r.store.SetEncodedObject(treeObj)
+		if err != nil {
+			return fmt.Errorf("failed to store empty tree: %w", err)
+		}
+
+		// Create initial commit with empty tree and no parents
+		commit := &object.Commit{
+			Author: object.Signature{
+				Name:  r.user.Name,
+				Email: r.user.Email,
+				When:  time.Now(),
+			},
+			Committer: object.Signature{
+				Name:  r.user.Name,
+				Email: r.user.Email,
+				When:  time.Now(),
+			},
+			Message:      message,
+			TreeHash:     treeHash,
+			ParentHashes: nil, // No parents for orphan branch
+		}
+
+		commitObj := r.store.NewEncodedObject()
+		commitObj.SetType(plumbing.CommitObject)
+		if err := commit.Encode(commitObj); err != nil {
+			return fmt.Errorf("failed to encode commit: %w", err)
+		}
+
+		commitHash, err = r.store.SetEncodedObject(commitObj)
+		if err != nil {
+			return fmt.Errorf("failed to store commit: %w", err)
+		}
+	} else {
+		// Resolve sourceRef to a commit hash
+		var sourceHash plumbing.Hash
+		
+		// Try to parse as a hash first
+		if h, ok := plumbing.FromHex(sourceRef); ok {
+			sourceHash = h
+		} else {
+			// Try to find it as a ref name
+			sourceRefName := sourceRef
+			if !strings.HasPrefix(sourceRefName, "refs/") {
+				sourceRefName = "refs/heads/" + sourceRef
+			}
+			
+			found := false
+			for _, ref := range refs {
+				if ref.Name().String() == sourceRefName {
+					sourceHash = ref.Hash()
+					found = true
+					break
+				}
+			}
+			
+			if !found {
+				return fmt.Errorf("source ref %s not found", sourceRef)
+			}
+		}
+
+		// Fetch the source commit to ensure we have it
+		fetchReq := &transport.FetchRequest{
+			Wants: []plumbing.Hash{sourceHash},
+			Depth: 0,
+		}
+
+		// Create a new connection for fetching
+		fetchConn, err := r.getOrCreateConnection(ctx)
+		if err != nil {
+			return fmt.Errorf("failed to get connection for fetch: %w", err)
+		}
+
+		err = fetchConn.Fetch(ctx, fetchReq)
+		if err != nil {
+			return fmt.Errorf("failed to fetch source commit: %w", err)
+		}
+
+		// The new branch will point to the same commit
+		commitHash = sourceHash
+	}
+
+	// Build push command to create the new branch
+	cmd := &packp.Command{
+		Name: plumbing.ReferenceName(refName),
+		Old:  plumbing.ZeroHash, // Creating a new ref
+		New:  commitHash,
+	}
+
+	// Create packfile with all objects
+	packfileReader, err := r.createPackfile(commitHash)
+	if err != nil {
+		return fmt.Errorf("failed to create packfile: %w", err)
+	}
+
+	// Build push request
+	pushReq := &transport.PushRequest{
+		Packfile: packfileReader,
+		Commands: []*packp.Command{cmd},
+	}
+
+	// Push to remote
+	err = conn.Push(ctx, pushReq)
+	if err != nil {
+		return fmt.Errorf("failed to push branch: %w", err)
+	}
+
+	// Invalidate cached connection since push changes remote state
+	r.invalidateConnection()
+
+	return nil
+}

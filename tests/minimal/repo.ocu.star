@@ -1,9 +1,7 @@
 repo_alias("minimal/repo")
 
-store.set(
-    store.fs(".store/state"),
-    intent=store.fs(".store/intent"),
-)
+state_store = store.local("minimal_state")
+intent_store = store.local("minimal_intent")
 
 def do_trigger(commit):
     print("Triggering work for repo at commit " + commit)

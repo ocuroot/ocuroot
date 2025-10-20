@@ -145,9 +145,14 @@ type StorageBackend struct {
 		PathPrefix   string            `json:"path_prefix,omitempty" starlark:"path_prefix,omitempty"`
 		CreateBranch bool              `json:"create_branch,omitempty" starlark:"create_branch,omitempty"`
 	} `json:"git,omitempty" starlark:"git,omitempty"`
+
 	Fs *struct {
 		Path string `json:"path" starlark:"path"`
 	} `json:"fs,omitempty" starlark:"fs,omitempty"`
+
+	Local *struct {
+		ID string `json:"id" starlark:"id"`
+	} `json:"local,omitempty" starlark:"local,omitempty"`
 }
 
 type StoreBackend interface {

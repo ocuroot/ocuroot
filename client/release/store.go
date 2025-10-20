@@ -1,11 +1,14 @@
 package release
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
 
+	"github.com/ocuroot/gittools"
 	"github.com/ocuroot/ocuroot/client"
+	"github.com/ocuroot/ocuroot/git"
 	"github.com/ocuroot/ocuroot/refs/refstore"
 	"github.com/ocuroot/ocuroot/sdk"
 )
@@ -88,16 +91,63 @@ func newRefStoreFromBackend(
 			return nil, fmt.Errorf("failed to create state store: %w", err)
 		}
 	}
-	if storeConfig.Git != nil {
-		gitUserName := "Ocuroot"
-		gitUserEmail := "contact@ocuroot.com"
-		if os.Getenv("OCUROOT_GIT_USER_NAME") != "" {
-			gitUserName = os.Getenv("OCUROOT_GIT_USER_NAME")
-		}
-		if os.Getenv("OCUROOT_GIT_USER_EMAIL") != "" {
-			gitUserEmail = os.Getenv("OCUROOT_GIT_USER_EMAIL")
+
+	gitUserName := "Ocuroot"
+	gitUserEmail := "contact@ocuroot.com"
+	if os.Getenv("OCUROOT_GIT_USER_NAME") != "" {
+		gitUserName = os.Getenv("OCUROOT_GIT_USER_NAME")
+	}
+	if os.Getenv("OCUROOT_GIT_USER_EMAIL") != "" {
+		gitUserEmail = os.Getenv("OCUROOT_GIT_USER_EMAIL")
+	}
+
+	if storeConfig.Local != nil {
+		statePath := filepath.Join(client.HomeDir(), "local_state", storeConfig.Local.ID, pathPrefix)
+
+		// Create an empty repo if it doesn't exist
+		if _, err := os.Stat(statePath); os.IsNotExist(err) {
+			if err := os.MkdirAll(statePath, 0755); err != nil {
+				return nil, fmt.Errorf("failed to create parent directories for state path %s: %w", statePath, err)
+			}
+			gitClient := gittools.Client{}
+			if _, err := gitClient.InitBare(statePath, "main"); err != nil {
+				return nil, fmt.Errorf("failed to initialize bare git repo at %s: %w", statePath, err)
+			}
+
+			// Use the new CreateBranch function to create the main branch
+			user := &git.GitUser{
+				Name:  gitUserName,
+				Email: gitUserEmail,
+			}
+			rg, err := git.NewRemoteGitWithUser("file://"+statePath, user)
+			if err != nil {
+				return nil, fmt.Errorf("failed to connect to bare repo: %w", err)
+			}
+			if err := rg.CreateBranch(context.Background(), "main", "", "Initial commit"); err != nil {
+				return nil, fmt.Errorf("failed to create main branch: %w", err)
+			}
 		}
 
+		store, err = refstore.NewGitRefStore(
+			filepath.Join(client.HomeDir(), "state"),
+			tags,
+			statePath,
+			"main",
+			refstore.GitRefStoreConfig{
+				PathPrefix: pathPrefix,
+				GitRepoConfig: refstore.GitRepoConfig{
+					CreateBranch: true,
+					GitUserName:  gitUserName,
+					GitUserEmail: gitUserEmail,
+				},
+			},
+		)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create state store: %w", err)
+		}
+	}
+
+	if storeConfig.Git != nil {
 		store, err = refstore.NewGitRefStore(
 			filepath.Join(client.HomeDir(), "state"),
 			tags,
