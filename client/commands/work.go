@@ -33,7 +33,7 @@ var WorkContinueCmd = &cobra.Command{
 		dryRun := cmd.Flag("dryrun").Changed
 		cmd.SilenceUsage = true
 
-		worker, err := work.NewWorker(ctx, ref)
+		worker, err := work.NewInRepoWorker(ctx, ref)
 		if err != nil {
 			return fmt.Errorf("failed to create worker: %w", err)
 		}
@@ -101,7 +101,7 @@ finally it will trigger work for other commits ('ocuroot work trigger').
 
 		cmd.SilenceUsage = true
 
-		worker, err := work.NewWorker(ctx, ref)
+		worker, err := work.NewInRepoWorker(ctx, ref)
 		if err != nil {
 			return fmt.Errorf("failed to create worker: %w", err)
 		}
@@ -165,7 +165,7 @@ var WorkTriggerCommand = &cobra.Command{
 			return fmt.Errorf("failed to get ref: %w", err)
 		}
 
-		w, err := work.NewWorker(ctx, ref)
+		w, err := work.NewInRepoWorker(ctx, ref)
 		if err != nil {
 			return fmt.Errorf("failed to create worker: %w", err)
 		}
@@ -179,7 +179,7 @@ var WorkTriggerCommand = &cobra.Command{
 		}
 		tc.State = tuiwork.WatchForStateUpdates(ctx, tc.State, workTui)
 
-		worker := &work.Worker{
+		worker := &work.InRepoWorker{
 			Tracker: tc,
 			Tui:     workTui,
 		}
@@ -230,7 +230,7 @@ var WorkOpsCmd = &cobra.Command{
 
 		cmd.SilenceUsage = true
 
-		worker, err := work.NewWorker(ctx, ref)
+		worker, err := work.NewInRepoWorker(ctx, ref)
 		if err != nil {
 			return fmt.Errorf("failed to create worker: %w", err)
 		}
@@ -286,7 +286,7 @@ finally it will trigger work for other commits ('ocuroot work trigger').
 
 		cmd.SilenceUsage = true
 
-		worker, err := work.NewWorker(ctx, ref)
+		worker, err := work.NewInRepoWorker(ctx, ref)
 		if err != nil {
 			return fmt.Errorf("failed to create worker: %w", err)
 		}

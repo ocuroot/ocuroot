@@ -53,7 +53,7 @@ var NewReleaseCmd = &cobra.Command{
 
 		cmd.SilenceUsage = true
 
-		worker, err := work.NewWorker(ctx, ref)
+		worker, err := work.NewInRepoWorker(ctx, ref)
 		if err != nil {
 			return err
 		}
@@ -149,7 +149,7 @@ var ContinueReleaseCmd = &cobra.Command{
 
 		cmd.SilenceUsage = true
 
-		worker, err := work.NewWorker(ctx, ref)
+		worker, err := work.NewInRepoWorker(ctx, ref)
 		if err != nil {
 			return err
 		}
@@ -192,7 +192,7 @@ var RetryReleaseCmd = &cobra.Command{
 
 		cmd.SilenceUsage = true
 
-		worker, err := work.NewWorker(ctx, ref)
+		worker, err := work.NewInRepoWorker(ctx, ref)
 		if err != nil {
 			return err
 		}
@@ -254,7 +254,7 @@ This involves loading state for environment lists, so the state and intent store
 
 		cmd.SilenceUsage = true
 
-		worker, err := work.NewWorker(ctx, ref)
+		worker, err := work.NewInRepoWorker(ctx, ref)
 		if err != nil {
 			return err
 		}

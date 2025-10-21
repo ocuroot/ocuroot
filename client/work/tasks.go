@@ -14,7 +14,7 @@ import (
 	"github.com/ocuroot/ocuroot/store/models"
 )
 
-func (w *Worker) ReadyRuns(ctx context.Context, req IdentifyWorkRequest) ([]Work, error) {
+func (w *InRepoWorker) ReadyRuns(ctx context.Context, req IdentifyWorkRequest) ([]Work, error) {
 	log.Info("Getting ready runs")
 
 	var out []Work
@@ -88,7 +88,7 @@ func (w *Worker) ReadyRuns(ctx context.Context, req IdentifyWorkRequest) ([]Work
 	return out, nil
 }
 
-func (w *Worker) CheckRun(ctx context.Context, ref string, req IdentifyWorkRequest) (bool, error) {
+func (w *InRepoWorker) CheckRun(ctx context.Context, ref string, req IdentifyWorkRequest) (bool, error) {
 	if req.StateChanges == nil {
 		return true, nil
 	}
@@ -143,7 +143,7 @@ func (w *Worker) CheckRun(ctx context.Context, ref string, req IdentifyWorkReque
 	return false, nil
 }
 
-func (w *Worker) CheckCommit(ctx context.Context, ref string, req IdentifyWorkRequest) (string, bool, error) {
+func (w *InRepoWorker) CheckCommit(ctx context.Context, ref string, req IdentifyWorkRequest) (string, bool, error) {
 	resolvedRef, err := w.Tracker.State.ResolveLink(ctx, ref)
 	if err != nil {
 		return "", false, fmt.Errorf("failed to resolve ref: %w", err)
@@ -168,7 +168,7 @@ func (w *Worker) CheckCommit(ctx context.Context, ref string, req IdentifyWorkRe
 	return r.Commit, valid, nil
 }
 
-func (w *Worker) ReconcilableDeployments(ctx context.Context, req IdentifyWorkRequest) ([]Work, error) {
+func (w *InRepoWorker) ReconcilableDeployments(ctx context.Context, req IdentifyWorkRequest) ([]Work, error) {
 	var out []Work
 
 	log.Info("Getting reconcilable deployments")
@@ -208,7 +208,7 @@ func (w *Worker) ReconcilableDeployments(ctx context.Context, req IdentifyWorkRe
 	return out, nil
 }
 
-func (w *Worker) Ops(ctx context.Context, req IdentifyWorkRequest) ([]Work, error) {
+func (w *InRepoWorker) Ops(ctx context.Context, req IdentifyWorkRequest) ([]Work, error) {
 	var out []Work
 
 	state := w.Tracker.State
@@ -257,7 +257,7 @@ func (w *Worker) Ops(ctx context.Context, req IdentifyWorkRequest) ([]Work, erro
 	return out, nil
 }
 
-func (w *Worker) reconcileDeployment(ctx context.Context, ref string, req IdentifyWorkRequest) (*refs.Ref, error) {
+func (w *InRepoWorker) reconcileDeployment(ctx context.Context, ref string, req IdentifyWorkRequest) (*refs.Ref, error) {
 	store := w.Tracker.State
 	var deployment models.Task
 	if err := store.Get(ctx, ref, &deployment); err != nil {

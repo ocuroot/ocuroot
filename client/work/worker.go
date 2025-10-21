@@ -19,7 +19,7 @@ import (
 	librelease "github.com/ocuroot/ocuroot/lib/release"
 )
 
-func NewWorker(ctx context.Context, ref refs.Ref) (w *Worker, err error) {
+func NewInRepoWorker(ctx context.Context, ref refs.Ref) (w *InRepoWorker, err error) {
 	workTui := tui.StartWorkTui()
 
 	defer func() {
@@ -28,7 +28,7 @@ func NewWorker(ctx context.Context, ref refs.Ref) (w *Worker, err error) {
 		}
 	}()
 
-	w = &Worker{
+	w = &InRepoWorker{
 		Tui: workTui,
 
 		StateChanges:  make(map[string]struct{}),
@@ -62,7 +62,7 @@ func NewWorker(ctx context.Context, ref refs.Ref) (w *Worker, err error) {
 	return w, nil
 }
 
-type Worker struct {
+type InRepoWorker struct {
 	Tracker  release.TrackerConfig
 	RepoInfo client.RepoInfo
 	RepoName string
@@ -96,11 +96,11 @@ type IdentifyWorkRequest struct {
 	StateChanges  map[string]struct{}
 }
 
-func (w *Worker) Cleanup() {
+func (w *InRepoWorker) Cleanup() {
 	w.Tui.Cleanup()
 }
 
-func (w *Worker) IdentifyWork(ctx context.Context, req IdentifyWorkRequest) ([]Work, error) {
+func (w *InRepoWorker) IdentifyWork(ctx context.Context, req IdentifyWorkRequest) ([]Work, error) {
 	var out []Work
 
 	diffs, err := w.Diff(ctx, req)
@@ -130,7 +130,7 @@ func (w *Worker) IdentifyWork(ctx context.Context, req IdentifyWorkRequest) ([]W
 	return out, nil
 }
 
-func (w *Worker) ExecuteWork(ctx context.Context, todos []Work) error {
+func (w *InRepoWorker) ExecuteWork(ctx context.Context, todos []Work) error {
 	log.Info("Applying intent diffs")
 	for _, t := range todos {
 		if t.WorkType == WorkTypeUpdate || t.WorkType == WorkTypeCreate || t.WorkType == WorkTypeDelete {
@@ -184,7 +184,7 @@ func (w *Worker) ExecuteWork(ctx context.Context, todos []Work) error {
 	return nil
 }
 
-func (w *Worker) runOp(ctx context.Context, ref string) error {
+func (w *InRepoWorker) runOp(ctx context.Context, ref string) error {
 	var err error
 
 	w.Tracker.Ref, err = refs.Parse(ref)
@@ -212,7 +212,7 @@ func (w *Worker) runOp(ctx context.Context, ref string) error {
 	return nil
 }
 
-func (w *Worker) continueRelease(ctx context.Context, workTui tui.Tui) error {
+func (w *InRepoWorker) continueRelease(ctx context.Context, workTui tui.Tui) error {
 	tracker, err := w.TrackerForExistingRelease(ctx)
 	if err != nil {
 		if errors.Is(err, refstore.ErrRefNotFound) {
@@ -233,7 +233,7 @@ func (w *Worker) continueRelease(ctx context.Context, workTui tui.Tui) error {
 	return nil
 }
 
-func (w *Worker) addRunForDeployment(ctx context.Context, ref string) error {
+func (w *InRepoWorker) addRunForDeployment(ctx context.Context, ref string) error {
 	state := w.Tracker.State
 
 	ref, err := refs.Reduce(ref, librelease.GlobDeployment)

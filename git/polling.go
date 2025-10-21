@@ -6,6 +6,49 @@ import (
 	"time"
 )
 
+type PollTarget struct {
+	Endpoint string
+	Branch   string
+}
+
+func PollMultiple(
+	ctx context.Context,
+	targets []PollTarget,
+	callback func(endpoint, hash string),
+	ticker <-chan time.Time,
+) error {
+	for _, target := range targets {
+		remote, err := NewRemoteGit(target.Endpoint)
+		if err != nil {
+			return err
+		}
+
+		type callBackConfig struct {
+			endpoint string
+			hash     string
+		}
+
+		callbacks := make(chan callBackConfig)
+
+		go PollRemote(ctx, remote, target.Branch, func(hash string) {
+			callbacks <- callBackConfig{
+				endpoint: target.Endpoint,
+				hash:     hash,
+			}
+		}, ticker)
+
+		for {
+			select {
+			case <-ctx.Done():
+				return nil
+			case config := <-callbacks:
+				callback(config.endpoint, config.hash)
+			}
+		}
+	}
+	return nil
+}
+
 func PollRemote(
 	ctx context.Context,
 	remote RemoteGit,

@@ -16,7 +16,7 @@ import (
 	"github.com/ocuroot/ocuroot/store/models"
 )
 
-func (w *Worker) ApplyIntent(ctx context.Context, ref refs.Ref) error {
+func (w *InRepoWorker) ApplyIntent(ctx context.Context, ref refs.Ref) error {
 	log.Info("Applying intent", "ref", ref.String())
 
 	switch ref.SubPathType {

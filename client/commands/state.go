@@ -37,7 +37,7 @@ var StateGetCmd = &cobra.Command{
 
 		cmd.SilenceUsage = true
 
-		w, err := work.NewWorker(ctx, ref)
+		w, err := work.NewInRepoWorker(ctx, ref)
 		if err != nil {
 			log.Error("Failed to create worker", "error", err)
 			return fmt.Errorf("failed to create worker: %w", err)
@@ -76,7 +76,7 @@ var StateMatchCmd = &cobra.Command{
 			return fmt.Errorf("failed to get ref: %w", err)
 		}
 
-		w, err := work.NewWorker(ctx, ref)
+		w, err := work.NewInRepoWorker(ctx, ref)
 		if err != nil {
 			return fmt.Errorf("failed to create worker: %w", err)
 		}
@@ -121,7 +121,7 @@ var StateDiffCmd = &cobra.Command{
 			return fmt.Errorf("failed to get ref: %w", err)
 		}
 
-		w, err := work.NewWorker(ctx, ref)
+		w, err := work.NewInRepoWorker(ctx, ref)
 		if err != nil {
 			return fmt.Errorf("failed to create worker: %w", err)
 		}
@@ -157,7 +157,7 @@ var StateDeleteIntentCmd = &cobra.Command{
 			return fmt.Errorf("failed to get ref: %w", err)
 		}
 
-		w, err := work.NewWorker(ctx, ref)
+		w, err := work.NewInRepoWorker(ctx, ref)
 		if err != nil {
 			return fmt.Errorf("failed to create worker: %w", err)
 		}
@@ -203,7 +203,7 @@ Set value to '-' to pass the value from stdin.
 			return fmt.Errorf("failed to get ref: %w", err)
 		}
 
-		w, err := work.NewWorker(ctx, ref)
+		w, err := work.NewInRepoWorker(ctx, ref)
 		if err != nil {
 			return fmt.Errorf("failed to create worker: %w", err)
 		}
@@ -269,7 +269,7 @@ var StateApplyIntentCmd = &cobra.Command{
 
 		cmd.SilenceUsage = true
 
-		worker, err := work.NewWorker(ctx, ref)
+		worker, err := work.NewInRepoWorker(ctx, ref)
 		if err != nil {
 			return fmt.Errorf("failed to create worker: %w", err)
 		}
@@ -301,7 +301,7 @@ var StateViewCmd = &cobra.Command{
 			return fmt.Errorf("failed to get ref: %w", err)
 		}
 
-		w, err := work.NewWorker(ctx, ref)
+		w, err := work.NewInRepoWorker(ctx, ref)
 		if err != nil {
 			return fmt.Errorf("failed to create worker: %w", err)
 		}

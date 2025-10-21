@@ -8,7 +8,7 @@ import (
 	"github.com/ocuroot/ocuroot/refs/refstore"
 )
 
-func (w *Worker) Cascade(ctx context.Context) error {
+func (w *InRepoWorker) Cascade(ctx context.Context) error {
 	log.Info("Cascading work", "StateChanges", w.StateChanges, "IntentChanges", w.IntentChanges)
 	for {
 		followOn, err := w.IdentifyWork(ctx, IdentifyWorkRequest{
@@ -34,7 +34,7 @@ func (w *Worker) Cascade(ctx context.Context) error {
 	return nil
 }
 
-func (w *Worker) RecordStateUpdates(ctx context.Context) error {
+func (w *InRepoWorker) RecordStateUpdates(ctx context.Context) error {
 
 	stateListener, err := refstore.ListenToStateChanges(
 		func(ctx context.Context, ref string) {

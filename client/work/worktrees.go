@@ -19,7 +19,7 @@ import (
 	"github.com/ricochet2200/go-disk-usage/du"
 )
 
-func (w *Worker) WorkerForWork(ctx context.Context, todo Work) (*Worker, func(), error) {
+func (w *InRepoWorker) WorkerForWork(ctx context.Context, todo Work) (*InRepoWorker, func(), error) {
 	if todo.Ref.Repo != w.RepoName {
 		wOut, cleanup, err := w.CopyInRepoClone(ctx, todo.Ref, todo.Ref.Repo, todo.Commit)
 		if err != nil {
@@ -69,7 +69,7 @@ func CloneRepo(ctx context.Context, repoRemotes []string, commit string) (string
 	return repoCloneDir, nil
 }
 
-func (w *Worker) CopyInRepoClone(ctx context.Context, ref refs.Ref, repoName, commit string) (*Worker, func(), error) {
+func (w *InRepoWorker) CopyInRepoClone(ctx context.Context, ref refs.Ref, repoName, commit string) (*InRepoWorker, func(), error) {
 	log.Info("Cloning repo", "ref", ref, "repoName", repoName, "commit", commit)
 
 	var repoInfo models.RepoConfig
@@ -145,7 +145,7 @@ func (w *Worker) CopyInRepoClone(ctx context.Context, ref refs.Ref, repoName, co
 	}, nil
 }
 
-func (w *Worker) CopyInWorktree(ctx context.Context, todo Work) (*Worker, func(), error) {
+func (w *InRepoWorker) CopyInWorktree(ctx context.Context, todo Work) (*InRepoWorker, func(), error) {
 	if err := os.MkdirAll(workTreeBaseDir(), 0755); err != nil {
 		return nil, nil, fmt.Errorf("failed to mkdir: %w", err)
 	}
@@ -172,7 +172,7 @@ func (w *Worker) CopyInWorktree(ctx context.Context, todo Work) (*Worker, func()
 		return nil, nil, fmt.Errorf("failed to add worktree: %w\nworkTreePath=%q, commit=%q, todo=%+v\n%v", err, workTreePath, todo.Commit, todo, string(stderr))
 	}
 
-	newWorker := &Worker{
+	newWorker := &InRepoWorker{
 		Tracker: w.Tracker,
 		Tui:     w.Tui,
 	}
@@ -199,7 +199,7 @@ func (w *Worker) CopyInWorktree(ctx context.Context, todo Work) (*Worker, func()
 	}, nil
 }
 
-func (w *Worker) checkSpaceForWorktree(repo *gittools.Repo, commit string) (bool, error) {
+func (w *InRepoWorker) checkSpaceForWorktree(repo *gittools.Repo, commit string) (bool, error) {
 	counts, stderr, err := repo.Client.Exec("ls-tree", "-r", "--format=%(objectsize)", commit)
 	if err != nil {
 		return false, fmt.Errorf("failed to get counts: %w\n%v", err, string(stderr))
@@ -223,7 +223,7 @@ func (w *Worker) checkSpaceForWorktree(repo *gittools.Repo, commit string) (bool
 	return usage.Free() > totalSize, nil
 }
 
-func (w *Worker) ExecuteWorkInCleanWorktrees(ctx context.Context, todos []Work) error {
+func (w *InRepoWorker) ExecuteWorkInCleanWorktrees(ctx context.Context, todos []Work) error {
 	log.Info("Applying intent diffs")
 	for _, t := range todos {
 		if t.WorkType == WorkTypeUpdate || t.WorkType == WorkTypeCreate || t.WorkType == WorkTypeDelete {

@@ -26,7 +26,7 @@ var PreviewCmd = &cobra.Command{
 			return fmt.Errorf("failed to get ref: %w", err)
 		}
 
-		w, err := work.NewWorker(ctx, ref)
+		w, err := work.NewInRepoWorker(ctx, ref)
 		if err != nil {
 			return fmt.Errorf("failed to create worker: %w", err)
 		}

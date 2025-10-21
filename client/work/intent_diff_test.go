@@ -110,7 +110,7 @@ func TestIntentDiffCustomRefs(t *testing.T) {
 	}
 
 	// Create worker and run diff
-	worker := &Worker{
+	worker := &InRepoWorker{
 		Tracker: release.TrackerConfig{
 			State:  stateStore,
 			Intent: intentStore,
@@ -283,7 +283,7 @@ func TestIntentDiffRepoFiltering(t *testing.T) {
 	}
 
 	// Test 1: No filtering (should include all repos)
-	worker := &Worker{
+	worker := &InRepoWorker{
 		Tracker: release.TrackerConfig{
 			State:  stateStore,
 			Intent: intentStore,

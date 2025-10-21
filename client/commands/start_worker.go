@@ -52,24 +52,22 @@ var WorkerCmd = &cobra.Command{
 			return fmt.Errorf("non-dev mode not yet implemented; use --dev flag for local repo")
 		}
 
-		// Create RemoteGit connection
-		remote, err := git.NewRemoteGit(repoURL)
-		if err != nil {
-			return fmt.Errorf("failed to connect to repository: %w", err)
-		}
-
 		log.Info("Starting worker", "branch", workerBranch, "interval", workerInterval)
 
 		// Create ticker for polling
 		ticker := time.NewTicker(workerInterval)
 
-		// Callback for when new commits are detected
-		callback := func(hash string) {
-			commitHandler(repoURL, hash)
-		}
-
-		// Start polling
-		err = git.PollRemote(ctx, remote, workerBranch, callback, ticker.C)
+		err := git.PollMultiple(
+			ctx,
+			[]git.PollTarget{
+				{
+					Endpoint: repoURL,
+					Branch:   workerBranch,
+				},
+			},
+			commitHandler,
+			ticker.C,
+		)
 		if err != nil && err != context.Canceled {
 			return fmt.Errorf("polling error: %w", err)
 		}
@@ -106,7 +104,7 @@ func commitHandler(remote string, hash string) {
 		return
 	}
 
-	worker, err := work.NewWorker(context.Background(), ref)
+	worker, err := work.NewInRepoWorker(context.Background(), ref)
 	if err != nil {
 		log.Error("failed to create worker", "hash", hash, "err", err)
 		return

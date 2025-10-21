@@ -19,7 +19,7 @@ import (
 
 const intentCommitRecordRef = "@/push/intent_commit"
 
-func (w *Worker) PushWork(ctx context.Context) ([]Work, error) {
+func (w *InRepoWorker) PushWork(ctx context.Context) ([]Work, error) {
 	if w.Index == nil {
 		// Add all configs to the index
 		w.Index = &models.PushIndex{
@@ -62,7 +62,7 @@ func (w *Worker) PushWork(ctx context.Context) ([]Work, error) {
 	return out, nil
 }
 
-func (w *Worker) filterReleaseWorkByFile(in []Work) ([]Work, error) {
+func (w *InRepoWorker) filterReleaseWorkByFile(in []Work) ([]Work, error) {
 	// Filter work by ignore patterns
 	var ignoreGlobs []libglob.Glob
 	for _, ignore := range w.Settings.ReleaseIgnore {
@@ -91,7 +91,7 @@ func (w *Worker) filterReleaseWorkByFile(in []Work) ([]Work, error) {
 	return filteredOut, nil
 }
 
-func (w *Worker) pushWorkFromSourceRepo(ctx context.Context) ([]Work, error) {
+func (w *InRepoWorker) pushWorkFromSourceRepo(ctx context.Context) ([]Work, error) {
 	var (
 		files []string
 		err   error
@@ -168,7 +168,7 @@ func (w *Worker) pushWorkFromSourceRepo(ctx context.Context) ([]Work, error) {
 	return out, nil
 }
 
-func (w *Worker) pushWorkFromIntentRepo(ctx context.Context) ([]Work, error) {
+func (w *InRepoWorker) pushWorkFromIntentRepo(ctx context.Context) ([]Work, error) {
 	if w.Index.PreviousCommit == "" {
 		log.Info("No previous commit, will analyze all state")
 		work, err := w.Diff(ctx, IdentifyWorkRequest{})
@@ -228,7 +228,7 @@ func (w *Worker) pushWorkFromIntentRepo(ctx context.Context) ([]Work, error) {
 	return out, nil
 }
 
-func (w *Worker) Push(ctx context.Context) error {
+func (w *InRepoWorker) Push(ctx context.Context) error {
 	if len(w.RepoInfo.UncommittedChanges) > 0 {
 		return fmt.Errorf(
 			"you have uncommitted changes, please commit or stash them before running push\n\nChanged files:\n%v",
@@ -288,7 +288,7 @@ func (w *Worker) Push(ctx context.Context) error {
 	return nil
 }
 
-func (w *Worker) getChangedFiles(ctx context.Context) ([]string, error) {
+func (w *InRepoWorker) getChangedFiles(ctx context.Context) ([]string, error) {
 	cmd := exec.Command("git", "diff", "--name-only", w.Index.PreviousCommit, w.Index.Commit)
 	cmd.Dir = w.RepoInfo.Root
 	out, err := cmd.Output()
@@ -317,7 +317,7 @@ func (w *Worker) getChangedFiles(ctx context.Context) ([]string, error) {
 	return changedFiles, nil
 }
 
-func (w *Worker) getWatchFiles(ctx context.Context, work Work) ([]string, error) {
+func (w *InRepoWorker) getWatchFiles(ctx context.Context, work Work) ([]string, error) {
 	releaseMatch, err := w.Tracker.State.Match(ctx, fmt.Sprintf("%v/@*/commit/%v", work.Ref.String(), work.Commit))
 	if err != nil {
 		return nil, err
@@ -362,7 +362,7 @@ func (w *Worker) getWatchFiles(ctx context.Context, work Work) ([]string, error)
 	return watchFiles, nil
 }
 
-func (w *Worker) startRelease(ctx context.Context, ref refs.Ref) error {
+func (w *InRepoWorker) startRelease(ctx context.Context, ref refs.Ref) error {
 	w.Tracker.Ref = ref
 	tracker, environments, err := w.TrackerForNewRelease(ctx)
 	if err != nil {

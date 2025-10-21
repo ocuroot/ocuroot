@@ -33,7 +33,7 @@ Example:
 
 		cmd.SilenceUsage = true
 
-		w, err := work.NewWorker(ctx, ref)
+		w, err := work.NewInRepoWorker(ctx, ref)
 		if err != nil {
 			return fmt.Errorf("failed to create worktree: %w", err)
 		}

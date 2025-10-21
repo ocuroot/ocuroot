@@ -60,7 +60,7 @@ Examples:
 // runSingleCommand executes a single Starlark command and exits
 func runSingleCommand(ctx context.Context, filePath string, command string) error {
 	// Get tracker config to load repo.ocu.star and set up state store
-	w, err := work.NewWorker(ctx, refs.Ref{
+	w, err := work.NewInRepoWorker(ctx, refs.Ref{
 		Repo:     "preview.git",
 		Filename: filePath,
 	})
@@ -162,7 +162,7 @@ func runSingleCommand(ctx context.Context, filePath string, command string) erro
 
 func runStarlarkReplWithFile(ctx context.Context, filePath string) error {
 	// Get tracker config to load repo.ocu.star and set up state store
-	w, err := work.NewWorker(ctx, refs.Ref{
+	w, err := work.NewInRepoWorker(ctx, refs.Ref{
 		Repo:     "preview.git",
 		Filename: filePath,
 	})

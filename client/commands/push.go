@@ -24,7 +24,7 @@ var PushCmd = &cobra.Command{
 			return err
 		}
 
-		worker, err := work.NewWorker(ctx, ref)
+		worker, err := work.NewInRepoWorker(ctx, ref)
 		if err != nil {
 			return err
 		}

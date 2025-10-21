@@ -23,7 +23,7 @@ import (
 	librelease "github.com/ocuroot/ocuroot/lib/release"
 )
 
-func (w *Worker) InitTrackerFromStateRepo(ctx context.Context, ref refs.Ref, wd, storeRootPath string) error {
+func (w *InRepoWorker) InitTrackerFromStateRepo(ctx context.Context, ref refs.Ref, wd, storeRootPath string) error {
 	fs, err := refstore.NewFSRefStore(storeRootPath, stateTags)
 	if err != nil {
 		return fmt.Errorf("failed to create fs ref store: %w", err)
@@ -110,7 +110,7 @@ func (w *Worker) InitTrackerFromStateRepo(ctx context.Context, ref refs.Ref, wd,
 	return fmt.Errorf("failed to init tracker from state repo\n%v", errorsByRepo)
 }
 
-func (w *Worker) InitTrackerFromSourceRepo(ctx context.Context, ref refs.Ref, wd, repoRootPath string, saveConfig bool) error {
+func (w *InRepoWorker) InitTrackerFromSourceRepo(ctx context.Context, ref refs.Ref, wd, repoRootPath string, saveConfig bool) error {
 	re := tuiwork.GetRepoEvent(repoRootPath, ref, w.Tui, tuiwork.WorkStatusRunning)
 	w.Tui.UpdateTask(re)
 	tLog := tuiwork.TuiLoggerForRepo(w.Tui, repoRootPath, ref)
@@ -229,7 +229,7 @@ func (w *Worker) InitTrackerFromSourceRepo(ctx context.Context, ref refs.Ref, wd
 	return nil
 }
 
-func (w *Worker) TrackerForNewRelease(ctx context.Context) (*librelease.ReleaseTracker, []sdk.Environment, error) {
+func (w *InRepoWorker) TrackerForNewRelease(ctx context.Context) (*librelease.ReleaseTracker, []sdk.Environment, error) {
 	var err error
 
 	tc := w.Tracker
@@ -294,7 +294,7 @@ func (w *Worker) TrackerForNewRelease(ctx context.Context) (*librelease.ReleaseT
 	return tracker, nil, nil
 }
 
-func (w *Worker) TrackerForExistingRelease(ctx context.Context) (*librelease.ReleaseTracker, error) {
+func (w *InRepoWorker) TrackerForExistingRelease(ctx context.Context) (*librelease.ReleaseTracker, error) {
 	tc := w.Tracker
 
 	backend, _ := release.NewBackend(tc)

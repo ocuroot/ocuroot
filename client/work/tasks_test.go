@@ -216,7 +216,7 @@ func TestReadyRuns(t *testing.T) {
 	}
 
 	// Create worker and test ReadyRuns
-	worker := &Worker{
+	worker := &InRepoWorker{
 		Tracker: release.TrackerConfig{
 			State: stateStore,
 		},
@@ -391,7 +391,7 @@ func TestReadyRunsRepoFiltering(t *testing.T) {
 	}
 
 	// Test without filtering (should find all runs)
-	worker := &Worker{
+	worker := &InRepoWorker{
 		Tracker: release.TrackerConfig{
 			State: stateStore,
 		},
@@ -509,7 +509,7 @@ func TestReadyRunsCommitFiltering(t *testing.T) {
 		}
 	}
 
-	worker := &Worker{
+	worker := &InRepoWorker{
 		Tracker: release.TrackerConfig{
 			State:  stateStore,
 			Ref:    mustParseRef(targetRepo + "/-/release1"),

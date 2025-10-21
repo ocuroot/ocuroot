@@ -110,7 +110,7 @@ func previewHandler(ctx context.Context, request mcp.CallToolRequest) (*mcp.Call
 	fmt.Println("repo: ", repoRootPath)
 	fmt.Println("ref: ", ref)
 
-	w, err := work.NewWorker(ctx, ref)
+	w, err := work.NewInRepoWorker(ctx, ref)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create worker: %w", err)
 	}

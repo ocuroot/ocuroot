@@ -15,7 +15,7 @@ import (
 	"go.starlark.net/starlark"
 )
 
-func (w *Worker) TriggerWork(ctx context.Context, todos []Work) error {
+func (w *InRepoWorker) TriggerWork(ctx context.Context, todos []Work) error {
 	type repoCommit struct {
 		Repo   string
 		Commit string
@@ -39,7 +39,7 @@ func (w *Worker) TriggerWork(ctx context.Context, todos []Work) error {
 	return nil
 }
 
-func (w *Worker) TriggerAll(ctx context.Context) error {
+func (w *InRepoWorker) TriggerAll(ctx context.Context) error {
 	log.Info("Triggering in intent mode")
 	// Match repo config files to identify unique repos
 	mr := "**/-/repo.ocu.star/@"
@@ -71,7 +71,7 @@ func (w *Worker) TriggerAll(ctx context.Context) error {
 	return nil
 }
 
-func (w *Worker) RepoConfigFromState(ctx context.Context, repo string) (starlark.StringDict, *local.BackendOutputs, error) {
+func (w *InRepoWorker) RepoConfigFromState(ctx context.Context, repo string) (starlark.StringDict, *local.BackendOutputs, error) {
 	configRef := repo + "/-/repo.ocu.star/@"
 
 	configWithCommit, err := w.Tracker.State.ResolveLink(ctx, configRef)
@@ -102,7 +102,7 @@ func (w *Worker) RepoConfigFromState(ctx context.Context, repo string) (starlark
 	return globals, be, nil
 }
 
-func (w *Worker) TriggerCommit(ctx context.Context, repo, commit string) error {
+func (w *InRepoWorker) TriggerCommit(ctx context.Context, repo, commit string) error {
 	tuiEvent := tuiwork.GetTriggerEvent(repo, commit, w.Tui, tuiwork.TriggerStatusRunning, w.Tracker)
 	w.Tui.UpdateTask(tuiEvent)
 
