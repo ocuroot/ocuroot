@@ -2,6 +2,7 @@ package refstore
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 )
 
@@ -28,12 +29,6 @@ type Store interface {
 	GetLinks(ctx context.Context, ref string) ([]string, error)
 	ResolveLink(ctx context.Context, ref string) (string, error)
 
-	// Dependencies track dependency relationships between refs
-	AddDependency(ctx context.Context, ref string, dependency string) error
-	RemoveDependency(ctx context.Context, ref string, dependency string) error
-	GetDependencies(ctx context.Context, ref string) ([]string, error)
-	GetDependants(ctx context.Context, ref string) ([]string, error)
-
 	Close() error
 }
 
@@ -45,4 +40,20 @@ type StoreInfo struct {
 
 type MatchOptions struct {
 	NoLinks bool
+}
+
+type StorageKind string
+
+const (
+	StorageKindRef  StorageKind = "ref"
+	StorageKindLink StorageKind = "link"
+)
+
+type StorageObject struct {
+	Kind        StorageKind     `json:"kind"`
+	BodyType    string          `json:"body_type,omitempty"`
+	CreateStack []string        `json:"create_stack,omitempty"`
+	SetStack    []string        `json:"set_stack,omitempty"`
+	Links       []string        `json:"links,omitempty"`
+	Body        json.RawMessage `json:"body"`
 }

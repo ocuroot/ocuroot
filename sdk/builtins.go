@@ -43,7 +43,7 @@ func resolveVersionAlias(version string) string {
 	// Always use semver library for version resolution - it handles exact versions,
 	// wildcards, and constraints uniformly
 	resolved := resolveVersionConstraint(version)
-	
+
 	// Handle exact version matching - check if it's a 0.3.x version (where x is any number)
 	// This provides backward compatibility for the specific 0.3.x -> 0.3.0 aliasing
 	if resolved == version && strings.HasPrefix(version, "0.3.") && version != "0.3.0" {
@@ -55,7 +55,7 @@ func resolveVersionAlias(version string) string {
 			}
 		}
 	}
-	
+
 	return resolved
 }
 
@@ -63,7 +63,7 @@ func resolveVersionAlias(version string) string {
 func resolveVersionConstraint(constraint string) string {
 	// Get available SDK versions
 	availableVersions := AvailableVersions()
-	
+
 	// Handle semver constraints including wildcards (x, X, *), ranges (>=, ~, ^), etc.
 	// The semver library natively supports wildcards, so no custom handling needed
 	c, err := semver.NewConstraint(constraint)
@@ -71,7 +71,7 @@ func resolveVersionConstraint(constraint string) string {
 		// If constraint parsing fails, return original version
 		return constraint
 	}
-	
+
 	// Find the best matching version
 	var bestMatch *semver.Version
 	for _, v := range availableVersions {
@@ -79,18 +79,18 @@ func resolveVersionConstraint(constraint string) string {
 		if err != nil {
 			continue
 		}
-		
+
 		if c.Check(version) {
 			if bestMatch == nil || version.GreaterThan(bestMatch) {
 				bestMatch = version
 			}
 		}
 	}
-	
+
 	if bestMatch != nil {
 		return bestMatch.String()
 	}
-	
+
 	// Return original constraint if no match found
 	return constraint
 }
@@ -101,7 +101,7 @@ func getCurrentSDKVersion() string {
 	if binaryVersion == "dev" {
 		return "0.3.0" // Default for development
 	}
-	
+
 	// Extract major.minor from binary version
 	parts := strings.Split(binaryVersion, ".")
 	if len(parts) >= 2 {
@@ -114,7 +114,7 @@ func getCurrentSDKVersion() string {
 			return "0.3.0" // Fallback to current SDK version
 		}
 	}
-	
+
 	return "0.3.0" // Fallback
 }
 
@@ -204,7 +204,6 @@ func (c *configLoader) LoadBuiltins(ctx context.Context, version string) (starla
 		loading[module] = struct{}{}
 		defer delete(loading, module)
 
-		log.Debug("Loading module", "module", module)
 		data, err := Builtins.ReadFile(fmt.Sprintf("sdk/%s/%s", version, module))
 		if err != nil {
 			return nil, err

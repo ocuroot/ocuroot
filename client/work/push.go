@@ -246,6 +246,8 @@ func (w *InRepoWorker) Push(ctx context.Context) error {
 		return nil
 	}
 
+	log.Info("Push work", "work", toJSON(pushWork))
+
 	if err := w.ExecuteWorkInCleanWorktrees(ctx, pushWork); err != nil {
 		return err
 	}

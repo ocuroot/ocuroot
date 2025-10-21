@@ -47,7 +47,7 @@ func TestRemoteGitPush(t *testing.T) {
 	}
 
 	// Push to main branch
-	err = rg.Push(ctx, "refs/heads/main", objectsByPath, "Initial commit\n\nAdded test files")
+	err = rg.Push(ctx, "refs/heads/main", toGitObjects(objectsByPath), "Initial commit\n\nAdded test files")
 	if err != nil {
 		t.Fatalf("Push failed: %v", err)
 	}
@@ -97,6 +97,49 @@ func TestRemoteGitPush(t *testing.T) {
 	t.Log("Push test completed successfully")
 }
 
+func TestRemoteGitWithEmptyRepository(t *testing.T) {
+	ctx := context.Background()
+
+	// Create a bare repository under testdata for review
+	bareRepoPath := "testdata/empty-repository.git"
+
+	// Remove if it exists from previous run
+	exec.Command("rm", "-rf", bareRepoPath).Run()
+
+	// Initialize bare repository using git command
+	err := exec.Command("git", "init", "--bare", bareRepoPath).Run()
+	if err != nil {
+		t.Fatalf("Failed to create bare repo: %v", err)
+	}
+
+	// Connect to the bare repository with a user
+	user := &GitUser{
+		Name:  "Test Author",
+		Email: "author@example.com",
+	}
+
+	rg, err := NewRemoteGitWithUser("file://"+bareRepoPath, user)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	refs, err := rg.BranchRefs(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(refs) != 0 {
+		t.Fatalf("Expected 0 refs, got %d", len(refs))
+	}
+
+	refs, err = rg.TagRefs(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(refs) != 0 {
+		t.Fatalf("Expected 0 refs, got %d", len(refs))
+	}
+}
+
 func TestRemoteGitPushWithCustomUser(t *testing.T) {
 	ctx := context.Background()
 
@@ -128,7 +171,7 @@ func TestRemoteGitPushWithCustomUser(t *testing.T) {
 		"test.txt": "Hello from custom user\n",
 	}
 
-	err = rg.Push(ctx, "refs/heads/main", objectsByPath, "Custom user commit")
+	err = rg.Push(ctx, "refs/heads/main", toGitObjects(objectsByPath), "Custom user commit")
 	if err != nil {
 		t.Fatalf("Push failed: %v", err)
 	}
@@ -168,7 +211,7 @@ func TestRemoteGitInvalidUser(t *testing.T) {
 		"test.txt": "test content\n",
 	}
 
-	err = rg.Push(ctx, "refs/heads/main", objectsByPath, "Test commit")
+	err = rg.Push(ctx, "refs/heads/main", toGitObjects(objectsByPath), "Test commit")
 	if err == nil {
 		t.Error("Expected error for nil user, got nil")
 	}
@@ -184,7 +227,7 @@ func TestRemoteGitInvalidUser(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	err = rgInvalidName.Push(ctx, "refs/heads/main", objectsByPath, "Test commit")
+	err = rgInvalidName.Push(ctx, "refs/heads/main", toGitObjects(objectsByPath), "Test commit")
 	if err == nil {
 		t.Error("Expected error for missing name, got nil")
 	}
@@ -197,7 +240,7 @@ func TestRemoteGitInvalidUser(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	err = rgInvalidEmail.Push(ctx, "refs/heads/main", objectsByPath, "Test commit")
+	err = rgInvalidEmail.Push(ctx, "refs/heads/main", toGitObjects(objectsByPath), "Test commit")
 	if err == nil {
 		t.Error("Expected error for missing email, got nil")
 	}
@@ -240,7 +283,7 @@ func TestRemoteGitPushPreservesExistingContent(t *testing.T) {
 		"docs/guide.md": "# Guide\n\nOriginal guide content.\n",
 	}
 
-	err = rg.Push(ctx, "refs/heads/main", initialObjects, "Initial commit")
+	err = rg.Push(ctx, "refs/heads/main", toGitObjects(initialObjects), "Initial commit")
 	if err != nil {
 		t.Fatalf("Initial push failed: %v", err)
 	}
@@ -276,7 +319,7 @@ func TestRemoteGitPushPreservesExistingContent(t *testing.T) {
 		"docs/guide.md": "# Guide\n\nOriginal guide content.\n",                         // unchanged
 	}
 
-	err = rg.Push(ctx, "refs/heads/main", modifiedObjects, "Update README")
+	err = rg.Push(ctx, "refs/heads/main", toGitObjects(modifiedObjects), "Update README")
 	if err != nil {
 		t.Fatalf("Second push failed: %v", err)
 	}
@@ -394,7 +437,7 @@ func TestRemoteGitPushRaceConditionGitHub(t *testing.T) {
 	}
 
 	t.Log("Pushing initial commit...")
-	err = rg1.Push(ctx, "refs/heads/main", initialObjects, "Initial commit")
+	err = rg1.Push(ctx, "refs/heads/main", toGitObjects(initialObjects), "Initial commit")
 	if err != nil {
 		t.Fatalf("Initial push failed: %v", err)
 	}
@@ -426,7 +469,7 @@ func TestRemoteGitPushRaceConditionGitHub(t *testing.T) {
 	}
 
 	t.Log("Pushing conflicting commit...")
-	err = rg2.Push(ctx, "refs/heads/main", conflictingObjects, "Conflicting commit")
+	err = rg2.Push(ctx, "refs/heads/main", toGitObjects(conflictingObjects), "Conflicting commit")
 	if err != nil {
 		t.Fatalf("Conflicting push failed: %v", err)
 	}
@@ -461,7 +504,7 @@ func TestRemoteGitPushRaceConditionGitHub(t *testing.T) {
 
 	// Push with the stale initial commit hash (convert string to plumbing.Hash)
 	initialHash := plumbing.NewHash(initialCommit)
-	err = rg1Impl.pushWithStaleRef(ctx, "refs/heads/main", ourObjects, "Our commit (should fail)", initialHash)
+	err = rg1Impl.pushWithStaleRef(ctx, "refs/heads/main", toGitObjects(ourObjects), "Our commit (should fail)", initialHash)
 	t.Logf("Push returned with error: %v", err)
 
 	// With a real Git server (GitHub), this SHOULD fail
@@ -554,7 +597,7 @@ func TestRemoteGitPushRaceCondition(t *testing.T) {
 	}
 
 	t.Log("Pushing initial commit...")
-	err = rg.Push(ctx, "refs/heads/main", initialObjects, "Initial commit")
+	err = rg.Push(ctx, "refs/heads/main", toGitObjects(initialObjects), "Initial commit")
 	if err != nil {
 		t.Fatalf("Initial push failed: %v", err)
 	}
@@ -586,7 +629,7 @@ func TestRemoteGitPushRaceCondition(t *testing.T) {
 	}
 
 	t.Log("Pushing conflicting commit...")
-	err = rgOtherUser.Push(ctx, "refs/heads/main", conflictingObjects, "Conflicting commit")
+	err = rgOtherUser.Push(ctx, "refs/heads/main", toGitObjects(conflictingObjects), "Conflicting commit")
 	if err != nil {
 		t.Fatalf("Conflicting push failed: %v", err)
 	}
@@ -610,7 +653,7 @@ func TestRemoteGitPushRaceCondition(t *testing.T) {
 	}
 
 	t.Log("Attempting to push our commit (should fail due to race)...")
-	err = rg.Push(ctx, "refs/heads/main", ourObjects, "Our commit (should fail)")
+	err = rg.Push(ctx, "refs/heads/main", toGitObjects(ourObjects), "Our commit (should fail)")
 	t.Logf("Push returned with error: %v", err)
 
 	// With file:// protocol, this will succeed (no atomic ref enforcement)
@@ -855,7 +898,7 @@ func TestGetObjectWithDeepNesting(t *testing.T) {
 	}
 
 	// Push the structure
-	err = rg.Push(ctx, "refs/heads/main", objectsByPath, "Create deep structure")
+	err = rg.Push(ctx, "refs/heads/main", toGitObjects(objectsByPath), "Create deep structure")
 	if err != nil {
 		t.Fatalf("Push failed: %v", err)
 	}
@@ -932,17 +975,17 @@ func TestGetObjectWithBinaryContent(t *testing.T) {
 	})
 
 	objectsByPath := map[string]string{
-		"image.png":         binaryData,
-		"text.txt":          "Normal text\n",
-		"data/binary.dat":   string([]byte{0x00, 0xFF, 0x00, 0xFF, 0xAA, 0x55}),
-		"empty.txt":         "",
-		"whitespace.txt":    "   \n\t\n   ",
-		"unicode.txt":       "Hello 世界 🌍\n",
-		"large.txt":         strings.Repeat("Line of text\n", 1000),
+		"image.png":       binaryData,
+		"text.txt":        "Normal text\n",
+		"data/binary.dat": string([]byte{0x00, 0xFF, 0x00, 0xFF, 0xAA, 0x55}),
+		"empty.txt":       "",
+		"whitespace.txt":  "   \n\t\n   ",
+		"unicode.txt":     "Hello 世界 🌍\n",
+		"large.txt":       strings.Repeat("Line of text\n", 1000),
 	}
 
 	// Push the content
-	err = rg.Push(ctx, "refs/heads/main", objectsByPath, "Add binary and special content")
+	err = rg.Push(ctx, "refs/heads/main", toGitObjects(objectsByPath), "Add binary and special content")
 	if err != nil {
 		t.Fatalf("Push failed: %v", err)
 	}
@@ -1011,12 +1054,12 @@ func TestGetObjectAfterMultipleCommits(t *testing.T) {
 
 	// First commit
 	commit1Objects := map[string]string{
-		"file1.txt": "Version 1\n",
-		"file2.txt": "Original\n",
+		"file1.txt":     "Version 1\n",
+		"file2.txt":     "Original\n",
 		"dir/file3.txt": "Nested v1\n",
 	}
 
-	err = rg.Push(ctx, "refs/heads/main", commit1Objects, "First commit")
+	err = rg.Push(ctx, "refs/heads/main", toGitObjects(commit1Objects), "First commit")
 	if err != nil {
 		t.Fatalf("First push failed: %v", err)
 	}
@@ -1035,7 +1078,7 @@ func TestGetObjectAfterMultipleCommits(t *testing.T) {
 		"new.txt":       "New file\n",
 	}
 
-	err = rg.Push(ctx, "refs/heads/main", commit2Objects, "Second commit")
+	err = rg.Push(ctx, "refs/heads/main", toGitObjects(commit2Objects), "Second commit")
 	if err != nil {
 		t.Fatalf("Second push failed: %v", err)
 	}
@@ -1096,8 +1139,11 @@ func TestGetObjectAfterMultipleCommits(t *testing.T) {
 	}
 
 	// Verify new file only exists in commit 2
-	_, err = tree1.NodeAtPath("new.txt")
-	if err == nil {
+	node, err := tree1.NodeAtPath("new.txt")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if node != nil {
 		t.Error("new.txt should not exist in commit 1")
 	}
 
@@ -1193,11 +1239,11 @@ func TestGetTreeWithConnectionInvalidation(t *testing.T) {
 
 	// Push with first connection
 	objectsByPath := map[string]string{
-		"file1.txt": "Content 1\n",
+		"file1.txt":     "Content 1\n",
 		"dir/file2.txt": "Content 2\n",
 	}
 
-	err = rg1.Push(ctx, "refs/heads/main", objectsByPath, "Initial commit")
+	err = rg1.Push(ctx, "refs/heads/main", toGitObjects(objectsByPath), "Initial commit")
 	if err != nil {
 		t.Fatalf("Push failed: %v", err)
 	}
@@ -1252,4 +1298,88 @@ func TestGetTreeWithConnectionInvalidation(t *testing.T) {
 	}
 
 	t.Log("Connection invalidation test completed successfully")
+}
+
+func TestGetCommitMessage(t *testing.T) {
+	ctx := context.Background()
+
+	// Create a bare repository for testing
+	bareRepoPath := "testdata/commit-message-test-repo.git"
+
+	// Remove if it exists from previous run
+	exec.Command("rm", "-rf", bareRepoPath).Run()
+
+	// Initialize bare repository
+	err := exec.Command("git", "init", "--bare", bareRepoPath).Run()
+	if err != nil {
+		t.Fatalf("Failed to create bare repo: %v", err)
+	}
+
+	// Connect with a user
+	user := &GitUser{
+		Name:  "Test Author",
+		Email: "author@example.com",
+	}
+
+	rg, err := NewRemoteGitWithUser("file://"+bareRepoPath, user)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Create test content and push with a specific commit message
+	objectsByPath := map[string]string{
+		"README.md": "# Test\n",
+	}
+
+	commitMessage := "Initial commit\n\nThis is a detailed commit message\nwith multiple lines."
+
+	err = rg.Push(ctx, "refs/heads/main", toGitObjects(objectsByPath), commitMessage)
+	if err != nil {
+		t.Fatalf("Push failed: %v", err)
+	}
+
+	// Get the commit hash
+	refs, err := rg.BranchRefs(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if len(refs) != 1 {
+		t.Fatalf("Expected 1 ref, got %d", len(refs))
+	}
+
+	commitHash := refs[0].Hash
+
+	// Test GetCommitMessage
+	message, err := rg.GetCommitMessage(ctx, commitHash)
+	if err != nil {
+		t.Fatalf("GetCommitMessage failed: %v", err)
+	}
+
+	if message != commitMessage {
+		t.Errorf("Commit message mismatch:\nExpected: %q\nGot: %q", commitMessage, message)
+	}
+
+	// Test with a new connection to ensure it fetches properly
+	rg2, err := NewRemoteGitWithUser("file://"+bareRepoPath, user)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	message2, err := rg2.GetCommitMessage(ctx, commitHash)
+	if err != nil {
+		t.Fatalf("GetCommitMessage with new connection failed: %v", err)
+	}
+
+	if message2 != commitMessage {
+		t.Errorf("Commit message mismatch with new connection:\nExpected: %q\nGot: %q", commitMessage, message2)
+	}
+
+	// Test with invalid hash
+	_, err = rg.GetCommitMessage(ctx, "invalid-hash")
+	if err == nil {
+		t.Error("Expected error for invalid hash, got nil")
+	}
+
+	t.Log("GetCommitMessage test completed successfully")
 }

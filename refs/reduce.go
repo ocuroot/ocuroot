@@ -2,6 +2,7 @@ package refs
 
 import (
 	"errors"
+	"fmt"
 	"path"
 	"strings"
 
@@ -17,7 +18,7 @@ func Reduce(ref string, glob libglob.Glob) (string, error) {
 		if strings.Contains(ref, "@") {
 			pr, err := Parse(ref)
 			if err != nil {
-				return "", err
+				return "", fmt.Errorf("reducing %v: %w", ref, err)
 			}
 			if glob.Match(pr.String()) {
 				return pr.String(), nil

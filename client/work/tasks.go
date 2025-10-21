@@ -45,7 +45,7 @@ func (w *InRepoWorker) ReadyRuns(ctx context.Context, req IdentifyWorkRequest) (
 		// Reduce the status ref back to the run ref
 		runRef, err := refs.Reduce(ref, release.GlobRun)
 		if err != nil {
-			return nil, fmt.Errorf("failed to reduce ref: %w", err)
+			return nil, err
 		}
 
 		// Filter by commit as needed
@@ -95,7 +95,7 @@ func (w *InRepoWorker) CheckRun(ctx context.Context, ref string, req IdentifyWor
 
 	runRef, err := refs.Reduce(ref, release.GlobRun)
 	if err != nil {
-		return false, fmt.Errorf("failed to reduce ref: %w", err)
+		return false, err
 	}
 
 	// Always attempt to execute runs we created
@@ -151,7 +151,7 @@ func (w *InRepoWorker) CheckCommit(ctx context.Context, ref string, req Identify
 
 	releaseRef, err := refs.Reduce(resolvedRef, release.GlobRelease)
 	if err != nil {
-		return "", false, fmt.Errorf("failed to reduce ref: %w", err)
+		return "", false, err
 	}
 	var r release.ReleaseInfo
 	if err := w.Tracker.State.Get(ctx, releaseRef, &r); err != nil {

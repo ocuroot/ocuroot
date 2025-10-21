@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -202,8 +203,24 @@ func GetRepoURL(repoRootPath string) (string, error) {
 		return "", fmt.Errorf("failed to get repo URL: %w", err)
 	}
 	repoURL = strings.TrimRight(repoURL, "\n")
-	repoURL = refstore.GitURLToValidPath(repoURL)
+	repoURL = GitURLToValidPath(repoURL)
 	return repoURL, nil
+}
+
+func GitURLToValidPath(gitURL string) string {
+	gitURL = strings.TrimSuffix(gitURL, ".git")
+
+	if strings.HasPrefix(gitURL, "git@") {
+		gitURL := strings.TrimPrefix(gitURL, "git@")
+		gitURL = strings.ReplaceAll(gitURL, ":", "/")
+		return gitURL
+	}
+
+	gu, err := url.Parse(gitURL)
+	if err != nil {
+		return gitURL
+	}
+	return fmt.Sprintf("%s/%s", gu.Host, strings.TrimPrefix(gu.Path, "/"))
 }
 
 func getRepoBranch(repoRootPath string) (string, error) {

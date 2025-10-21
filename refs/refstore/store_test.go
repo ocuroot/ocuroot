@@ -4,7 +4,10 @@ import (
 	"context"
 	"fmt"
 	"path/filepath"
+	"strings"
 	"testing"
+
+	"github.com/google/go-cmp/cmp"
 )
 
 func DoTestStore(t *testing.T, store Store) {
@@ -14,11 +17,11 @@ func DoTestStore(t *testing.T, store Store) {
 	t.Run("link", func(t *testing.T) {
 		testStoreLink(t, store)
 	})
-	t.Run("dependencies", func(t *testing.T) {
-		testStoreDependencies(t, store)
-	})
 	t.Run("fragments", func(t *testing.T) {
 		testStoreFragments(t, store)
+	})
+	t.Run("transaction", func(t *testing.T) {
+		testStoreTransactions(t, store)
 	})
 }
 
@@ -31,18 +34,21 @@ func testStoreSetGet(t *testing.T, store Store) {
 
 	var total int = 5
 
+	var refSet = make(map[string]struct{})
 	for i := 0; i < total; i++ {
 		err := store.Set(ctx, refFromInt(i), fmt.Sprintf("value%d", i))
 		if err != nil {
 			t.Errorf("failed to set key%d: %v", i, err)
 		}
+		refSet[refFromInt(i)] = struct{}{}
 	}
 
 	for i := 0; i < total; i++ {
 		var got string
-		err := store.Get(ctx, refFromInt(i), &got)
+		r := refFromInt(i)
+		err := store.Get(ctx, r, &got)
 		if err != nil {
-			t.Errorf("failed to get key%d: %v", i, err)
+			t.Errorf("failed to get key%d (%v): %v", i, r, err)
 		}
 		if got != fmt.Sprintf("value%d", i) {
 			t.Errorf("unexpected value for key%d: got %q, want %q", i, got, fmt.Sprintf("value%d", i))
@@ -56,6 +62,14 @@ func testStoreSetGet(t *testing.T, store Store) {
 	}
 	if len(matches) != total {
 		t.Errorf("unexpected number of matches: got %d, want %d", len(matches), total)
+	}
+	for _, match := range matches {
+		if !strings.HasPrefix(match, "github.com/example/repo.git/path/to/package/@/") {
+			t.Errorf("ref was not a match: got %q, want prefix %q", match, "github.com/example/repo.git/path/to/package/@/")
+		}
+		if _, exists := refSet[match]; !exists {
+			t.Errorf("ref was not in ref set: got %q", match)
+		}
 	}
 
 	for i := 0; i < total; i++ {
@@ -185,7 +199,7 @@ func testStoreLink(t *testing.T, store Store) {
 		t.Errorf("failed to get links: %v", err)
 	}
 	if len(links) != 0 {
-		t.Errorf("unexpected links: got %v, want %v", links, []string{})
+		t.Errorf("link should have been removed when overwritten: got %v, want %v", links, []string{})
 	}
 
 	links, err = store.GetLinks(ctx, ref2)
@@ -205,74 +219,7 @@ func testStoreLink(t *testing.T, store Store) {
 		t.Errorf("failed to get links: %v", err)
 	}
 	if len(links) != 0 {
-		t.Errorf("unexpected links: got %v, want %v", links, []string{})
-	}
-}
-
-func testStoreDependencies(t *testing.T, store Store) {
-	ctx := context.Background()
-
-	ref1 := "github.com/example/repo.git/1/package/first/@/deploy/staging"
-	ref2 := "github.com/example/repo.git/second/package/@/deploy/production"
-	ref3 := "github.com/example/alternative.git/third/@/deploy/staging"
-
-	createTestRefs(t, store,
-		ref1, "value1",
-		ref2, "value2",
-		ref3, "value3",
-	)
-
-	err := store.AddDependency(ctx, ref1, ref2)
-	if err != nil {
-		t.Errorf("failed to add dependency: %v", err)
-	}
-	t.Cleanup(func() {
-		if err := store.RemoveDependency(ctx, ref1, ref2); err != nil {
-			t.Errorf("failed to remove dependency: %v", err)
-		}
-	})
-	err = store.AddDependency(ctx, ref1, ref3)
-	if err != nil {
-		t.Errorf("failed to add dependency: %v", err)
-	}
-	t.Cleanup(func() {
-		if err := store.RemoveDependency(ctx, ref1, ref3); err != nil {
-			t.Errorf("failed to remove dependency: %v", err)
-		}
-	})
-
-	// ref1 should have the above dependencies
-	gotDeps, err := store.GetDependencies(ctx, ref1)
-	if err != nil {
-		t.Errorf("failed to get dependencies: %v", err)
-	}
-	if len(gotDeps) != 2 {
-		t.Errorf("unexpected number of dependencies: got %d, want %d", len(gotDeps), 2)
-	}
-	if len(gotDeps) >= 2 && (gotDeps[0] != ref3 || gotDeps[1] != ref2) {
-		t.Errorf("unexpected dependencies: got %v, want %v", gotDeps, []string{ref2, ref3})
-	}
-
-	// ref2 should have no dependencies
-	gotDeps, err = store.GetDependencies(ctx, ref2)
-	if err != nil {
-		t.Errorf("failed to get dependencies: %v", err)
-	}
-	if len(gotDeps) != 0 {
-		t.Log(gotDeps)
-		t.Errorf("unexpected number of dependencies: got %d, want %d", len(gotDeps), 0)
-	}
-
-	// ref3 should have ref1 as a dependant
-	gotDeps, err = store.GetDependants(ctx, ref3)
-	if err != nil {
-		t.Errorf("failed to get dependants: %v", err)
-	}
-	if len(gotDeps) != 1 {
-		t.Errorf("unexpected number of dependants: got %d, want %d", len(gotDeps), 1)
-	}
-	if len(gotDeps) > 0 && gotDeps[0] != ref1 {
-		t.Errorf("unexpected dependant: got %v, want %v", gotDeps[0], ref1)
+		t.Errorf("overwritten link should be unaffected: got %v, want %v", links, []string{})
 	}
 }
 
@@ -307,5 +254,95 @@ func testStoreFragments(t *testing.T, store Store) {
 	}
 	if got != "value1" {
 		t.Errorf("unexpected value for key: got %q, want %q", got, "value1")
+	}
+}
+
+func testStoreTransactions(t *testing.T, store Store) {
+	setRef(t, store, "tns/a", "b")
+	setRef(t, store, "tns/todelete", "x")
+	setRef(t, store, "before/should/not/match", "x")
+
+	err := store.StartTransaction(t.Context(), "transaction1")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	checkRef(t, store, "tns/a", "b", "should see original value after starting transaction")
+
+	setRef(t, store, "tns/a", "c")
+	setRef(t, store, "tns/d", "e")
+
+	if err := store.Link(t.Context(), "tns/link", "tns/d"); err != nil {
+		t.Fatal(err)
+	}
+
+	checkRef(t, store, "tns/a", "c", "should see modified value mid-transaction")
+	checkRef(t, store, "tns/d", "e", "should see new value mid-transaction")
+	checkRef(t, store, "tns/link", "e", "link should be valid mid-transaction")
+
+	deleteRef(t, store, "tns/todelete")
+
+	checkRefNotExist(t, store, "tns/todelete", "deleted ref should not appear mid-transaction")
+
+	// Ephemeral ref, only exists in the transaction
+	setRef(t, store, "tns/ephemeral", "x")
+	deleteRef(t, store, "tns/ephemeral")
+	checkRefNotExist(t, store, "tns/ephemeral", "ephemeral ref should not exist after delete")
+
+	setRef(t, store, "after/should/not/match", "x")
+
+	matches, err := store.Match(t.Context(), "tns/**")
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := []string{"tns/a", "tns/d", "tns/link"}
+	if !cmp.Equal(matches, want) {
+		t.Errorf("matches did not reflect transaction:\n%s", cmp.Diff(want, matches))
+	}
+
+	if err := store.CommitTransaction(t.Context()); err != nil {
+		t.Fatal(err)
+	}
+
+	checkRef(t, store, "tns/a", "c", "should see modified value after commit")
+	checkRef(t, store, "tns/d", "e", "should see new value after commit")
+	checkRefNotExist(t, store, "tns/todelete", "deleted ref should not appear after commit")
+	checkRef(t, store, "tns/link", "e", "link should be valid after commit")
+
+	matches, err = store.Match(t.Context(), "tns/**")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !cmp.Equal(matches, want) {
+		t.Errorf("matches did not reflect committed transaction:\n%s", cmp.Diff(want, matches))
+	}
+}
+
+func setRef(t *testing.T, store Store, ref string, value any) {
+	if err := store.Set(t.Context(), ref, value); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func deleteRef(t *testing.T, store Store, ref string) {
+	if err := store.Delete(t.Context(), ref); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func checkRef(t *testing.T, store Store, ref string, expected any, message string) {
+	var v any
+	if err := store.Get(t.Context(), ref, &v); err != nil {
+		t.Fatalf("failed to get key: %v", err)
+	}
+	if !cmp.Equal(v, expected) {
+		t.Errorf("%s: got %v, want %v", message, v, expected)
+	}
+}
+
+func checkRefNotExist(t *testing.T, store Store, ref string, message string) {
+	var v any
+	if err := store.Get(t.Context(), ref, &v); err != ErrRefNotFound {
+		t.Fatalf("%v: %v", message, err)
 	}
 }

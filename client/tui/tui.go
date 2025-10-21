@@ -78,7 +78,8 @@ func (n *NullTui) Cleanup() error {
 }
 
 func StartWorkTui() Tui {
-	if !isatty.IsTerminal(os.Stdout.Fd()) {
+	// Use non-TTY mode if not a terminal or if OCUROOT_DEBUG is set
+	if !isatty.IsTerminal(os.Stdout.Fd()) || os.Getenv("OCUROOT_DEBUG") != "" {
 		return &NonTTYTui{tasks: make(map[string]Task)}
 	}
 

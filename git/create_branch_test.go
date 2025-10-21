@@ -98,7 +98,7 @@ func TestRemoteGitCreateBranchFromExisting(t *testing.T) {
 		"src/main.go": "package main\n\nfunc main() {}\n",
 	}
 
-	err = rg.Push(ctx, "refs/heads/main", objectsByPath, "Initial commit")
+	err = rg.Push(ctx, "refs/heads/main", toGitObjects(objectsByPath), "Initial commit")
 	if err != nil {
 		t.Fatalf("Initial push failed: %v", err)
 	}
@@ -198,7 +198,7 @@ func TestRemoteGitCreateBranchFromCommitHash(t *testing.T) {
 		"file1.txt": "Version 1\n",
 	}
 
-	err = rg.Push(ctx, "refs/heads/main", objectsByPath, "First commit")
+	err = rg.Push(ctx, "refs/heads/main", toGitObjects(objectsByPath), "First commit")
 	if err != nil {
 		t.Fatalf("First push failed: %v", err)
 	}
@@ -212,7 +212,7 @@ func TestRemoteGitCreateBranchFromCommitHash(t *testing.T) {
 
 	// Make a second commit
 	objectsByPath["file2.txt"] = "Version 2\n"
-	err = rg.Push(ctx, "refs/heads/main", objectsByPath, "Second commit")
+	err = rg.Push(ctx, "refs/heads/main", toGitObjects(objectsByPath), "Second commit")
 	if err != nil {
 		t.Fatalf("Second push failed: %v", err)
 	}
@@ -257,11 +257,11 @@ func TestRemoteGitCreateBranchFromCommitHash(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if _, err := releaseTree.NodeAtPath("file1.txt"); err != nil {
+	if node, err := releaseTree.NodeAtPath("file1.txt"); node == nil || err != nil {
 		t.Errorf("file1.txt not found in release-v1 branch: %v", err)
 	}
 
-	if _, err := releaseTree.NodeAtPath("file2.txt"); err == nil {
+	if node, err := releaseTree.NodeAtPath("file2.txt"); node != nil || err != nil {
 		t.Error("file2.txt should not exist in release-v1 branch")
 	}
 

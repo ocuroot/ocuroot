@@ -4,11 +4,11 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"path/filepath"
 	"time"
 
 	"github.com/charmbracelet/log"
 	"github.com/ocuroot/ocuroot/git"
+	"github.com/ocuroot/ocuroot/refs"
 )
 
 func (w *InRepoWorker) Poll(ctx context.Context) error {
@@ -22,14 +22,23 @@ func (w *InRepoWorker) Poll(ctx context.Context) error {
 	// Create ticker for polling
 	ticker := time.NewTicker(workerInterval)
 
+	pollTargets := []git.PollTarget{
+		{
+			Endpoint: repoURL,
+			Branch:   workerBranch,
+		},
+	}
+
+	if w.Tracker.StoreConfig.Intent != nil && w.Tracker.StoreConfig.Intent.Git != nil {
+		pollTargets = append(pollTargets, git.PollTarget{
+			Endpoint: w.Tracker.StoreConfig.Intent.Git.RemoteURL,
+			Branch:   w.Tracker.StoreConfig.Intent.Git.Branch,
+		})
+	}
+
 	err := git.PollMultiple(
 		ctx,
-		[]git.PollTarget{
-			{
-				Endpoint: repoURL,
-				Branch:   workerBranch,
-			},
-		},
+		pollTargets,
 		w.handleCommit,
 		ticker.C,
 	)
@@ -41,17 +50,11 @@ func (w *InRepoWorker) Poll(ctx context.Context) error {
 }
 
 func (w *InRepoWorker) handleCommit(remote string, hash string) {
-	log.Info("New commit detected", "hash", hash)
+	log.Info("New commit detected", "remote", remote, "hash", hash)
 
 	repoDir, err := CloneRepo(context.Background(), []string{remote}, hash)
 	if err != nil {
-		log.Error("failed to clone repo", "hash", hash, "err", err)
-		return
-	}
-
-	ocuRepoPath := filepath.Join(repoDir, "repo.ocu.star")
-	if _, err := os.Stat(ocuRepoPath); os.IsNotExist(err) {
-		log.Error("repo.ocu.star not found in repository", "hash", hash, "err", err)
+		log.Error("failed to clone repo", "remote", remote, "hash", hash, "err", err)
 		return
 	}
 
@@ -61,7 +64,9 @@ func (w *InRepoWorker) handleCommit(remote string, hash string) {
 		return
 	}
 
-	worker, err := NewInRepoWorker(context.Background(), w.Tracker.Ref)
+	worker, err := NewInRepoWorker(context.Background(), refs.Ref{
+		Filename: ".",
+	})
 	if err != nil {
 		log.Error("failed to create worker", "hash", hash, "err", err)
 		return

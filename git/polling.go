@@ -3,7 +3,10 @@ package git
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
+
+	"github.com/charmbracelet/log"
 )
 
 type PollTarget struct {
@@ -17,33 +20,47 @@ func PollMultiple(
 	callback func(endpoint, hash string),
 	ticker <-chan time.Time,
 ) error {
+	type callBackConfig struct {
+		endpoint string
+		hash     string
+	}
+
+	callbacks := make(chan callBackConfig)
+
+	// Each target needs a dedicated ticker so they all respond to every tick
+	tickerByTarget := make(map[PollTarget]chan time.Time)
+
 	for _, target := range targets {
 		remote, err := NewRemoteGit(target.Endpoint)
 		if err != nil {
 			return err
 		}
 
-		type callBackConfig struct {
-			endpoint string
-			hash     string
-		}
-
-		callbacks := make(chan callBackConfig)
+		tickerByTarget[target] = make(chan time.Time)
 
 		go PollRemote(ctx, remote, target.Branch, func(hash string) {
 			callbacks <- callBackConfig{
 				endpoint: target.Endpoint,
 				hash:     hash,
 			}
-		}, ticker)
+		}, tickerByTarget[target])
+	}
 
-		for {
-			select {
-			case <-ctx.Done():
-				return nil
-			case config := <-callbacks:
-				callback(config.endpoint, config.hash)
+	// Forward ticker to all targets
+	go func() {
+		for t := range ticker {
+			for _, t2 := range tickerByTarget {
+				t2 <- t
 			}
+		}
+	}()
+
+	for {
+		select {
+		case <-ctx.Done():
+			return nil
+		case config := <-callbacks:
+			callback(config.endpoint, config.hash)
 		}
 	}
 	return nil
@@ -56,6 +73,10 @@ func PollRemote(
 	callback func(hash string),
 	ticker <-chan time.Time,
 ) error {
+	if !strings.HasPrefix(branch, "refs/") {
+		branch = fmt.Sprintf("refs/heads/%v", branch)
+	}
+
 	lastHash, err := currentHash(ctx, remote, branch)
 	if err != nil {
 		return err
@@ -80,11 +101,13 @@ func PollRemote(
 
 			currentHash, err := currentHash(ctx, remote, branch)
 			if err != nil {
-				fmt.Println(time.Now(), "Error getting current hash: ", err)
-				return err
+				// TODO: Maybe randomize a retry
+				log.Error("Error getting current hash", "branch", branch, "endpoint", remote.Endpoint(), "err", err)
+				continue
 			}
 
 			if currentHash != lastHash {
+				log.Info("Branch hash changed", "endpoint", remote.Endpoint(), "branch", branch, "lastHash", lastHash, "currentHash", currentHash)
 				lastHash = currentHash
 				callback(currentHash)
 			}

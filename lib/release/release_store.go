@@ -162,7 +162,7 @@ func (w *releaseStore) InitDeploymentDown(ctx context.Context, env string) error
 func RunIsReady(ctx context.Context, state refstore.Store, ref string) (bool, error) {
 	runRef, err := refs.Reduce(ref, GlobRun)
 	if err != nil {
-		return false, fmt.Errorf("failed to reduce ref: %w", err)
+		return false, err
 	}
 
 	var run models.Run

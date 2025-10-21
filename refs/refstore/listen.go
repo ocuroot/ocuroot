@@ -56,11 +56,6 @@ func (s *stateListener) Info() StoreInfo {
 	return s.store.Info()
 }
 
-// AddDependency implements RefStore.
-func (s *stateListener) AddDependency(ctx context.Context, ref string, dependency string) error {
-	return s.store.AddDependency(ctx, ref, dependency)
-}
-
 // Close implements RefStore.
 func (s *stateListener) Close() error {
 	return s.store.Close()
@@ -79,16 +74,6 @@ func (s *stateListener) Delete(ctx context.Context, ref string) error {
 // Get implements RefStore.
 func (s *stateListener) Get(ctx context.Context, ref string, v any) error {
 	return s.store.Get(ctx, ref, v)
-}
-
-// GetDependants implements RefStore.
-func (s *stateListener) GetDependants(ctx context.Context, ref string) ([]string, error) {
-	return s.store.GetDependants(ctx, ref)
-}
-
-// GetDependencies implements RefStore.
-func (s *stateListener) GetDependencies(ctx context.Context, ref string) ([]string, error) {
-	return s.store.GetDependencies(ctx, ref)
 }
 
 // GetLinks implements RefStore.
@@ -114,11 +99,6 @@ func (s *stateListener) Match(ctx context.Context, glob ...string) ([]string, er
 // MatchOptions implements RefStore.
 func (s *stateListener) MatchOptions(ctx context.Context, options MatchOptions, glob ...string) ([]string, error) {
 	return s.store.MatchOptions(ctx, options, glob...)
-}
-
-// RemoveDependency implements RefStore.
-func (s *stateListener) RemoveDependency(ctx context.Context, ref string, dependency string) error {
-	return s.store.RemoveDependency(ctx, ref, dependency)
 }
 
 // ResolveLink implements RefStore.

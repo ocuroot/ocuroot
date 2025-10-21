@@ -31,16 +31,6 @@ func (w *WithOtel) Info() StoreInfo {
 	return w.Store.Info()
 }
 
-// AddDependency implements Store.
-func (w *WithOtel) AddDependency(ctx context.Context, ref string, dependency string) error {
-	span := trace.SpanFromContext(ctx)
-	if span.IsRecording() {
-		span.AddEvent("RefStore.AddDependency", trace.WithAttributes(attribute.String("ref", ref), attribute.String("dependency", dependency)))
-	}
-
-	return w.Store.AddDependency(ctx, ref, dependency)
-}
-
 // Close implements Store.
 func (w *WithOtel) Close() error {
 	return w.Store.Close()
@@ -77,26 +67,6 @@ func (w *WithOtel) Get(ctx context.Context, ref string, v any) error {
 	}
 
 	return w.Store.Get(ctx, ref, v)
-}
-
-// GetDependants implements Store.
-func (w *WithOtel) GetDependants(ctx context.Context, ref string) ([]string, error) {
-	span := trace.SpanFromContext(ctx)
-	if span.IsRecording() {
-		span.AddEvent("RefStore.GetDependants", trace.WithAttributes(attribute.String("ref", ref)))
-	}
-
-	return w.Store.GetDependants(ctx, ref)
-}
-
-// GetDependencies implements Store.
-func (w *WithOtel) GetDependencies(ctx context.Context, ref string) ([]string, error) {
-	span := trace.SpanFromContext(ctx)
-	if span.IsRecording() {
-		span.AddEvent("RefStore.GetDependencies", trace.WithAttributes(attribute.String("ref", ref)))
-	}
-
-	return w.Store.GetDependencies(ctx, ref)
 }
 
 // GetLinks implements Store.
@@ -137,16 +107,6 @@ func (w *WithOtel) MatchOptions(ctx context.Context, options MatchOptions, glob 
 	}
 
 	return w.Store.MatchOptions(ctx, options, glob...)
-}
-
-// RemoveDependency implements Store.
-func (w *WithOtel) RemoveDependency(ctx context.Context, ref string, dependency string) error {
-	span := trace.SpanFromContext(ctx)
-	if span.IsRecording() {
-		span.AddEvent("RefStore.RemoveDependency", trace.WithAttributes(attribute.String("ref", ref), attribute.String("dependency", dependency)))
-	}
-
-	return w.Store.RemoveDependency(ctx, ref, dependency)
 }
 
 // ResolveLink implements Store.
@@ -190,88 +150,4 @@ func (w *WithOtel) Unlink(ctx context.Context, ref string) error {
 	}
 
 	return w.Store.Unlink(ctx, ref)
-}
-
-func (w *WithOtel) AddSupportFiles(ctx context.Context, files map[string]string) error {
-	if gitSupportFileWriter, ok := w.Store.(GitSupportFileWriter); ok {
-		_, span := tracer.Start(
-			ctx,
-			"RefStore.AddSupportFiles",
-		)
-		defer span.End()
-
-		return gitSupportFileWriter.AddSupportFiles(ctx, files)
-	}
-	return nil
-}
-
-var _ GitRepo = (*GitRepoWrapperWithOtel)(nil)
-
-func GitRepoWithOtel(repo GitRepo) GitRepo {
-	if DEBUG_TRACES {
-		return &GitRepoWrapperWithOtel{
-			r: repo,
-		}
-	}
-	return repo
-}
-
-type GitRepoWrapperWithOtel struct {
-	r GitRepo
-}
-
-// Branch implements GitRepo.
-func (g *GitRepoWrapperWithOtel) Branch() string {
-	return g.r.Branch()
-}
-
-// RepoPath implements GitRepo.
-func (g *GitRepoWrapperWithOtel) RepoPath() string {
-	return g.r.RepoPath()
-}
-
-// add implements GitRepo.
-func (g *GitRepoWrapperWithOtel) add(ctx context.Context, paths []string) error {
-	_, span := tracer.Start(ctx, "git.add", trace.WithAttributes(
-		attribute.StringSlice("paths", paths),
-	))
-	defer span.End()
-
-	return g.r.add(ctx, paths)
-}
-
-// checkStagedFiles implements GitRepo.
-func (g *GitRepoWrapperWithOtel) checkStagedFiles() error {
-	return g.r.checkStagedFiles()
-}
-
-// commit implements GitRepo.
-func (g *GitRepoWrapperWithOtel) commit(ctx context.Context, message string) error {
-	_, span := tracer.Start(ctx, "git.commit", trace.WithAttributes(
-		attribute.String("message", message),
-	))
-	defer span.End()
-
-	return g.r.commit(ctx, message)
-}
-
-// pull implements GitRepo.
-func (g *GitRepoWrapperWithOtel) pull(ctx context.Context) error {
-	_, span := tracer.Start(ctx, "git.pull", trace.WithAttributes(
-		attribute.String("remote", "origin"),
-		attribute.String("branch", g.r.Branch()),
-	))
-	defer span.End()
-
-	return g.r.pull(ctx)
-}
-
-// push implements GitRepo.
-func (g *GitRepoWrapperWithOtel) push(ctx context.Context, remote string) error {
-	_, span := tracer.Start(ctx, "git.push", trace.WithAttributes(
-		attribute.String("remote", remote),
-	))
-	defer span.End()
-
-	return g.r.push(ctx, remote)
 }

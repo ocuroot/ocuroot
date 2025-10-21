@@ -169,7 +169,7 @@ func (w *InRepoWorker) ExecuteWork(ctx context.Context, todos []Work) error {
 			}
 			releaseRef, err := refs.Reduce(t.Ref.String(), librelease.GlobRelease)
 			if err != nil {
-				return fmt.Errorf("failed to reduce ref: %w", err)
+				return err
 			}
 			pr, err := refs.Parse(releaseRef)
 			if err != nil {
@@ -238,7 +238,7 @@ func (w *InRepoWorker) addRunForDeployment(ctx context.Context, ref string) erro
 
 	ref, err := refs.Reduce(ref, librelease.GlobDeployment)
 	if err != nil {
-		return fmt.Errorf("failed to reduce ref: %w", err)
+		return err
 	}
 	log.Info("Adding run for deployment if needed", "ref", ref)
 	var deployment models.Task

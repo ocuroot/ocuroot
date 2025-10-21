@@ -209,7 +209,8 @@ func (w *InRepoWorker) InitTrackerFromSourceRepo(ctx context.Context, ref refs.R
 	if saveConfig && tc.Ref.Repo != "" {
 		err = saveRepoConfig(ctx, tc, repoRootPath, w.RepoName, tc.Commit, data)
 		if err != nil {
-			return fmt.Errorf("failed to save repo config: %w", err)
+			log.Info("Failed to save repo config", "repo", tc.Ref.Repo, "repoRootPath", repoRootPath, "repoName", w.RepoName, "commit", tc.Commit, "err", err)
+			return fmt.Errorf("saving repo config: %w", err)
 		}
 	}
 
@@ -396,36 +397,19 @@ func saveRepoConfig(ctx context.Context, tc release.TrackerConfig, repoPath, rep
 
 	if err := tc.State.Get(ctx, repoRef.String(), &models.RepoConfig{}); err == refstore.ErrRefNotFound {
 		if err = tc.State.Set(ctx, repoRef.String(), repoConfig); err != nil {
-			return fmt.Errorf("failed to set ref store: %w", err)
+			return fmt.Errorf("saving state repo config: %w", err)
 		}
 		if err = tc.State.Link(ctx, repoRef.SetRelease("").String(), repoRef.String()); err != nil {
-			return fmt.Errorf("failed to link ref store: %w", err)
-		}
-
-		// Add support files if this is the first time we've seen this commit
-		if gitSupportFilesBackend, ok := tc.State.(refstore.GitSupportFileWriter); ok && tc.StoreConfig != nil && tc.StoreConfig.State.Git != nil {
-			if err := gitSupportFilesBackend.AddSupportFiles(ctx, tc.StoreConfig.State.Git.SupportFiles); err != nil {
-				return fmt.Errorf("failed to add support files: %w", err)
-			}
+			return fmt.Errorf("linking current state repo state: %w", err)
 		}
 	}
 
 	if err := tc.Intent.Get(ctx, repoRef.String(), &models.RepoConfig{}); err == refstore.ErrRefNotFound {
 		if err := tc.Intent.Set(ctx, repoRef.String(), repoConfig); err != nil {
-			return fmt.Errorf("failed to set ref store: %w", err)
+			return fmt.Errorf("saving intent repo config: %w", err)
 		}
 		if err := tc.Intent.Link(ctx, repoRef.SetRelease("").String(), repoRef.String()); err != nil {
-			return fmt.Errorf("failed to link ref store: %w", err)
-		}
-
-		// Add support files if this is the first time we've seen this commit
-		if gitSupportFilesBackend, ok := tc.Intent.(refstore.GitSupportFileWriter); ok &&
-			tc.StoreConfig != nil &&
-			tc.StoreConfig.Intent != nil &&
-			tc.StoreConfig.Intent.Git != nil {
-			if err := gitSupportFilesBackend.AddSupportFiles(ctx, tc.StoreConfig.Intent.Git.SupportFiles); err != nil {
-				return fmt.Errorf("failed to add support files: %w", err)
-			}
+			return fmt.Errorf("linking current intent repo state: %w", err)
 		}
 	}
 

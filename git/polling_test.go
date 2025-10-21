@@ -37,7 +37,7 @@ func TestPollRemote(t *testing.T) {
 	initialObjects := map[string]string{
 		"file1.txt": "Initial content\n",
 	}
-	err = rg.Push(ctx, "refs/heads/main", initialObjects, "Initial commit")
+	err = rg.Push(ctx, "refs/heads/main", toGitObjects(initialObjects), "Initial commit")
 	if err != nil {
 		t.Fatalf("Initial push failed: %v", err)
 	}
@@ -73,7 +73,7 @@ func TestPollRemote(t *testing.T) {
 		"file1.txt": "Updated content\n",
 		"file2.txt": "New file\n",
 	}
-	err = rg.Push(ctx, "refs/heads/main", secondObjects, "Second commit")
+	err = rg.Push(ctx, "refs/heads/main", toGitObjects(secondObjects), "Second commit")
 	if err != nil {
 		t.Fatalf("Second push failed: %v", err)
 	}
@@ -104,7 +104,7 @@ func TestPollRemote(t *testing.T) {
 		"file2.txt": "Updated file\n",
 		"file3.txt": "Another new file\n",
 	}
-	err = rg.Push(ctx, "refs/heads/main", thirdObjects, "Third commit")
+	err = rg.Push(ctx, "refs/heads/main", toGitObjects(thirdObjects), "Third commit")
 	if err != nil {
 		t.Fatalf("Third push failed: %v", err)
 	}
@@ -184,7 +184,7 @@ func TestPollRemoteNoChanges(t *testing.T) {
 	initialObjects := map[string]string{
 		"file1.txt": "Content\n",
 	}
-	err = rg.Push(ctx, "refs/heads/main", initialObjects, "Initial commit")
+	err = rg.Push(ctx, "refs/heads/main", toGitObjects(initialObjects), "Initial commit")
 	if err != nil {
 		t.Fatalf("Initial push failed: %v", err)
 	}
@@ -252,7 +252,7 @@ func TestPollRemoteContextCancellation(t *testing.T) {
 	initialObjects := map[string]string{
 		"file1.txt": "Content\n",
 	}
-	err = rg.Push(ctx, "refs/heads/main", initialObjects, "Initial commit")
+	err = rg.Push(ctx, "refs/heads/main", toGitObjects(initialObjects), "Initial commit")
 	if err != nil {
 		t.Fatalf("Initial push failed: %v", err)
 	}
@@ -326,7 +326,7 @@ func TestPollRemoteWithSeparateClients(t *testing.T) {
 	initialObjects := map[string]string{
 		"file1.txt": "Initial content\n",
 	}
-	err = rgPush.Push(ctx, "refs/heads/main", initialObjects, "Initial commit")
+	err = rgPush.Push(ctx, "refs/heads/main", toGitObjects(initialObjects), "Initial commit")
 	if err != nil {
 		t.Fatalf("Initial push failed: %v", err)
 	}
@@ -362,7 +362,7 @@ func TestPollRemoteWithSeparateClients(t *testing.T) {
 		"file1.txt": "Updated content\n",
 		"file2.txt": "New file\n",
 	}
-	err = rgPush.Push(ctx, "refs/heads/main", secondObjects, "Second commit")
+	err = rgPush.Push(ctx, "refs/heads/main", toGitObjects(secondObjects), "Second commit")
 	if err != nil {
 		t.Fatalf("Second push failed: %v", err)
 	}
@@ -388,7 +388,7 @@ func TestPollRemoteWithSeparateClients(t *testing.T) {
 		"file2.txt": "Updated file\n",
 		"file3.txt": "Another new file\n",
 	}
-	err = rgPush.Push(ctx, "refs/heads/main", thirdObjects, "Third commit")
+	err = rgPush.Push(ctx, "refs/heads/main", toGitObjects(thirdObjects), "Third commit")
 	if err != nil {
 		t.Fatalf("Third push failed: %v", err)
 	}

@@ -27,7 +27,7 @@ test_push_from_source() {
     git push
 
     ocuroot push
-    assert_equal "0" "$?" "Failed to push"
+    assert_equal "0" "$?" "Failed to push from commit 1"
 
     assert_deployed "a.ocu.star" "production"
     assert_deployed "b.ocu.star" "production"
@@ -52,7 +52,7 @@ test_push_from_source() {
     git push
 
     ocuroot push
-    assert_equal "0" "$?" "Failed to push"
+    assert_equal "0" "$?" "Failed to push from commit 2"
 
     assert_deployed "a.ocu.star" "production"
     assert_deployed "b.ocu.star" "production"
@@ -91,7 +91,7 @@ test_push_from_intent() {
     git push
 
     ocuroot push
-    assert_equal "0" "$?" "Failed to push"
+    assert_equal "0" "$?" "Failed to push from commit 1"
 
     assert_deployed "a.ocu.star" "production"
     assert_deployed "b.ocu.star" "production"
@@ -105,7 +105,7 @@ test_push_from_intent() {
     git checkout intent
 
     ocuroot push
-    assert_equal "0" "$?" "Failed to push"
+    assert_equal "0" "$?" "Failed to push from intent"
 
     git checkout main
 
@@ -117,7 +117,7 @@ test_push_from_intent() {
     git checkout intent
     
     ocuroot push
-    assert_equal "0" "$?" "Failed to push"
+    assert_equal "0" "$?" "Failed to push from intent"
     
     git checkout main
     

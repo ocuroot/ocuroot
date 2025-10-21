@@ -54,11 +54,11 @@ func (w *InRepoWorker) Diff(ctx context.Context, req IdentifyWorkRequest) ([]Wor
 		intentRefsMap[ref] = struct{}{}
 		ir, err := refs.Parse(ref)
 		if err != nil {
-			return nil, fmt.Errorf("failed to parse intent ref: %w", err)
+			return nil, fmt.Errorf("parsing %v: %w", ref, err)
 		}
 		resolvedRef, err := state.ResolveLink(ctx, ir.String())
 		if err != nil {
-			return nil, fmt.Errorf("failed to resolve intent ref: %w", err)
+			return nil, err
 		}
 		_, existsAsIs := stateRefsMap[ref]
 		_, existsResolved := stateRefsMap[resolvedRef]
@@ -95,7 +95,7 @@ func (w *InRepoWorker) Diff(ctx context.Context, req IdentifyWorkRequest) ([]Wor
 	for stateRef, intentRef := range stateToIntentRefSet {
 		ir, err := refs.Parse(intentRef)
 		if err != nil {
-			return nil, fmt.Errorf("failed to parse intent ref: %w", err)
+			return nil, fmt.Errorf("parsing %v: %w", intentRef, err)
 		}
 		sr, err := refs.Parse(stateRef)
 		if err != nil {

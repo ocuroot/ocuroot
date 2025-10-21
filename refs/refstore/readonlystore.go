@@ -44,16 +44,6 @@ func (r *ReadOnlyStore) Get(ctx context.Context, ref string, v any) error {
 	return r.store.Get(ctx, ref, v)
 }
 
-// GetDependants implements RefStore.
-func (r *ReadOnlyStore) GetDependants(ctx context.Context, ref string) ([]string, error) {
-	return r.store.GetDependants(ctx, ref)
-}
-
-// GetDependencies implements RefStore.
-func (r *ReadOnlyStore) GetDependencies(ctx context.Context, ref string) ([]string, error) {
-	return r.store.GetDependencies(ctx, ref)
-}
-
 // GetLinks implements RefStore.
 func (r *ReadOnlyStore) GetLinks(ctx context.Context, ref string) ([]string, error) {
 	return r.store.GetLinks(ctx, ref)
