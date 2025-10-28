@@ -34,3 +34,5 @@ tmp
 
 # Ignore ocuroot build
 .build
+
+.env

@@ -12,6 +12,13 @@ def unit_test():
 
 task(unit_test, name="unit_test")
 
+def integration_test():
+    print("Running integration tests")
+    shell("go test -tags=integration ./...")
+    return done()
+
+task(integration_test, name="integration_test")
+
 def endtoend():
     print("Running end-to-end tests")
     host.shell("make e2e")
