@@ -122,11 +122,16 @@ func newRefStoreFromBackend(
 	}
 
 	if storeConfig.Git != nil {
+		branch := storeConfig.Git.Branch
+		if branch == "" {
+			branch = "main"
+		}
+		
 		store, err = refstore.NewGitRefStore(
 			filepath.Join(client.HomeDir(), "state"),
 			tags,
 			storeConfig.Git.RemoteURL,
-			storeConfig.Git.Branch,
+			branch,
 			refstore.GitRefStoreConfig{
 				PathPrefix:   pathPrefix,
 				SupportFiles: storeConfig.Git.SupportFiles,

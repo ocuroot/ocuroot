@@ -12,7 +12,7 @@ import (
 func TestGitBackend(t *testing.T) {
 	doTestBackendSetGet(t, func() DocumentBackend {
 		bareRepoPath, remoteURL := setupTestRepo(t, "set-get")
-		be, err := NewGitBackend(context.Background(), bareRepoPath, remoteURL, "main", "", "")
+		be, err := NewGitBackend(context.Background(), bareRepoPath, remoteURL, "main", "", "", "")
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -20,7 +20,7 @@ func TestGitBackend(t *testing.T) {
 	})
 	doTestBackendMatch(t, func() DocumentBackend {
 		bareRepoPath, remoteURL := setupTestRepo(t, "match")
-		be, err := NewGitBackend(context.Background(), bareRepoPath, remoteURL, "main", "", "")
+		be, err := NewGitBackend(context.Background(), bareRepoPath, remoteURL, "main", "", "", "")
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -28,7 +28,7 @@ func TestGitBackend(t *testing.T) {
 	})
 	doTestBackendInfo(t, func() DocumentBackend {
 		bareRepoPath, remoteURL := setupTestRepo(t, "info")
-		be, err := NewGitBackend(context.Background(), bareRepoPath, remoteURL, "main", "", "")
+		be, err := NewGitBackend(context.Background(), bareRepoPath, remoteURL, "main", "", "", "")
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -40,7 +40,7 @@ func TestGitBackend(t *testing.T) {
 // (as StoreInfo directly, not wrapped in a StorageObject)
 func TestGitBackendInfoFileFormat(t *testing.T) {
 	bareRepoPath, remoteURL := setupTestRepo(t, "info-format")
-	backend, err := NewGitBackend(context.Background(), bareRepoPath, remoteURL, "main", "", "")
+	backend, err := NewGitBackend(context.Background(), bareRepoPath, remoteURL, "main", "", "", "")
 	if err != nil {
 		t.Fatal(err)
 	}

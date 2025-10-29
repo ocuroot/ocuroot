@@ -10,7 +10,7 @@ func TestGitRefStore(t *testing.T) {
 	t.Skip()
 
 	bareRepoPath, remoteURL := setupTestRepo(t, "refstore")
-	be, err := NewGitBackend(context.Background(), bareRepoPath, remoteURL, "main", "", "")
+	be, err := NewGitBackend(context.Background(), bareRepoPath, remoteURL, "main", "", "", "")
 	if err != nil {
 		t.Fatal(err)
 	}

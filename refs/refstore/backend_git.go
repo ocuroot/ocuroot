@@ -34,11 +34,17 @@ func getWorktreeMutex(worktreePath string) *sync.Mutex {
 // bareRepoPath: path to the bare repository (will be created if it doesn't exist)
 // remoteURL: the remote repository URL to fetch from and push to
 // branch: the branch name (without refs/heads/ prefix)
+// pathPrefix: optional path prefix to scope all operations (e.g., "state" or "intent")
 // gitUserName: git author name (optional, defaults to system config)
 // gitUserEmail: git author email (optional, defaults to system config)
-func NewGitBackend(ctx context.Context, bareRepoPath string, remoteURL string, branch string, gitUserName string, gitUserEmail string) (DocumentBackend, error) {
+func NewGitBackend(ctx context.Context, bareRepoPath string, remoteURL string, branch string, pathPrefix string, gitUserName string, gitUserEmail string) (DocumentBackend, error) {
 	// Ensure branch doesn't have refs/heads/ prefix for worktree operations
 	branch = strings.TrimPrefix(branch, "refs/heads/")
+	
+	// Validate branch name
+	if branch == "" {
+		return nil, fmt.Errorf("branch name cannot be empty")
+	}
 	
 	// Initialize bare repo if it doesn't exist
 	if err := initBareRepo(bareRepoPath, remoteURL); err != nil {
@@ -61,6 +67,7 @@ func NewGitBackend(ctx context.Context, bareRepoPath string, remoteURL string, b
 		worktreePath: worktreePath,
 		remoteURL:    remoteURL,
 		branch:       branch,
+		pathPrefix:   pathPrefix,
 		gitUserName:  gitUserName,
 		gitUserEmail: gitUserEmail,
 	}, nil
@@ -73,13 +80,14 @@ type gitBackend struct {
 	worktreePath string
 	remoteURL    string
 	branch       string
+	pathPrefix   string
 	gitUserName  string
 	gitUserEmail string
 }
 
 // GetBytes implements DocumentBackend.
 func (g *gitBackend) GetBytes(ctx context.Context, path string) ([]byte, error) {
-	filePath := filepath.Join(g.worktreePath, path)
+	filePath := filepath.Join(g.worktreePath, g.pathPrefix, path)
 	
 	data, err := os.ReadFile(filePath)
 	if err != nil {
@@ -94,6 +102,11 @@ func (g *gitBackend) GetBytes(ctx context.Context, path string) ([]byte, error) 
 
 // SetBytes implements DocumentBackend.
 func (g *gitBackend) SetBytes(ctx context.Context, path string, content []byte) error {
+	return g.setBytesWithPrefix(ctx, path, content, true)
+}
+
+// setBytesWithPrefix writes a file with optional path prefix
+func (g *gitBackend) setBytesWithPrefix(ctx context.Context, path string, content []byte, usePrefix bool) error {
 	// Use mutex to prevent concurrent operations on the same worktree
 	mu := getWorktreeMutex(g.worktreePath)
 	mu.Lock()
@@ -105,7 +118,13 @@ func (g *gitBackend) SetBytes(ctx context.Context, path string, content []byte) 
 	}
 
 	// Write directly to file
-	filePath := filepath.Join(g.worktreePath, path)
+	var filePath string
+	if usePrefix {
+		filePath = filepath.Join(g.worktreePath, g.pathPrefix, path)
+	} else {
+		filePath = filepath.Join(g.worktreePath, path)
+	}
+	
 	if err := os.MkdirAll(filepath.Dir(filePath), 0755); err != nil {
 		return fmt.Errorf("failed to create directory: %w", err)
 	}
@@ -130,12 +149,17 @@ func (g *gitBackend) SetBytes(ctx context.Context, path string, content []byte) 
 	return nil
 }
 
+// SetBytesAtRoot writes a file at the repository root, ignoring the path prefix
+func (g *gitBackend) SetBytesAtRoot(ctx context.Context, path string, content []byte) error {
+	return g.setBytesWithPrefix(ctx, path, content, false)
+}
+
 // Get implements DocumentBackend.
 func (g *gitBackend) Get(ctx context.Context, refs []string) ([]GetResult, error) {
 	var out []GetResult
 
 	for _, ref := range refs {
-		filePath := filepath.Join(g.worktreePath, ref)
+		filePath := filepath.Join(g.worktreePath, g.pathPrefix, ref)
 		
 		// Check if file exists
 		data, err := os.ReadFile(filePath)
@@ -179,9 +203,9 @@ func (g *gitBackend) Match(ctx context.Context, reqs []MatchRequest) ([]string, 
 
 	var out []string
 	for _, req := range compiledReqs {
-		searchPath := g.worktreePath
+		searchPath := filepath.Join(g.worktreePath, g.pathPrefix)
 		if req.prefix != "" {
-			searchPath = filepath.Join(g.worktreePath, req.prefix)
+			searchPath = filepath.Join(g.worktreePath, g.pathPrefix, req.prefix)
 		}
 
 		// Check if search path exists
@@ -203,8 +227,8 @@ func (g *gitBackend) Match(ctx context.Context, reqs []MatchRequest) ([]string, 
 				return nil
 			}
 
-			// Get relative path from worktree root
-			relPath, err := filepath.Rel(g.worktreePath, filePath)
+			// Get relative path from pathPrefix root
+			relPath, err := filepath.Rel(filepath.Join(g.worktreePath, g.pathPrefix), filePath)
 			if err != nil {
 				return err
 			}
@@ -246,7 +270,7 @@ func (g *gitBackend) Set(ctx context.Context, marker []byte, message string, req
 
 	// Apply changes to worktree
 	for _, req := range reqs {
-		filePath := filepath.Join(g.worktreePath, req.Path)
+		filePath := filepath.Join(g.worktreePath, g.pathPrefix, req.Path)
 		
 		if req.Doc == nil {
 			// Delete file

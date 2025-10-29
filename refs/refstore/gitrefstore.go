@@ -2,6 +2,7 @@ package refstore
 
 import (
 	"context"
+	"fmt"
 	"path/filepath"
 )
 
@@ -31,15 +32,19 @@ func NewGitRefStore(
 	// Create bare repo path under baseDir
 	bareRepoPath := filepath.Join(baseDir, "git-repos", sanitizeRepoName(remote))
 	
-	be, err := NewGitBackend(ctx, bareRepoPath, remote, branch, cfg.GitUserName, cfg.GitUserEmail)
+	be, err := NewGitBackend(ctx, bareRepoPath, remote, branch, cfg.PathPrefix, cfg.GitUserName, cfg.GitUserEmail)
 	if err != nil {
 		return nil, err
 	}
 	
-	// Write support files if provided
+	// Write support files if provided (at repository root, not under path prefix)
 	if len(cfg.SupportFiles) > 0 {
+		gitBe, ok := be.(*gitBackend)
+		if !ok {
+			return nil, fmt.Errorf("support files are only supported for git backends")
+		}
 		for path, content := range cfg.SupportFiles {
-			if err := be.SetBytes(ctx, path, []byte(content)); err != nil {
+			if err := gitBe.SetBytesAtRoot(ctx, path, []byte(content)); err != nil {
 				return nil, err
 			}
 		}
