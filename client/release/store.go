@@ -1,14 +1,11 @@
 package release
 
 import (
-	"context"
 	"fmt"
 	"os"
 	"path/filepath"
 
-	"github.com/ocuroot/gittools"
 	"github.com/ocuroot/ocuroot/client"
-	"github.com/ocuroot/ocuroot/git"
 	"github.com/ocuroot/ocuroot/refs/refstore"
 	"github.com/ocuroot/ocuroot/sdk"
 )
@@ -104,34 +101,11 @@ func newRefStoreFromBackend(
 	if storeConfig.Local != nil {
 		statePath := filepath.Join(client.HomeDir(), "local_state", storeConfig.Local.ID, pathPrefix)
 
-		// Create an empty repo if it doesn't exist
-		if _, err := os.Stat(statePath); os.IsNotExist(err) {
-			if err := os.MkdirAll(statePath, 0755); err != nil {
-				return nil, fmt.Errorf("failed to create parent directories for state path %s: %w", statePath, err)
-			}
-			gitClient := gittools.Client{}
-			if _, err := gitClient.InitBare(statePath, "main"); err != nil {
-				return nil, fmt.Errorf("failed to initialize bare git repo at %s: %w", statePath, err)
-			}
-
-			// Use the new CreateBranch function to create the main branch
-			user := &git.GitUser{
-				Name:  gitUserName,
-				Email: gitUserEmail,
-			}
-			rg, err := git.NewRemoteGitWithUser("file://"+statePath, user)
-			if err != nil {
-				return nil, fmt.Errorf("failed to connect to bare repo: %w", err)
-			}
-			if err := rg.CreateBranch(context.Background(), "main", "", "Initial commit"); err != nil {
-				return nil, fmt.Errorf("failed to create main branch: %w", err)
-			}
-		}
-
+		// The git backend will handle initialization and branch creation
 		store, err = refstore.NewGitRefStore(
 			filepath.Join(client.HomeDir(), "state"),
 			tags,
-			statePath,
+			"file://"+statePath,
 			"main",
 			refstore.GitRefStoreConfig{
 				PathPrefix: pathPrefix,

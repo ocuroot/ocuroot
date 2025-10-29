@@ -3,48 +3,72 @@ package refstore
 import (
 	"context"
 	"encoding/json"
-	"path"
+	"fmt"
+	"os"
+	"os/exec"
+	"path/filepath"
 	"strings"
-
-	"github.com/ocuroot/ocuroot/git"
+	"sync"
 )
 
-func NewGitBackend(ctx context.Context, remote git.RemoteGit, branch string) (DocumentBackend, error) {
-	if !strings.HasPrefix(branch, "refs/") {
-		branch = "refs/heads/" + branch
-	}
+// Global mutex map to ensure only one operation per worktree
+var (
+	worktreeMutexes   = make(map[string]*sync.Mutex)
+	worktreeMutexesMu sync.Mutex
+)
 
-	brs, err := remote.BranchRefs(ctx)
-	if err != nil {
-		return nil, err
+func getWorktreeMutex(worktreePath string) *sync.Mutex {
+	worktreeMutexesMu.Lock()
+	defer worktreeMutexesMu.Unlock()
+	
+	if mu, exists := worktreeMutexes[worktreePath]; exists {
+		return mu
 	}
+	
+	mu := &sync.Mutex{}
+	worktreeMutexes[worktreePath] = mu
+	return mu
+}
 
-	var branchExists bool
-	for _, br := range brs {
-		if br.Name == branch {
-			branchExists = true
-			break
-		}
+// NewGitBackend creates a new git backend using a local bare repository with worktrees.
+// bareRepoPath: path to the bare repository (will be created if it doesn't exist)
+// remoteURL: the remote repository URL to fetch from and push to
+// branch: the branch name (without refs/heads/ prefix)
+func NewGitBackend(ctx context.Context, bareRepoPath string, remoteURL string, branch string) (DocumentBackend, error) {
+	// Ensure branch doesn't have refs/heads/ prefix for worktree operations
+	branch = strings.TrimPrefix(branch, "refs/heads/")
+	
+	// Initialize bare repo if it doesn't exist
+	if err := initBareRepo(bareRepoPath, remoteURL); err != nil {
+		return nil, fmt.Errorf("failed to init bare repo: %w", err)
 	}
-
-	if !branchExists {
-		err = remote.CreateBranch(ctx, branch, "", "Creating branch")
-		if err != nil {
-			return nil, err
-		}
+	
+	// Fetch from remote to ensure we have latest refs
+	if err := fetchRemote(bareRepoPath); err != nil {
+		return nil, fmt.Errorf("failed to fetch remote: %w", err)
+	}
+	
+	// Create worktree for this branch
+	worktreePath := filepath.Join(bareRepoPath, "worktrees", branch)
+	if err := ensureWorktree(bareRepoPath, worktreePath, branch); err != nil {
+		return nil, fmt.Errorf("failed to ensure worktree: %w", err)
 	}
 
 	return &gitBackend{
-		remote: remote,
-		branch: branch,
+		bareRepoPath: bareRepoPath,
+		worktreePath: worktreePath,
+		remoteURL:    remoteURL,
+		branch:       branch,
 	}, nil
 }
 
 var _ DocumentBackend = (*gitBackend)(nil)
 
 type gitBackend struct {
-	remote git.RemoteGit
-	branch string
+	bareRepoPath string
+	worktreePath string
+	remoteURL    string
+	branch       string
 }
 
 // GetInfo implements DocumentBackend.
@@ -86,59 +110,36 @@ func (g *gitBackend) SetInfo(ctx context.Context, info *StoreInfo) error {
 
 // Get implements DocumentBackend.
 func (g *gitBackend) Get(ctx context.Context, refs []string) ([]GetResult, error) {
-	brs, err := g.remote.BranchRefs(ctx)
-	if err != nil {
-		return nil, err
-	}
-
-	var tree *git.TreeNode
-	for _, br := range brs {
-		if br.Name == g.branch {
-			tree, err = g.remote.GetTree(ctx, br.Hash)
-			if err != nil {
-				return nil, err
-			}
-			break
-		}
-	}
-
 	var out []GetResult
 
-	// If the branch does not exist, return an empty set of results
-	if tree == nil {
-		for _, ref := range refs {
-			out = append(out, GetResult{
-				Path: ref,
-			})
-		}
-		return out, nil
-	}
-
 	for _, ref := range refs {
-		n, err := tree.NodeAtPath(ref)
+		filePath := filepath.Join(g.worktreePath, ref)
+		
+		// Check if file exists
+		data, err := os.ReadFile(filePath)
 		if err != nil {
-			return nil, err
+			if os.IsNotExist(err) {
+				// File doesn't exist, return empty result
+				out = append(out, GetResult{
+					Path: ref,
+				})
+				continue
+			}
+			return nil, fmt.Errorf("failed to read %s: %w", ref, err)
 		}
-		if n != nil && n.IsObject {
-			body, err := g.remote.GetObject(ctx, n.Hash)
-			if err != nil {
-				return nil, err
-			}
-			var doc StorageObject
-			if err := json.Unmarshal(body, &doc); err != nil {
-				return nil, err
-			}
 
-			out = append(out, GetResult{
-				Path: ref,
-				Doc:  &doc,
-			})
-		} else {
-			out = append(out, GetResult{
-				Path: ref,
-			})
+		// Unmarshal the document
+		var doc StorageObject
+		if err := json.Unmarshal(data, &doc); err != nil {
+			return nil, fmt.Errorf("failed to unmarshal %s: %w", ref, err)
 		}
+
+		out = append(out, GetResult{
+			Path: ref,
+			Doc:  &doc,
+		})
 	}
+	
 	return out, nil
 }
 
@@ -154,37 +155,15 @@ func (g *gitBackend) Match(ctx context.Context, reqs []MatchRequest) ([]string, 
 		return nil, err
 	}
 
-	brs, err := g.remote.BranchRefs(ctx)
-	if err != nil {
-		return nil, err
-	}
-
-	var tree *git.TreeNode
-	for _, br := range brs {
-		if br.Name == g.branch {
-			tree, err = g.remote.GetTree(ctx, br.Hash)
-			if err != nil {
-				return nil, err
-			}
-			break
-		}
-	}
-
-	if tree == nil {
-		return nil, nil
-	}
-
 	var out []string
 	for _, req := range compiledReqs {
-		t := tree
+		searchPath := g.worktreePath
 		if req.prefix != "" {
-			t, err = tree.NodeAtPath(req.prefix)
-			if err != nil {
-				return nil, err
-			}
+			searchPath = filepath.Join(g.worktreePath, req.prefix)
 		}
 
-		if t == nil {
+		// Check if search path exists
+		if _, err := os.Stat(searchPath); os.IsNotExist(err) {
 			continue
 		}
 
@@ -193,14 +172,39 @@ func (g *gitBackend) Match(ctx context.Context, reqs []MatchRequest) ([]string, 
 			suffixes = []string{""}
 		}
 
-		for _, p := range t.Paths() {
+		// Walk the directory tree
+		err := filepath.Walk(searchPath, func(filePath string, info os.FileInfo, err error) error {
+			if err != nil {
+				return err
+			}
+			if info.IsDir() {
+				return nil
+			}
+
+			// Get relative path from worktree root
+			relPath, err := filepath.Rel(g.worktreePath, filePath)
+			if err != nil {
+				return err
+			}
+
+			// Get relative path from search path
+			relFromPrefix, err := filepath.Rel(searchPath, filePath)
+			if err != nil {
+				return err
+			}
+
+			// Check suffixes and glob
 			for _, suffix := range suffixes {
-				if strings.HasSuffix(p, suffix) && req.compiledGlob.Match(strings.TrimSuffix(p, suffix)) {
-					out = append(out, path.Join(req.prefix, p))
+				if strings.HasSuffix(relFromPrefix, suffix) && req.compiledGlob.Match(strings.TrimSuffix(relFromPrefix, suffix)) {
+					out = append(out, filepath.ToSlash(relPath))
+					break
 				}
 			}
+			return nil
+		})
+		if err != nil {
+			return nil, err
 		}
-
 	}
 
 	return out, nil
@@ -208,24 +212,196 @@ func (g *gitBackend) Match(ctx context.Context, reqs []MatchRequest) ([]string, 
 
 // Set implements DocumentBackend.
 func (g *gitBackend) Set(ctx context.Context, marker []byte, message string, reqs []SetRequest) error {
-	var objects = make(map[string]git.GitObject)
+	// Use mutex to prevent concurrent operations on the same worktree
+	mu := getWorktreeMutex(g.worktreePath)
+	mu.Lock()
+	defer mu.Unlock()
+
+	// Pull latest changes from remote
+	if err := g.pullWorktree(); err != nil {
+		return fmt.Errorf("failed to pull: %w", err)
+	}
+
+	// Apply changes to worktree
 	for _, req := range reqs {
+		filePath := filepath.Join(g.worktreePath, req.Path)
+		
 		if req.Doc == nil {
-			// Tombstone for deletion
-			objects[req.Path] = git.GitObject{
-				Tombstone: true,
+			// Delete file
+			if err := os.Remove(filePath); err != nil && !os.IsNotExist(err) {
+				return fmt.Errorf("failed to delete %s: %w", req.Path, err)
 			}
 		} else {
+			// Write file
 			docContent, err := json.Marshal(req.Doc)
 			if err != nil {
-				return err
+				return fmt.Errorf("failed to marshal doc: %w", err)
 			}
-			objects[req.Path] = git.GitObject{
-				Content: docContent,
+			
+			// Ensure directory exists
+			if err := os.MkdirAll(filepath.Dir(filePath), 0755); err != nil {
+				return fmt.Errorf("failed to create directory: %w", err)
+			}
+			
+			if err := os.WriteFile(filePath, docContent, 0644); err != nil {
+				return fmt.Errorf("failed to write file: %w", err)
 			}
 		}
 	}
 
-	return g.remote.Push(ctx, g.branch, objects, message)
+	// Stage all changes
+	if err := g.gitAdd(); err != nil {
+		return fmt.Errorf("failed to stage changes: %w", err)
+	}
 
+	// Commit changes
+	if err := g.gitCommit(message); err != nil {
+		return fmt.Errorf("failed to commit: %w", err)
+	}
+
+	// Push to remote
+	if err := g.gitPush(); err != nil {
+		return fmt.Errorf("failed to push: %w", err)
+	}
+
+	return nil
+}
+
+// Helper functions for git operations
+
+func initBareRepo(bareRepoPath string, remoteURL string) error {
+	// Check if bare repo already exists
+	if _, err := os.Stat(filepath.Join(bareRepoPath, "config")); err == nil {
+		return nil // Already initialized
+	}
+
+	// Create directory
+	if err := os.MkdirAll(bareRepoPath, 0755); err != nil {
+		return err
+	}
+
+	// Initialize bare repo
+	cmd := exec.Command("git", "init", "--bare", bareRepoPath)
+	if output, err := cmd.CombinedOutput(); err != nil {
+		return fmt.Errorf("git init failed: %w: %s", err, output)
+	}
+
+	// Add remote
+	cmd = exec.Command("git", "-C", bareRepoPath, "remote", "add", "origin", remoteURL)
+	if output, err := cmd.CombinedOutput(); err != nil {
+		return fmt.Errorf("git remote add failed: %w: %s", err, output)
+	}
+
+	return nil
+}
+
+func fetchRemote(bareRepoPath string) error {
+	cmd := exec.Command("git", "-C", bareRepoPath, "fetch", "origin")
+	if output, err := cmd.CombinedOutput(); err != nil {
+		return fmt.Errorf("git fetch failed: %w: %s", err, output)
+	}
+	return nil
+}
+
+func ensureWorktree(bareRepoPath string, worktreePath string, branch string) error {
+	// Check if worktree already exists
+	if _, err := os.Stat(filepath.Join(worktreePath, ".git")); err == nil {
+		return nil // Already exists
+	}
+
+	// Get absolute paths
+	absBareRepoPath, err := filepath.Abs(bareRepoPath)
+	if err != nil {
+		return err
+	}
+	absWorktreePath, err := filepath.Abs(worktreePath)
+	if err != nil {
+		return err
+	}
+
+	// Create worktree directory parent
+	if err := os.MkdirAll(filepath.Dir(absWorktreePath), 0755); err != nil {
+		return err
+	}
+
+	// Try to create worktree from existing remote branch
+	cmd := exec.Command("git", "-C", absBareRepoPath, "worktree", "add", absWorktreePath, "-b", branch, "origin/"+branch)
+	if err := cmd.Run(); err != nil {
+		// If branch doesn't exist on remote, create orphan branch
+		cmd = exec.Command("git", "-C", absBareRepoPath, "worktree", "add", "--orphan", "-b", branch, absWorktreePath)
+		if output, err := cmd.CombinedOutput(); err != nil {
+			return fmt.Errorf("git worktree add --orphan failed: %w: %s", err, output)
+		}
+
+		// Create initial commit in the worktree
+		cmd = exec.Command("git", "-C", absWorktreePath, "commit", "--allow-empty", "-m", "Initial commit")
+		if output, err := cmd.CombinedOutput(); err != nil {
+			return fmt.Errorf("git commit failed: %w: %s", err, output)
+		}
+
+		// Push to create branch on remote
+		cmd = exec.Command("git", "-C", absWorktreePath, "push", "-u", "origin", branch)
+		if output, err := cmd.CombinedOutput(); err != nil {
+			return fmt.Errorf("git push failed: %w: %s", err, output)
+		}
+	}
+
+	return nil
+}
+
+func (g *gitBackend) pullWorktree() error {
+	// Check if there are any local changes
+	cmd := exec.Command("git", "-C", g.worktreePath, "diff", "--quiet")
+	hasChanges := cmd.Run() != nil
+	
+	cmd = exec.Command("git", "-C", g.worktreePath, "diff", "--cached", "--quiet")
+	hasStagedChanges := cmd.Run() != nil
+	
+	if hasChanges || hasStagedChanges {
+		// If there are local changes, skip the pull
+		// The changes will be committed and pushed in this Set operation
+		return nil
+	}
+	
+	cmd = exec.Command("git", "-C", g.worktreePath, "pull", "--rebase")
+	if output, err := cmd.CombinedOutput(); err != nil {
+		return fmt.Errorf("git pull failed: %w: %s", err, output)
+	}
+	return nil
+}
+
+func (g *gitBackend) gitAdd() error {
+	cmd := exec.Command("git", "-C", g.worktreePath, "add", "-A")
+	if output, err := cmd.CombinedOutput(); err != nil {
+		return fmt.Errorf("git add failed: %w: %s", err, output)
+	}
+	return nil
+}
+
+func (g *gitBackend) gitCommit(message string) error {
+	// Check if there are changes to commit
+	cmd := exec.Command("git", "-C", g.worktreePath, "diff", "--cached", "--quiet")
+	if err := cmd.Run(); err == nil {
+		// No changes to commit
+		return nil
+	}
+
+	// Use a default message if empty
+	if message == "" {
+		message = "Update"
+	}
+
+	cmd = exec.Command("git", "-C", g.worktreePath, "commit", "-m", message)
+	if output, err := cmd.CombinedOutput(); err != nil {
+		return fmt.Errorf("git commit failed: %w: %s", err, output)
+	}
+	return nil
+}
+
+func (g *gitBackend) gitPush() error {
+	cmd := exec.Command("git", "-C", g.worktreePath, "push")
+	if output, err := cmd.CombinedOutput(); err != nil {
+		return fmt.Errorf("git push failed: %w: %s", err, output)
+	}
+	return nil
 }

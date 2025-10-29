@@ -1,16 +1,20 @@
 package refstore
 
-import "testing"
+import (
+	"context"
+	"testing"
+)
 
 func TestGitRefStore(t *testing.T) {
 	// TODO: This tests passes, but takes 17s for some reason!
 	t.Skip()
 
-	be, err := NewGitBackend(t.Context(), remoteWithBareRepoAtDir(t, "git/refstore.git"), "main")
+	bareRepoPath, remoteURL := setupTestRepo(t, "refstore")
+	be, err := NewGitBackend(context.Background(), bareRepoPath, remoteURL, "main")
 	if err != nil {
 		t.Fatal(err)
 	}
-	store, err := NewRefStore(t.Context(), be, map[string]struct{}{})
+	store, err := NewRefStore(context.Background(), be, map[string]struct{}{})
 	if err != nil {
 		t.Fatal(err)
 	}

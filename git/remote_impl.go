@@ -37,8 +37,6 @@ func NewRemoteGitWithUser(endpoint string, user *GitUser) (RemoteGit, error) {
 		return nil, err
 	}
 
-	log.Info("Endpoint", "endpoint", endpoint, "protocol", ep.Protocol)
-
 	c, err := transport.Get(ep.Protocol)
 	if err != nil {
 		return nil, err
@@ -63,24 +61,26 @@ type remoteGitImpl struct {
 	store     *memory.Storage
 	user      *GitUser
 
-	// Cached connection for reuse
-	cachedConn transport.Connection
+	// Cached connection for read operations (UploadPackService)
+	cachedReadConn transport.Connection
+	// Cached connection for write operations (ReceivePackService)
+	cachedWriteConn transport.Connection
 }
 
 func (r *remoteGitImpl) Endpoint() string {
 	return r.endpoint
 }
 
-// getOrCreateConnection returns a valid connection, reusing the cached one if available
+// getOrCreateConnection returns a valid read connection, reusing the cached one if available
 // or creating a new one if needed. The caller should NOT close the returned connection
 // as it may be reused. Use invalidateConnection() if the connection fails.
 func (r *remoteGitImpl) getOrCreateConnection(ctx context.Context) (transport.Connection, error) {
-	// Try to reuse cached connection if it exists
-	if r.cachedConn != nil {
-		return r.cachedConn, nil
+	// Try to reuse cached read connection if it exists
+	if r.cachedReadConn != nil {
+		return r.cachedReadConn, nil
 	}
 
-	// Create new session and connection
+	// Create new session and connection for reading
 	sess, err := r.transport.NewSession(r.store, r.ep, nil)
 	if err != nil {
 		return nil, err
@@ -92,15 +92,44 @@ func (r *remoteGitImpl) getOrCreateConnection(ctx context.Context) (transport.Co
 	}
 
 	// Cache the connection for reuse
-	r.cachedConn = conn
+	r.cachedReadConn = conn
 	return conn, nil
 }
 
-// InvalidateConnection closes and clears the cached connection
+// getOrCreateWriteConnection returns a valid write connection, reusing the cached one if available
+// or creating a new one if needed. The caller should NOT close the returned connection
+// as it may be reused.
+func (r *remoteGitImpl) getOrCreateWriteConnection(ctx context.Context) (transport.Connection, error) {
+	// Try to reuse cached write connection if it exists
+	if r.cachedWriteConn != nil {
+		return r.cachedWriteConn, nil
+	}
+
+	// Create new session and connection for writing
+	sess, err := r.transport.NewSession(r.store, r.ep, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	conn, err := sess.Handshake(ctx, transport.ReceivePackService, "")
+	if err != nil {
+		return nil, err
+	}
+
+	// Cache the connection for reuse
+	r.cachedWriteConn = conn
+	return conn, nil
+}
+
+// InvalidateConnection closes and clears both cached connections
 func (r *remoteGitImpl) InvalidateConnection() {
-	if r.cachedConn != nil {
-		r.cachedConn.Close()
-		r.cachedConn = nil
+	if r.cachedReadConn != nil {
+		r.cachedReadConn.Close()
+		r.cachedReadConn = nil
+	}
+	if r.cachedWriteConn != nil {
+		r.cachedWriteConn.Close()
+		r.cachedWriteConn = nil
 	}
 }
 
@@ -389,8 +418,9 @@ func (r *remoteGitImpl) GetCommitMessage(ctx context.Context, hash string) (stri
 }
 
 // Push implements RemoteGit.
-func (r *remoteGitImpl) Push(ctx context.Context, refName string, objectsByPath map[string]GitObject, message string) error {
-	return r.pushWithOptions(ctx, refName, objectsByPath, message, true)
+func (r *remoteGitImpl) Push(ctx context.Context, refName string, objectsByPath map[string]GitObject, message string) (string, error) {
+	hash, err := r.pushWithOptions(ctx, refName, objectsByPath, message, true)
+	return hash.String(), err
 }
 
 // pushWithStaleRef is an internal helper for testing race conditions
@@ -460,17 +490,11 @@ func (r *remoteGitImpl) pushWithStaleRef(ctx context.Context, refName string, ob
 		return fmt.Errorf("failed to create packfile: %w", err)
 	}
 
-	// Create a new session for the push
-	sess, err := r.transport.NewSession(r.store, r.ep, nil)
+	// Get or create cached write connection
+	conn, err := r.getOrCreateWriteConnection(ctx)
 	if err != nil {
-		return fmt.Errorf("failed to create session: %w", err)
+		return fmt.Errorf("failed to get write connection: %w", err)
 	}
-
-	conn, err := sess.Handshake(ctx, transport.ReceivePackService, "")
-	if err != nil {
-		return fmt.Errorf("failed to handshake: %w", err)
-	}
-	defer conn.Close()
 
 	// Build push request
 	pushReq := &transport.PushRequest{
@@ -484,16 +508,17 @@ func (r *remoteGitImpl) pushWithStaleRef(ctx context.Context, refName string, ob
 		return fmt.Errorf("failed to push: %w", err)
 	}
 
-	// Invalidate cached connection since push changes remote state
-	// This ensures subsequent operations see the updated refs
-	r.invalidateConnection()
+	// Invalidate both connections after push
+	// The write connection cannot be reused after a push (git protocol limitation)
+	// The read connection needs to be invalidated to see updated refs
+	r.InvalidateConnection()
 
 	return nil
 }
 
 // pushWithOptions is an internal helper that allows controlling whether to fetch fresh refs
 // This is used for testing race conditions
-func (r *remoteGitImpl) pushWithOptions(ctx context.Context, refName string, objectsByPath map[string]GitObject, message string, fetchFreshRefs bool) error {
+func (r *remoteGitImpl) pushWithOptions(ctx context.Context, refName string, objectsByPath map[string]GitObject, message string, fetchFreshRefs bool) (plumbing.Hash, error) {
 	var oldHash plumbing.Hash = plumbing.ZeroHash
 	var parentHashes []plumbing.Hash
 
@@ -503,22 +528,16 @@ func (r *remoteGitImpl) pushWithOptions(ctx context.Context, refName string, obj
 		r.invalidateConnection()
 	}
 
-	// Create a new session for receive-pack to get current refs
-	sess, err := r.transport.NewSession(r.store, r.ep, nil)
+	// Get or create cached write connection
+	conn, err := r.getOrCreateWriteConnection(ctx)
 	if err != nil {
-		return fmt.Errorf("failed to create session: %w", err)
+		return plumbing.ZeroHash, fmt.Errorf("failed to get write connection: %w", err)
 	}
-
-	conn, err := sess.Handshake(ctx, transport.ReceivePackService, "")
-	if err != nil {
-		return fmt.Errorf("failed to handshake: %w", err)
-	}
-	defer conn.Close()
 
 	// Get current refs to determine parent commit and old hash
 	refs, err := conn.GetRemoteRefs(ctx)
 	if err != nil {
-		return fmt.Errorf("failed to get remote refs: %w", err)
+		return plumbing.ZeroHash, fmt.Errorf("failed to get remote refs: %w", err)
 	}
 
 	for _, ref := range refs {
@@ -533,16 +552,16 @@ func (r *remoteGitImpl) pushWithOptions(ctx context.Context, refName string, obj
 	// Build the tree from the objects
 	rootTreeHash, err := r.buildTreeFromObjects(ctx, refName, objectsByPath, oldHash)
 	if err != nil {
-		return fmt.Errorf("failed to build tree: %w", err)
+		return plumbing.ZeroHash, fmt.Errorf("failed to build tree: %w", err)
 	}
 
 	if r.user == nil {
-		return errors.New("user must be set to push")
+		return plumbing.ZeroHash, errors.New("user must be set to push")
 	}
 
 	// Validate user
 	if err := r.user.Validate(); err != nil {
-		return fmt.Errorf("invalid user: %w", err)
+		return plumbing.ZeroHash, fmt.Errorf("invalid user: %w", err)
 	}
 
 	// Create a commit object with proper parent
@@ -566,12 +585,12 @@ func (r *remoteGitImpl) pushWithOptions(ctx context.Context, refName string, obj
 	commitObj := r.store.NewEncodedObject()
 	commitObj.SetType(plumbing.CommitObject)
 	if err := commit.Encode(commitObj); err != nil {
-		return fmt.Errorf("failed to encode commit: %w", err)
+		return plumbing.ZeroHash, fmt.Errorf("failed to encode commit: %w", err)
 	}
 
 	commitHash, err := r.store.SetEncodedObject(commitObj)
 	if err != nil {
-		return fmt.Errorf("failed to store commit: %w", err)
+		return plumbing.ZeroHash, fmt.Errorf("failed to store commit: %w", err)
 	}
 
 	// Build push command
@@ -584,7 +603,7 @@ func (r *remoteGitImpl) pushWithOptions(ctx context.Context, refName string, obj
 	// Create packfile with all objects
 	packfileReader, err := r.createPackfile(commitHash)
 	if err != nil {
-		return fmt.Errorf("failed to create packfile: %w", err)
+		return plumbing.ZeroHash, fmt.Errorf("failed to create packfile: %w", err)
 	}
 
 	// Build push request
@@ -596,14 +615,15 @@ func (r *remoteGitImpl) pushWithOptions(ctx context.Context, refName string, obj
 	// Push to remote
 	err = conn.Push(ctx, pushReq)
 	if err != nil {
-		return fmt.Errorf("failed to push: %w", err)
+		return plumbing.ZeroHash, fmt.Errorf("failed to push: %w", err)
 	}
 
-	// Invalidate cached connection since push changes remote state
-	// This ensures subsequent operations see the updated refs
-	r.invalidateConnection()
+	// Invalidate both connections after push
+	// The write connection cannot be reused after a push (git protocol limitation)
+	// The read connection needs to be invalidated to see updated refs
+	r.InvalidateConnection()
 
-	return nil
+	return commitHash, nil
 }
 
 // dirEntry represents an entry in a directory (file or subdirectory)
@@ -619,7 +639,7 @@ type dirEntry struct {
 func (r *remoteGitImpl) buildTreeFromObjects(ctx context.Context, refName string, objectsByPath map[string]GitObject, parentHash plumbing.Hash) (plumbing.Hash, error) {
 	// Start with a map of file paths to blob hashes from the parent
 	fileHashes := make(map[string]plumbing.Hash)
-	
+
 	if !parentHash.IsZero() {
 		// Get the parent tree structure
 		// The parent commit must already be in our store - we don't fetch it here
@@ -824,7 +844,7 @@ func (r *remoteGitImpl) createPackfile(commitHash plumbing.Hash) (io.ReadCloser,
 	// Get all objects reachable from the commit
 	// We collect hashes as we walk, ensuring all objects are in the store
 	var hashes []plumbing.Hash
-	
+
 	// Add the commit itself
 	hashes = append(hashes, commitHash)
 
@@ -942,22 +962,20 @@ func (r *remoteGitImpl) CreateBranch(ctx context.Context, branchName string, sou
 		refName = "refs/heads/" + branchName
 	}
 
-	// Create a new session for receive-pack
-	sess, err := r.transport.NewSession(r.store, r.ep, nil)
+	// Get or create cached write connection
+	conn, err := r.getOrCreateWriteConnection(ctx)
 	if err != nil {
-		return fmt.Errorf("failed to create session: %w", err)
+		return fmt.Errorf("failed to get write connection: %w", err)
 	}
-
-	conn, err := sess.Handshake(ctx, transport.ReceivePackService, "")
-	if err != nil {
-		return fmt.Errorf("failed to handshake: %w", err)
-	}
-	defer conn.Close()
 
 	// Get current refs to check if branch already exists
 	refs, err := conn.GetRemoteRefs(ctx)
 	if err != nil {
-		return fmt.Errorf("failed to get remote refs: %w", err)
+		// Empty repositories should just return empty refs
+		if !errors.Is(err, transport.ErrEmptyRemoteRepository) {
+			return fmt.Errorf("failed to get remote refs: %w", err)
+		}
+		refs = nil // Empty repository, no refs
 	}
 
 	// Check if branch already exists
@@ -1084,8 +1102,10 @@ func (r *remoteGitImpl) CreateBranch(ctx context.Context, branchName string, sou
 		return fmt.Errorf("failed to push branch: %w", err)
 	}
 
-	// Invalidate cached connection since push changes remote state
-	r.invalidateConnection()
+	// Invalidate both connections after push
+	// The write connection cannot be reused after a push (git protocol limitation)
+	// The read connection needs to be invalidated to see updated refs
+	r.InvalidateConnection()
 
 	return nil
 }

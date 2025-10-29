@@ -23,13 +23,6 @@ type RemoteGit interface {
 	GetTree(ctx context.Context, ref string) (*TreeNode, error)
 	GetObject(ctx context.Context, hash string) ([]byte, error)
 	GetCommitMessage(ctx context.Context, hash string) (string, error)
-	Push(ctx context.Context, refName string, objectsByPath map[string]GitObject, message string) error
-
-	// CreateBranch creates a new branch on the remote repository without checking it out.
-	// The branch is created from the specified sourceRef (commit hash or branch name).
-	// If sourceRef is empty, creates an orphan branch with an empty initial commit.
-	// This works on newly-initialized bare repos as well as repos with existing branches.
-	CreateBranch(ctx context.Context, branchName string, sourceRef string, message string) error
 
 	// InvalidateConnection closes and clears any cached connection
 	// This can be useful for polling scenarios to ensure fresh data
@@ -65,6 +58,10 @@ type TreeNode struct {
 }
 
 func (t *TreeNode) Paths() []string {
+	if t == nil {
+		return []string{}
+	}
+
 	var paths []string
 	if t.IsObject {
 		return []string{""}
