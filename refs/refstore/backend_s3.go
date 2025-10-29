@@ -56,9 +56,9 @@ func (s *s3Backend) Get(ctx context.Context, paths []string) ([]GetResult, error
 	return out, nil
 }
 
-// GetInfo implements DocumentBackend.
-func (s *s3Backend) GetInfo(ctx context.Context) (*StoreInfo, error) {
-	obj, err := s.getObjectOrNil(ctx, storeInfoFile)
+// GetBytes implements DocumentBackend.
+func (s *s3Backend) GetBytes(ctx context.Context, path string) ([]byte, error) {
+	obj, err := s.getObjectOrNil(ctx, path)
 	if err != nil {
 		return nil, err
 	}
@@ -70,11 +70,7 @@ func (s *s3Backend) GetInfo(ctx context.Context) (*StoreInfo, error) {
 	if err != nil {
 		return nil, err
 	}
-	var info StoreInfo
-	if err := json.Unmarshal(body, &info); err != nil {
-		return nil, err
-	}
-	return &info, nil
+	return body, nil
 }
 
 // Marker implements DocumentBackend.
@@ -187,17 +183,12 @@ func (s *s3Backend) Set(ctx context.Context, marker []byte, message string, reqs
 	return nil
 }
 
-// SetInfo implements DocumentBackend.
-func (s *s3Backend) SetInfo(ctx context.Context, info *StoreInfo) error {
-	bodyJSON, err := json.MarshalIndent(info, "", "  ")
-	if err != nil {
-		return fmt.Errorf("marshal: %w", err)
-	}
-
-	bodyReader := bytes.NewReader(bodyJSON)
-	_, err = s.client.PutObject(ctx, &s3.PutObjectInput{
+// SetBytes implements DocumentBackend.
+func (s *s3Backend) SetBytes(ctx context.Context, path string, content []byte) error {
+	bodyReader := bytes.NewReader(content)
+	_, err := s.client.PutObject(ctx, &s3.PutObjectInput{
 		Bucket: aws.String(s.bucket),
-		Key:    aws.String(s.prefix + storeInfoFile),
+		Key:    aws.String(s.prefix + path),
 		Body:   bodyReader,
 	})
 	if err != nil {

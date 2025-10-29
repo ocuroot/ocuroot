@@ -10,7 +10,6 @@ import (
 var _ DocumentBackend = (*inMemoryBackend)(nil)
 
 type inMemoryBackend struct {
-	info    *StoreInfo
 	storage map[string]json.RawMessage
 }
 
@@ -20,14 +19,17 @@ func NewInMemoryBackend() DocumentBackend {
 	}
 }
 
-// GetInfo implements DocumentBackend.
-func (i *inMemoryBackend) GetInfo(ctx context.Context) (*StoreInfo, error) {
-	return i.info, nil
+// GetBytes implements DocumentBackend.
+func (i *inMemoryBackend) GetBytes(ctx context.Context, path string) ([]byte, error) {
+	if data, ok := i.storage[path]; ok {
+		return []byte(data), nil
+	}
+	return nil, nil
 }
 
-// SetInfo implements DocumentBackend.
-func (i *inMemoryBackend) SetInfo(ctx context.Context, info *StoreInfo) error {
-	i.info = info
+// SetBytes implements DocumentBackend.
+func (i *inMemoryBackend) SetBytes(ctx context.Context, path string, content []byte) error {
+	i.storage[path] = json.RawMessage(content)
 	return nil
 }
 

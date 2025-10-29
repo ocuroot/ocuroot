@@ -128,7 +128,8 @@ func newRefStoreFromBackend(
 			storeConfig.Git.RemoteURL,
 			storeConfig.Git.Branch,
 			refstore.GitRefStoreConfig{
-				PathPrefix: pathPrefix,
+				PathPrefix:   pathPrefix,
+				SupportFiles: storeConfig.Git.SupportFiles,
 				GitRepoConfig: refstore.GitRepoConfig{
 					CreateBranch: storeConfig.Git.CreateBranch,
 					GitUserName:  gitUserName,

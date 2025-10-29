@@ -35,7 +35,7 @@ type Store interface {
 type StoreInfo struct {
 	Version int `json:"version"`
 
-	Tags map[string]struct{}
+	Tags map[string]struct{} `json:"tags"`
 }
 
 type MatchOptions struct {

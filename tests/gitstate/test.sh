@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 export OCU_REPO_COMMIT_OVERRIDE=${OCU_REPO_COMMIT_OVERRIDE:-commitid}
-export OCUROOT_HOME=$(pwd)/$(dirname "$0")/.ocuroot
+export OCUROOT_HOME=$(pwd)/$(dirname "$0")/testdata/.ocuroot
 
 source $(dirname "$0")/../test_helpers.sh
 source $(dirname "$0")/../git_helpers.sh
@@ -11,8 +11,8 @@ test_gitstate() {
     init_repos
 
     # Set up working directories with initial commits
-    init_working_dir "$(mktemp -d)" "$STATE_REMOTE" "STATE_WORKING"
-    init_working_dir "$(mktemp -d)" "$INTENT_REMOTE" "INTENT_WORKING"
+    init_working_dir "$(pwd)/testdata/state" "$STATE_REMOTE" "STATE_WORKING"
+    init_working_dir "$(pwd)/testdata/intent" "$INTENT_REMOTE" "INTENT_WORKING"
 
     setup_test
 
@@ -28,12 +28,13 @@ test_gitstate() {
     assert_equal "0" "$?" "Failed to delete deployment intent"
 
     echo "== check out intent store =="
-    INTENT_WORKING=$(mktemp -d)
-    git clone "$INTENT_REMOTE" "$INTENT_WORKING"
+    INTENT_CHECKOUT="$(pwd)/testdata/intent_checkout"
+    git clone "$INTENT_REMOTE" "$INTENT_CHECKOUT"
     assert_equal "0" "$?" "Failed to clone intent store"
 
     echo "== trigger update from intent store =="
-    pushd "$INTENT_WORKING" > /dev/null
+    pushd "$INTENT_CHECKOUT" > /dev/null
+
     git checkout intent
     assert_equal "0" "$?" "Failed to checkout intent branch"
 
@@ -72,7 +73,7 @@ setup_test() {
     echo "State remote: $STATE_REMOTE"
     echo "Intent remote: $INTENT_REMOTE"
 
-    rm -rf .ocuroot
+    rm -rf testdata
 
     # Set up environments
     echo "ocuroot release new environments.ocu.star"

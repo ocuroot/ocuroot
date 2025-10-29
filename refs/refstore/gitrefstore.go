@@ -15,7 +15,8 @@ type GitRepoConfig struct {
 type GitRefStoreConfig struct {
 	GitRepoConfig
 
-	PathPrefix string
+	PathPrefix   string
+	SupportFiles map[string]string
 }
 
 func NewGitRefStore(
@@ -25,14 +26,26 @@ func NewGitRefStore(
 	branch string,
 	cfg GitRefStoreConfig,
 ) (Store, error) {
+	ctx := context.Background()
+	
 	// Create bare repo path under baseDir
 	bareRepoPath := filepath.Join(baseDir, "git-repos", sanitizeRepoName(remote))
 	
-	be, err := NewGitBackend(context.Background(), bareRepoPath, remote, branch)
+	be, err := NewGitBackend(ctx, bareRepoPath, remote, branch, cfg.GitUserName, cfg.GitUserEmail)
 	if err != nil {
 		return nil, err
 	}
-	return NewRefStore(context.Background(), be, tags)
+	
+	// Write support files if provided
+	if len(cfg.SupportFiles) > 0 {
+		for path, content := range cfg.SupportFiles {
+			if err := be.SetBytes(ctx, path, []byte(content)); err != nil {
+				return nil, err
+			}
+		}
+	}
+	
+	return NewRefStore(ctx, be, tags)
 }
 
 // sanitizeRepoName creates a safe directory name from a git remote URL

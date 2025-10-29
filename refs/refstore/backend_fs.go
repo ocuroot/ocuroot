@@ -23,36 +23,31 @@ type fsBackend struct {
 	root string
 }
 
-// GetInfo implements DocumentBackend.
-func (f *fsBackend) GetInfo(ctx context.Context) (*StoreInfo, error) {
-	infoFile := filepath.Join(f.root, storeInfoFile)
+// GetBytes implements DocumentBackend.
+func (f *fsBackend) GetBytes(ctx context.Context, path string) ([]byte, error) {
+	filePath := filepath.Join(f.root, path)
 
-	if err := os.MkdirAll(filepath.Dir(infoFile), 0755); err != nil {
+	if err := os.MkdirAll(filepath.Dir(filePath), 0755); err != nil {
 		return nil, err
 	}
 
-	content, err := os.ReadFile(infoFile)
+	content, err := os.ReadFile(filePath)
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
 			return nil, nil
 		}
 		return nil, err
 	}
-	var info StoreInfo
-	if err := json.Unmarshal(content, &info); err != nil {
-		return nil, err
-	}
-	return &info, nil
+	return content, nil
 }
 
-// SetInfo implements DocumentBackend.
-func (f *fsBackend) SetInfo(ctx context.Context, info *StoreInfo) error {
-	infoFile := filepath.Join(f.root, storeInfoFile)
-	content, err := json.Marshal(info)
-	if err != nil {
+// SetBytes implements DocumentBackend.
+func (f *fsBackend) SetBytes(ctx context.Context, path string, content []byte) error {
+	filePath := filepath.Join(f.root, path)
+	if err := os.MkdirAll(filepath.Dir(filePath), 0755); err != nil {
 		return err
 	}
-	return os.WriteFile(infoFile, content, 0644)
+	return os.WriteFile(filePath, content, 0644)
 }
 
 // Get implements DocumentBackend.

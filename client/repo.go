@@ -72,7 +72,7 @@ func GetRepoInfo(path string) (RepoInfo, error) {
 		} else if _, ok := info.Tags["intent"]; ok {
 			repoType = RepoTypeIntent
 		} else {
-			return RepoInfo{}, fmt.Errorf("unknown repo type")
+			return RepoInfo{}, fmt.Errorf("unknown repo type. tags: %v", info.Tags)
 		}
 	} else {
 		repoType = RepoTypeSource

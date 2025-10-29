@@ -25,16 +25,30 @@ const (
 var _ Store = &RefStore{}
 
 func NewRefStore(ctx context.Context, backend DocumentBackend, tags map[string]struct{}) (*RefStore, error) {
-	info, err := backend.GetInfo(ctx)
+	// Read store info using GetBytes
+	infoBytes, err := backend.GetBytes(ctx, storeInfoFile)
 	if err != nil {
 		return nil, err
+	}
+
+	var info *StoreInfo
+	if infoBytes != nil {
+		info = &StoreInfo{}
+		if err := json.Unmarshal(infoBytes, info); err != nil {
+			return nil, fmt.Errorf("failed to unmarshal store info: %w", err)
+		}
 	}
 
 	if info != nil {
 		if info.Version == 2 {
 			info.Version = 3
 			info.Tags = tags
-			if err := backend.SetInfo(ctx, info); err != nil {
+			// Write updated info using SetBytes
+			updatedBytes, err := json.Marshal(info)
+			if err != nil {
+				return nil, err
+			}
+			if err := backend.SetBytes(ctx, storeInfoFile, updatedBytes); err != nil {
 				return nil, err
 			}
 		}
@@ -43,9 +57,13 @@ func NewRefStore(ctx context.Context, backend DocumentBackend, tags map[string]s
 			return nil, fmt.Errorf("incompatible store version: expected %d, got %d", stateVersion, info.Version)
 		}
 	} else {
-		var info StoreInfo = StoreInfo{Version: stateVersion, Tags: tags}
-		err = backend.SetInfo(ctx, &info)
+		// Create new store info
+		info := StoreInfo{Version: stateVersion, Tags: tags}
+		infoBytes, err := json.Marshal(&info)
 		if err != nil {
+			return nil, err
+		}
+		if err := backend.SetBytes(ctx, storeInfoFile, infoBytes); err != nil {
 			return nil, err
 		}
 	}
@@ -70,11 +88,19 @@ type TransactionAction struct {
 
 // Info implements Store.
 func (r *RefStore) Info() StoreInfo {
-	info, err := r.Backend.GetInfo(context.Background())
+	infoBytes, err := r.Backend.GetBytes(context.Background(), storeInfoFile)
 	if err != nil {
 		panic(err)
 	}
-	return *info
+	if infoBytes == nil {
+		panic("store info not found")
+	}
+	
+	var info StoreInfo
+	if err := json.Unmarshal(infoBytes, &info); err != nil {
+		panic(err)
+	}
+	return info
 }
 
 // StartTransaction implements Store.

@@ -55,10 +55,10 @@ func (m MatchRequest) Matches(in string) bool {
 // DocumentBackend defines functions to interact with a storage backend
 // Documents are stored as StorageObject values against string refs.
 type DocumentBackend interface {
-	// GetInfo retrives the metadata about this store backend
-	GetInfo(ctx context.Context) (*StoreInfo, error)
-	// SetInfo applies the metadata about this store backend
-	SetInfo(ctx context.Context, info *StoreInfo) error
+	// GetBytes retrieves a file explicitly as bytes rather than batched documents
+	GetBytes(ctx context.Context, path string) ([]byte, error)
+	// SetBytes sets the contents of a file at a path to explicit bytes
+	SetBytes(ctx context.Context, path string, content []byte) error
 
 	// Marker returns a value that can be used to identify a point in time snapshot of the document content
 	// It is used in the Set function to indicate when a transaction was started.

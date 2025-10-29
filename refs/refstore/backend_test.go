@@ -2,6 +2,7 @@ package refstore
 
 import (
 	"context"
+	"encoding/json"
 	"sort"
 	"testing"
 )
@@ -78,23 +79,45 @@ func doTestBackendSetGet(t *testing.T, getBackend func() DocumentBackend) {
 
 func doTestBackendInfo(t *testing.T, getBackend func() DocumentBackend) {
 	backend := getBackend()
-	info, err := backend.GetInfo(context.Background())
+	
+	// Test GetBytes on non-existent file
+	data, err := backend.GetBytes(context.Background(), storeInfoFile)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if info != nil {
-		t.Errorf("expected nil info, got %+v", info)
+	if data != nil {
+		t.Errorf("expected nil data, got %+v", data)
 	}
 
-	if err := backend.SetInfo(context.Background(), &StoreInfo{Version: 2}); err != nil {
-		t.Fatal(err)
-	}
-	info, err = backend.GetInfo(context.Background())
+	// Test SetBytes
+	testInfo := &StoreInfo{Version: 2, Tags: map[string]struct{}{"test": {}}}
+	infoBytes, err := json.Marshal(testInfo)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if info == nil || info.Version != 2 {
-		t.Errorf("expected version 2, got %+v", info)
+	
+	if err := backend.SetBytes(context.Background(), storeInfoFile, infoBytes); err != nil {
+		t.Fatal(err)
+	}
+	
+	// Test GetBytes retrieves what was set
+	data, err = backend.GetBytes(context.Background(), storeInfoFile)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if data == nil {
+		t.Fatal("expected data, got nil")
+	}
+	
+	var retrievedInfo StoreInfo
+	if err := json.Unmarshal(data, &retrievedInfo); err != nil {
+		t.Fatal(err)
+	}
+	if retrievedInfo.Version != 2 {
+		t.Errorf("expected version 2, got %d", retrievedInfo.Version)
+	}
+	if _, ok := retrievedInfo.Tags["test"]; !ok {
+		t.Errorf("expected 'test' tag to be present")
 	}
 }
 

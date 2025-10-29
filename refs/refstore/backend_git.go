@@ -34,7 +34,9 @@ func getWorktreeMutex(worktreePath string) *sync.Mutex {
 // bareRepoPath: path to the bare repository (will be created if it doesn't exist)
 // remoteURL: the remote repository URL to fetch from and push to
 // branch: the branch name (without refs/heads/ prefix)
-func NewGitBackend(ctx context.Context, bareRepoPath string, remoteURL string, branch string) (DocumentBackend, error) {
+// gitUserName: git author name (optional, defaults to system config)
+// gitUserEmail: git author email (optional, defaults to system config)
+func NewGitBackend(ctx context.Context, bareRepoPath string, remoteURL string, branch string, gitUserName string, gitUserEmail string) (DocumentBackend, error) {
 	// Ensure branch doesn't have refs/heads/ prefix for worktree operations
 	branch = strings.TrimPrefix(branch, "refs/heads/")
 	
@@ -59,6 +61,8 @@ func NewGitBackend(ctx context.Context, bareRepoPath string, remoteURL string, b
 		worktreePath: worktreePath,
 		remoteURL:    remoteURL,
 		branch:       branch,
+		gitUserName:  gitUserName,
+		gitUserEmail: gitUserEmail,
 	}, nil
 }
 
@@ -69,43 +73,61 @@ type gitBackend struct {
 	worktreePath string
 	remoteURL    string
 	branch       string
+	gitUserName  string
+	gitUserEmail string
 }
 
-// GetInfo implements DocumentBackend.
-func (g *gitBackend) GetInfo(ctx context.Context) (*StoreInfo, error) {
-	results, err := g.Get(ctx, []string{storeInfoFile})
+// GetBytes implements DocumentBackend.
+func (g *gitBackend) GetBytes(ctx context.Context, path string) ([]byte, error) {
+	filePath := filepath.Join(g.worktreePath, path)
+	
+	data, err := os.ReadFile(filePath)
 	if err != nil {
-		return nil, err
-	}
-	if len(results) != 1 {
-		return nil, nil
-	}
-	if results[0].Doc == nil {
-		return nil, nil
+		if os.IsNotExist(err) {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("failed to read file %s: %w", path, err)
 	}
 
-	var info StoreInfo
-	if err := json.Unmarshal(results[0].Doc.Body, &info); err != nil {
-		return nil, err
-	}
-	return &info, nil
+	return data, nil
 }
 
-// SetInfo implements DocumentBackend.
-func (g *gitBackend) SetInfo(ctx context.Context, info *StoreInfo) error {
-	content, err := json.Marshal(info)
-	if err != nil {
-		return err
+// SetBytes implements DocumentBackend.
+func (g *gitBackend) SetBytes(ctx context.Context, path string, content []byte) error {
+	// Use mutex to prevent concurrent operations on the same worktree
+	mu := getWorktreeMutex(g.worktreePath)
+	mu.Lock()
+	defer mu.Unlock()
+
+	// Pull latest changes from remote
+	if err := g.pullWorktree(); err != nil {
+		return fmt.Errorf("failed to pull: %w", err)
 	}
 
-	return g.Set(ctx, nil, "Update store info", []SetRequest{
-		{
-			Path: storeInfoFile,
-			Doc: &StorageObject{
-				Body: content,
-			},
-		},
-	})
+	// Write directly to file
+	filePath := filepath.Join(g.worktreePath, path)
+	if err := os.MkdirAll(filepath.Dir(filePath), 0755); err != nil {
+		return fmt.Errorf("failed to create directory: %w", err)
+	}
+	
+	if err := os.WriteFile(filePath, content, 0644); err != nil {
+		return fmt.Errorf("failed to write file %s: %w", path, err)
+	}
+
+	// Commit and push
+	if err := g.gitAdd(); err != nil {
+		return fmt.Errorf("failed to add: %w", err)
+	}
+
+	if err := g.gitCommit(fmt.Sprintf("Update %s", path)); err != nil {
+		return fmt.Errorf("failed to commit: %w", err)
+	}
+
+	if err := g.gitPush(); err != nil {
+		return fmt.Errorf("failed to push: %w", err)
+	}
+
+	return nil
 }
 
 // Get implements DocumentBackend.
@@ -391,7 +413,13 @@ func (g *gitBackend) gitCommit(message string) error {
 		message = "Update"
 	}
 
-	cmd = exec.Command("git", "-C", g.worktreePath, "commit", "-m", message)
+	// Build commit command with author if provided
+	args := []string{"-C", g.worktreePath, "commit", "-m", message}
+	if g.gitUserName != "" && g.gitUserEmail != "" {
+		args = append(args, "--author", fmt.Sprintf("%s <%s>", g.gitUserName, g.gitUserEmail))
+	}
+
+	cmd = exec.Command("git", args...)
 	if output, err := cmd.CombinedOutput(); err != nil {
 		return fmt.Errorf("git commit failed: %w: %s", err, output)
 	}
