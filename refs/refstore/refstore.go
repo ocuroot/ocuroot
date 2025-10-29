@@ -133,8 +133,14 @@ func refContentPath(ref string) string {
 
 // Delete implements Store.
 func (r *RefStore) Delete(ctx context.Context, ref string) error {
+	// Resolve any links in the ref path
+	resolved, err := r.ResolveLink(ctx, ref)
+	if err != nil {
+		return err
+	}
+
 	return r.handleRequest(ctx, SetRequest{
-		Path: refContentPath(ref),
+		Path: refContentPath(resolved),
 		Doc:  nil,
 	})
 }
@@ -149,17 +155,25 @@ func (r *RefStore) Get(ctx context.Context, ref string, v any) error {
 	refWithoutFragment := parsedRef
 	refWithoutFragment.Fragment = ""
 
-	resolved, err := r.ResolveLink(ctx, refWithoutFragment.String())
+	storageObject, err := r.getRef(ctx, refWithoutFragment.String())
 	if err != nil {
 		return err
 	}
 
-	storageObject, err := r.getRef(ctx, resolved)
-	if err != nil {
-		return err
-	}
-	if storageObject == nil {
-		return ErrRefNotFound
+	// Resolve links if the direct object does not exist
+	if storageObject == nil || storageObject.Kind == StorageKindLink {
+		resolved, err := r.ResolveLink(ctx, refWithoutFragment.String())
+		if err != nil {
+			return err
+		}
+
+		storageObject, err = r.getRef(ctx, resolved)
+		if err != nil {
+			return err
+		}
+		if storageObject == nil {
+			return ErrRefNotFound
+		}
 	}
 
 	if parsedRef.Fragment == "" {
@@ -252,7 +266,7 @@ func (r *RefStore) Link(ctx context.Context, ref string, target string) error {
 		return fmt.Errorf("load existing: %w", err)
 	}
 
-	if existing != nil && existing.Kind == "link" {
+	if existing != nil && existing.Kind == StorageKindLink {
 		unlinkReqs, err := r.unlinkRequests(ctx, ref)
 		if err != nil {
 			return fmt.Errorf("failed to unlink: %w", err)
@@ -268,7 +282,7 @@ func (r *RefStore) Link(ctx context.Context, ref string, target string) error {
 	requests = append(requests, SetRequest{
 		Path: refContentPath(ref),
 		Doc: &StorageObject{
-			Kind: "link",
+			Kind: StorageKindLink,
 			Body: targetJSON,
 		},
 	})
@@ -315,7 +329,7 @@ func (r *RefStore) MatchOptions(ctx context.Context, options MatchOptions, glob 
 			if doc == nil {
 				continue
 			}
-			if doc.Kind == "link" {
+			if doc.Kind == StorageKindLink {
 				continue
 			}
 			out = append(out, res)
@@ -367,14 +381,13 @@ func (r *RefStore) MatchOptions(ctx context.Context, options MatchOptions, glob 
 
 // ResolveLink implements Store.
 func (r *RefStore) ResolveLink(ctx context.Context, ref string) (string, error) {
-	out, err := r.refOrLinkTarget(ctx, ref)
+	lt, err := r.getLinkTarget(ctx, ref)
 	if err != nil {
-		return "", fmt.Errorf("resolving %v: %w", ref, err)
+		return "", err
 	}
-	if out != "" {
-		return out, nil
+	if lt != nil {
+		return *lt, nil
 	}
-
 	var prefix string
 	dirs := strings.Split(ref, "/")
 	for i := 0; i < len(dirs); i++ {
@@ -382,47 +395,51 @@ func (r *RefStore) ResolveLink(ctx context.Context, ref string) (string, error) 
 			continue
 		}
 		prefix = path.Join(prefix, dirs[i])
-		out, err := r.refOrLinkTarget(ctx, prefix)
+		lt, err := r.getLinkTarget(ctx, prefix)
 		if err != nil {
 			return "", fmt.Errorf("resolving %v: %w", prefix, err)
 		}
-		if out != "" && out != prefix {
-			return path.Join(out, strings.Join(dirs[i+1:], "/")), nil
+		if lt != nil {
+			return path.Join(*lt, strings.Join(dirs[i+1:], "/")), nil
 		}
 	}
-
 	return ref, nil
 }
 
-func (r *RefStore) refOrLinkTarget(ctx context.Context, ref string) (string, error) {
+func (r *RefStore) getLinkTarget(ctx context.Context, ref string) (*string, error) {
 	result, err := r.getRef(ctx, ref)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 	if result == nil {
-		return "", nil
+		return nil, nil
 	}
-	if result.Kind != "link" {
-		return ref, nil
+	if result.Kind != StorageKindLink {
+		return nil, nil
 	}
 	var linkRef string
 	err = json.Unmarshal(result.Body, &linkRef)
 	if err != nil {
-		return "", fmt.Errorf("unmarshal: %w", err)
+		return nil, fmt.Errorf("unmarshal: %w", err)
 	}
-
-	return linkRef, nil
+	return &linkRef, nil
 }
 
 // Set implements Store.
 func (r *RefStore) Set(ctx context.Context, ref string, v any) error {
+	// Resolve any links in the ref path
+	resolved, err := r.ResolveLink(ctx, ref)
+	if err != nil {
+		return err
+	}
+
 	var doc StorageObject = StorageObject{
 		Kind:     StorageKindRef,
 		BodyType: fmt.Sprintf("%T", v),
 	}
 
 	// Retrieve the previous doc to preserve links, etc
-	previous, err := r.getRef(ctx, ref)
+	previous, err := r.getRef(ctx, resolved)
 	if err != nil {
 		return err
 	}
@@ -439,7 +456,7 @@ func (r *RefStore) Set(ctx context.Context, ref string, v any) error {
 	}
 
 	return r.handleRequest(ctx, SetRequest{
-		Path: refContentPath(ref),
+		Path: refContentPath(resolved),
 		Doc:  &doc,
 	})
 }

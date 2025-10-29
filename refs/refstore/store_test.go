@@ -17,6 +17,9 @@ func DoTestStore(t *testing.T, store Store) {
 	t.Run("link", func(t *testing.T) {
 		testStoreLink(t, store)
 	})
+	t.Run("link_with_child_path", func(t *testing.T) {
+		testStoreLinkWithChildPath(t, store)
+	})
 	t.Run("fragments", func(t *testing.T) {
 		testStoreFragments(t, store)
 	})
@@ -223,6 +226,48 @@ func testStoreLink(t *testing.T, store Store) {
 	}
 }
 
+func testStoreLinkWithChildPath(t *testing.T, store Store) {
+	ctx := context.Background()
+
+	// Create a link from @ to @r1
+	linkSource := "minimal/repo/-/approvals.ocu.star/@v1"
+	linkTarget := "minimal/repo/-/approvals.ocu.star/@r1"
+
+	preExistingChildRef := "minimal/repo/-/approvals.ocu.star/@v1/custom/preexisting"
+	createTestRefs(t, store, preExistingChildRef, "preexisting_value")
+
+	// Create the target ref (links require the target to exist)
+	// and the actual ref that will be accessed through the link
+	createTestRefs(t, store, linkTarget, "r1_value")
+
+	// Create the link
+	if err := store.Link(ctx, linkSource, linkTarget); err != nil {
+		t.Fatalf("failed to create link: %v", err)
+	}
+
+	// Get the value of the linked source
+	checkRef(t, store, linkSource, "r1_value", "linked source value")
+
+	// Resolve a child link
+	linkedRef := "minimal/repo/-/approvals.ocu.star/@v1/custom/approval"
+	resolved, err := store.ResolveLink(ctx, linkedRef)
+	if resolved != "minimal/repo/-/approvals.ocu.star/@r1/custom/approval" {
+		t.Fatalf("failed to resolve link: got %v %v", resolved, err)
+	}
+
+	// Set a child ref
+	createTestRefs(t, store, linkedRef, "child_value")
+
+	// Get the value of the linked ref
+	checkRef(t, store, linkedRef, "child_value", "linked ref value")
+
+	// Get the value of the linked ref at the resolved path
+	checkRef(t, store, resolved, "child_value", "resolved ref value")
+
+	// Check the preexisting child ref wasn't clobbered
+	checkRef(t, store, preExistingChildRef, "preexisting_value", "preexisting child ref should not have been clobbered")
+}
+
 func testStoreFragments(t *testing.T, store Store) {
 	ctx := context.Background()
 
@@ -319,21 +364,24 @@ func testStoreTransactions(t *testing.T, store Store) {
 }
 
 func setRef(t *testing.T, store Store, ref string, value any) {
+	t.Helper()
 	if err := store.Set(t.Context(), ref, value); err != nil {
 		t.Fatal(err)
 	}
 }
 
 func deleteRef(t *testing.T, store Store, ref string) {
+	t.Helper()
 	if err := store.Delete(t.Context(), ref); err != nil {
 		t.Fatal(err)
 	}
 }
 
 func checkRef(t *testing.T, store Store, ref string, expected any, message string) {
+	t.Helper()
 	var v any
 	if err := store.Get(t.Context(), ref, &v); err != nil {
-		t.Fatalf("failed to get key: %v", err)
+		t.Fatalf("%s: failed to get key: %v", message, err)
 	}
 	if !cmp.Equal(v, expected) {
 		t.Errorf("%s: got %v, want %v", message, v, expected)
@@ -341,6 +389,7 @@ func checkRef(t *testing.T, store Store, ref string, expected any, message strin
 }
 
 func checkRefNotExist(t *testing.T, store Store, ref string, message string) {
+	t.Helper()
 	var v any
 	if err := store.Get(t.Context(), ref, &v); err != ErrRefNotFound {
 		t.Fatalf("%v: %v", message, err)
