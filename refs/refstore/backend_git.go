@@ -56,8 +56,10 @@ func NewGitBackend(ctx context.Context, bareRepoPath string, remoteURL string, b
 		return nil, fmt.Errorf("fetching remote: %w", err)
 	}
 	
-	// Create worktree for this branch
-	worktreePath := filepath.Join(bareRepoPath, "worktrees", branch)
+	// Create worktree for this branch in a separate directory outside the bare repo
+	// This prevents worktree metadata from being committed to the repository
+	worktreeBaseDir := filepath.Join(filepath.Dir(bareRepoPath), "worktrees")
+	worktreePath := filepath.Join(worktreeBaseDir, filepath.Base(bareRepoPath), branch)
 	if err := ensureWorktree(bareRepoPath, worktreePath, branch); err != nil {
 		return nil, fmt.Errorf("ensuring worktree: %w", err)
 	}
@@ -417,10 +419,50 @@ func (g *gitBackend) pullWorktree() error {
 }
 
 func (g *gitBackend) gitAdd() error {
-	cmd := exec.Command("git", "-C", g.worktreePath, "add", "-A")
-	if output, err := cmd.CombinedOutput(); err != nil {
-		return fmt.Errorf("git add failed: %w: %s", err, output)
+	// Add files, being careful to only add data files and not worktree metadata
+	// Strategy: explicitly add files that should be tracked, avoiding metadata files
+	
+	if g.pathPrefix != "" {
+		// When using a pathPrefix, add both:
+		// 1. Files in the pathPrefix directory (data files)
+		// 2. Files at the root (support files like .gitignore, support.txt, etc.)
+		
+		// First, add files from the pathPrefix directory if it exists
+		prefixFullPath := filepath.Join(g.worktreePath, g.pathPrefix)
+		if _, err := os.Stat(prefixFullPath); err == nil {
+			cmd := exec.Command("git", "-C", g.worktreePath, "add", "-A", g.pathPrefix)
+			if output, err := cmd.CombinedOutput(); err != nil {
+				return fmt.Errorf("git add failed: %w: %s", err, output)
+			}
+		}
+		
+		// Then, add any root-level files (but not directories, to avoid metadata)
+		// List files in the root directory
+		entries, err := os.ReadDir(g.worktreePath)
+		if err != nil {
+			return fmt.Errorf("reading worktree: %w", err)
+		}
+		
+		for _, entry := range entries {
+			// Skip directories and .git
+			if entry.IsDir() || entry.Name() == ".git" {
+				continue
+			}
+			
+			// Add this root-level file
+			cmd := exec.Command("git", "-C", g.worktreePath, "add", entry.Name())
+			if output, err := cmd.CombinedOutput(); err != nil {
+				return fmt.Errorf("git add %s failed: %w: %s", entry.Name(), err, output)
+			}
+		}
+	} else {
+		// No pathPrefix, add everything from current directory
+		cmd := exec.Command("git", "-C", g.worktreePath, "add", "-A", ".")
+		if output, err := cmd.CombinedOutput(); err != nil {
+			return fmt.Errorf("git add failed: %w: %s", err, output)
+		}
 	}
+	
 	return nil
 }
 
