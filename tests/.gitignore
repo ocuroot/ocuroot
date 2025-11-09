@@ -1,1 +1,6 @@
 bin/
+
+# .ocuroot-dir-boundary is a marker file that prevents ocuroot from searching
+# beyond the tests directory for repo.ocu.star files. This isolates tests from
+# the parent ocuroot source repository.
+!.ocuroot-dir-boundary

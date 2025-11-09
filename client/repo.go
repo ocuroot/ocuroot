@@ -170,6 +170,12 @@ func findRoot(path string, markerFile string) (string, error) {
 	}
 
 	for {
+		// Check for directory boundary marker - stops search immediately
+		boundaryPath := filepath.Join(dir, ".ocuroot-dir-boundary")
+		if _, err := os.Stat(boundaryPath); err == nil {
+			return "", ErrRootNotFound
+		}
+
 		repoPath := filepath.Join(dir, markerFile)
 		if _, err := os.Stat(repoPath); err == nil {
 			return dir, nil
