@@ -258,6 +258,8 @@ func (w *InRepoWorker) Ops(ctx context.Context, req IdentifyWorkRequest) ([]Work
 }
 
 func (w *InRepoWorker) reconcileDeployment(ctx context.Context, ref string, req IdentifyWorkRequest) (*refs.Ref, error) {
+	log.Debug("Reconciling deployment", "ref", ref)
+
 	store := w.Tracker.State
 	var deployment models.Task
 	if err := store.Get(ctx, ref, &deployment); err != nil {
@@ -284,6 +286,7 @@ func (w *InRepoWorker) reconcileDeployment(ctx context.Context, ref string, req 
 	}
 	// Don't attempt to trigger if the dependencies haven't been satisfied
 	if !dependenciesSatisfied {
+		log.Debug("Dependencies unsatisfied", "ref", ref)
 		return nil, nil
 	}
 
@@ -295,8 +298,11 @@ func (w *InRepoWorker) reconcileDeployment(ctx context.Context, ref string, req 
 
 	var changed bool
 	for k, v := range inputs {
+		log.Debug("checking input", "key", k)
+
 		// Ensure we don't create loops with the outputs of this job
 		if v.Ref != nil && isForSameJob(*v.Ref, parsedResolvedDeployment) {
+			log.Debug("input is from same job, skipping")
 			continue
 		}
 		if v.Ref != nil && req.StateChanges != nil {
@@ -309,6 +315,7 @@ func (w *InRepoWorker) reconcileDeployment(ctx context.Context, ref string, req 
 				return nil, fmt.Errorf("failed to parse resolved inputs %q: %w", resolvedV, err)
 			}
 			if _, ok := req.StateChanges[parsedResolvedV.SetFragment("").String()]; !ok {
+				log.Debug("Resolved input was not in changed state", "inputRef", v.Ref, "inputRefResolved", parsedResolvedV, "stateChanges", req.StateChanges)
 				continue
 			}
 		}

@@ -95,7 +95,7 @@ func (r *RefStore) Info() StoreInfo {
 	if infoBytes == nil {
 		panic("store info not found")
 	}
-	
+
 	var info StoreInfo
 	if err := json.Unmarshal(infoBytes, &info); err != nil {
 		panic(err)
@@ -433,7 +433,15 @@ func (r *RefStore) ResolveLink(ctx context.Context, ref string) (string, error) 
 }
 
 func (r *RefStore) getLinkTarget(ctx context.Context, ref string) (*string, error) {
-	result, err := r.getRef(ctx, ref)
+	parsedRef, err := refs.Parse(ref)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse ref: %w", err)
+	}
+
+	refWithoutFragment := parsedRef
+	refWithoutFragment.Fragment = ""
+
+	result, err := r.getRef(ctx, refWithoutFragment.String())
 	if err != nil {
 		return nil, err
 	}
@@ -448,7 +456,18 @@ func (r *RefStore) getLinkTarget(ctx context.Context, ref string) (*string, erro
 	if err != nil {
 		return nil, fmt.Errorf("unmarshal: %w", err)
 	}
-	return &linkRef, nil
+
+	parsedLinkRef, err := refs.Parse(linkRef)
+	if err != nil {
+		return nil, fmt.Errorf("parse: %w", err)
+	}
+
+	// Restore any fragment from the original ref
+	parsedLinkRef.Fragment = parsedRef.Fragment
+
+	out := parsedLinkRef.String()
+
+	return &out, nil
 }
 
 // Set implements Store.

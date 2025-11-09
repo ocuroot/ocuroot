@@ -23,6 +23,9 @@ func DoTestStore(t *testing.T, store Store) {
 	t.Run("fragments", func(t *testing.T) {
 		testStoreFragments(t, store)
 	})
+	t.Run("link_with_fragment", func(t *testing.T) {
+		testStoreLinkWithFragment(t, store)
+	})
 	t.Run("transaction", func(t *testing.T) {
 		testStoreTransactions(t, store)
 	})
@@ -299,6 +302,56 @@ func testStoreFragments(t *testing.T, store Store) {
 	}
 	if got != "value1" {
 		t.Errorf("unexpected value for key: got %q, want %q", got, "value1")
+	}
+}
+
+func testStoreLinkWithFragment(t *testing.T, store Store) {
+	ctx := context.Background()
+
+	// Create a link from @v1 to @r1
+	linkSource := "repo.git/package/@v1"
+	linkTarget := "repo.git/package/@r1"
+
+	// Create the target ref
+	createTestRefs(t, store, linkTarget, "r1_value")
+
+	// Create the link
+	if err := store.Link(ctx, linkSource, linkTarget); err != nil {
+		t.Fatalf("failed to create link: %v", err)
+	}
+
+	// Resolve the link without a fragment
+	resolvedWithoutFragment, err := store.ResolveLink(ctx, linkSource)
+	if err != nil {
+		t.Fatalf("failed to resolve link without fragment: %v", err)
+	}
+	if resolvedWithoutFragment != linkTarget {
+		t.Errorf("unexpected resolution without fragment: got %q, want %q", resolvedWithoutFragment, linkTarget)
+	}
+
+	// Resolve the link with a fragment
+	linkWithFragment := linkSource + "#outputs/message"
+	resolvedWithFragment, err := store.ResolveLink(ctx, linkWithFragment)
+	if err != nil {
+		t.Fatalf("failed to resolve link with fragment: %v", err)
+	}
+
+	// The resolved link should be the same as without the fragment, but with the fragment appended
+	expectedResolved := linkTarget + "#outputs/message"
+	if resolvedWithFragment != expectedResolved {
+		t.Errorf("unexpected resolution with fragment: got %q, want %q", resolvedWithFragment, expectedResolved)
+	}
+
+	// Test with a more complex fragment
+	linkWithComplexFragment := linkSource + "#nested/path/to/field"
+	resolvedWithComplexFragment, err := store.ResolveLink(ctx, linkWithComplexFragment)
+	if err != nil {
+		t.Fatalf("failed to resolve link with complex fragment: %v", err)
+	}
+
+	expectedComplexResolved := linkTarget + "#nested/path/to/field"
+	if resolvedWithComplexFragment != expectedComplexResolved {
+		t.Errorf("unexpected resolution with complex fragment: got %q, want %q", resolvedWithComplexFragment, expectedComplexResolved)
 	}
 }
 
