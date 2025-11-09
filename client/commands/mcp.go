@@ -91,12 +91,12 @@ func previewHandler(ctx context.Context, request mcp.CallToolRequest) (*mcp.Call
 
 	repoRootPath, err := client.FindSourceRepoRoot(path.Dir(pkgFile))
 	if err != nil {
-		return nil, fmt.Errorf("failed to find repo root: %w", err)
+		return nil, fmt.Errorf("finding repo root: %w", err)
 	}
 
 	relativePackagePath, err := filepath.Rel(repoRootPath, pkgFile)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get relative package path: %w", err)
+		return nil, fmt.Errorf("getting relative package path: %w", err)
 	}
 
 	ref := refs.Ref{
@@ -112,7 +112,7 @@ func previewHandler(ctx context.Context, request mcp.CallToolRequest) (*mcp.Call
 
 	w, err := work.NewInRepoWorker(ctx, ref)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create worker: %w", err)
+		return nil, fmt.Errorf("creating worker: %w", err)
 	}
 	defer w.Cleanup()
 
@@ -123,12 +123,12 @@ func previewHandler(ctx context.Context, request mcp.CallToolRequest) (*mcp.Call
 
 	config, err := local.ExecutePackage(ctx, repoRootPath, ref, backend)
 	if err != nil {
-		return nil, fmt.Errorf("failed to load config at ref %s in repo %s: %v", ref, repoRootPath, starlarkerrors.Render(err))
+		return nil, fmt.Errorf("loading config at ref %s in repo %s: %v", ref, repoRootPath, starlarkerrors.Render(err))
 	}
 
 	packageJSON, err := json.Marshal(config.Package)
 	if err != nil {
-		return nil, fmt.Errorf("failed to marshal package: %w", err)
+		return nil, fmt.Errorf("marshaling package: %w", err)
 	}
 
 	return mcp.NewToolResultText(string(packageJSON)), nil
@@ -168,7 +168,7 @@ func sdkHandler(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallTool
 func exampleListHandler(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	exampleNames, err := fs.ReadDir(ocuroot.Examples, "examples")
 	if err != nil {
-		return nil, fmt.Errorf("failed to read example directory: %w", err)
+		return nil, fmt.Errorf("reading example directory: %w", err)
 	}
 
 	var sb strings.Builder
@@ -188,7 +188,7 @@ func exampleGetHandler(ctx context.Context, request mcp.CallToolRequest) (*mcp.C
 	exampleDirPath := fmt.Sprintf("examples/%s", exampleName)
 	exampleEntries, err := fs.ReadDir(ocuroot.Examples, exampleDirPath)
 	if err != nil {
-		return nil, fmt.Errorf("failed to read example %s: %w", exampleName, err)
+		return nil, fmt.Errorf("reading example %s: %w", exampleName, err)
 	}
 
 	var exampleStarBytes []byte
@@ -201,7 +201,7 @@ func exampleGetHandler(ctx context.Context, request mcp.CallToolRequest) (*mcp.C
 		}
 		exampleStarBytes, err = fs.ReadFile(ocuroot.Examples, fmt.Sprintf("%s/%s", exampleDirPath, entry.Name()))
 		if err != nil {
-			return nil, fmt.Errorf("failed to read example %s's .star file: %w", exampleName, err)
+			return nil, fmt.Errorf("reading example %s's .star file: %w", exampleName, err)
 		}
 		break
 	}

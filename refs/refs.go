@@ -190,11 +190,11 @@ func (r Ref) RelativeTo(ref Ref) (Ref, error) {
 func (r *Ref) UnmarshalJSON(data []byte) error {
 	var refStr string
 	if err := json.Unmarshal(data, &refStr); err != nil {
-		return fmt.Errorf("failed to unpack ref string: %w", err)
+		return fmt.Errorf("unpacking ref string: %w", err)
 	}
 	rp, err := Parse(refStr)
 	if err != nil {
-		return fmt.Errorf("failed to parse ref: %w", err)
+		return fmt.Errorf("parsing ref: %w", err)
 	}
 	*r = rp
 	return nil

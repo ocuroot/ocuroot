@@ -48,18 +48,18 @@ func NewGitBackend(ctx context.Context, bareRepoPath string, remoteURL string, b
 	
 	// Initialize bare repo if it doesn't exist
 	if err := initBareRepo(bareRepoPath, remoteURL); err != nil {
-		return nil, fmt.Errorf("failed to init bare repo: %w", err)
+		return nil, fmt.Errorf("initializing bare repo: %w", err)
 	}
 	
 	// Fetch from remote to ensure we have latest refs
 	if err := fetchRemote(bareRepoPath); err != nil {
-		return nil, fmt.Errorf("failed to fetch remote: %w", err)
+		return nil, fmt.Errorf("fetching remote: %w", err)
 	}
 	
 	// Create worktree for this branch
 	worktreePath := filepath.Join(bareRepoPath, "worktrees", branch)
 	if err := ensureWorktree(bareRepoPath, worktreePath, branch); err != nil {
-		return nil, fmt.Errorf("failed to ensure worktree: %w", err)
+		return nil, fmt.Errorf("ensuring worktree: %w", err)
 	}
 
 	return &gitBackend{
@@ -94,7 +94,7 @@ func (g *gitBackend) GetBytes(ctx context.Context, path string) ([]byte, error) 
 		if os.IsNotExist(err) {
 			return nil, nil
 		}
-		return nil, fmt.Errorf("failed to read file %s: %w", path, err)
+		return nil, fmt.Errorf("reading file %s: %w", path, err)
 	}
 
 	return data, nil
@@ -114,7 +114,7 @@ func (g *gitBackend) setBytesWithPrefix(ctx context.Context, path string, conten
 
 	// Pull latest changes from remote
 	if err := g.pullWorktree(); err != nil {
-		return fmt.Errorf("failed to pull: %w", err)
+		return fmt.Errorf("pulling: %w", err)
 	}
 
 	// Write directly to file
@@ -126,24 +126,24 @@ func (g *gitBackend) setBytesWithPrefix(ctx context.Context, path string, conten
 	}
 	
 	if err := os.MkdirAll(filepath.Dir(filePath), 0755); err != nil {
-		return fmt.Errorf("failed to create directory: %w", err)
+		return fmt.Errorf("creating directory: %w", err)
 	}
 	
 	if err := os.WriteFile(filePath, content, 0644); err != nil {
-		return fmt.Errorf("failed to write file %s: %w", path, err)
+		return fmt.Errorf("writing file %s: %w", path, err)
 	}
 
 	// Commit and push
 	if err := g.gitAdd(); err != nil {
-		return fmt.Errorf("failed to add: %w", err)
+		return fmt.Errorf("adding: %w", err)
 	}
 
 	if err := g.gitCommit(fmt.Sprintf("Update %s", path)); err != nil {
-		return fmt.Errorf("failed to commit: %w", err)
+		return fmt.Errorf("committing: %w", err)
 	}
 
 	if err := g.gitPush(); err != nil {
-		return fmt.Errorf("failed to push: %w", err)
+		return fmt.Errorf("pushing: %w", err)
 	}
 
 	return nil
@@ -171,13 +171,13 @@ func (g *gitBackend) Get(ctx context.Context, refs []string) ([]GetResult, error
 				})
 				continue
 			}
-			return nil, fmt.Errorf("failed to read %s: %w", ref, err)
+			return nil, fmt.Errorf("reading %s: %w", ref, err)
 		}
 
 		// Unmarshal the document
 		var doc StorageObject
 		if err := json.Unmarshal(data, &doc); err != nil {
-			return nil, fmt.Errorf("failed to unmarshal %s: %w", ref, err)
+			return nil, fmt.Errorf("unmarshaling %s: %w", ref, err)
 		}
 
 		out = append(out, GetResult{
@@ -265,7 +265,7 @@ func (g *gitBackend) Set(ctx context.Context, marker []byte, message string, req
 
 	// Pull latest changes from remote
 	if err := g.pullWorktree(); err != nil {
-		return fmt.Errorf("failed to pull: %w", err)
+		return fmt.Errorf("pulling: %w", err)
 	}
 
 	// Apply changes to worktree
@@ -275,39 +275,39 @@ func (g *gitBackend) Set(ctx context.Context, marker []byte, message string, req
 		if req.Doc == nil {
 			// Delete file
 			if err := os.Remove(filePath); err != nil && !os.IsNotExist(err) {
-				return fmt.Errorf("failed to delete %s: %w", req.Path, err)
+				return fmt.Errorf("deleting %s: %w", req.Path, err)
 			}
 		} else {
 			// Write file
 			docContent, err := json.Marshal(req.Doc)
 			if err != nil {
-				return fmt.Errorf("failed to marshal doc: %w", err)
+				return fmt.Errorf("marshaling doc: %w", err)
 			}
 			
 			// Ensure directory exists
 			if err := os.MkdirAll(filepath.Dir(filePath), 0755); err != nil {
-				return fmt.Errorf("failed to create directory: %w", err)
+				return fmt.Errorf("creating directory: %w", err)
 			}
 			
 			if err := os.WriteFile(filePath, docContent, 0644); err != nil {
-				return fmt.Errorf("failed to write file: %w", err)
+				return fmt.Errorf("writing file: %w", err)
 			}
 		}
 	}
 
 	// Stage all changes
 	if err := g.gitAdd(); err != nil {
-		return fmt.Errorf("failed to stage changes: %w", err)
+		return fmt.Errorf("staging changes: %w", err)
 	}
 
 	// Commit changes
 	if err := g.gitCommit(message); err != nil {
-		return fmt.Errorf("failed to commit: %w", err)
+		return fmt.Errorf("committing: %w", err)
 	}
 
 	// Push to remote
 	if err := g.gitPush(); err != nil {
-		return fmt.Errorf("failed to push: %w", err)
+		return fmt.Errorf("pushing: %w", err)
 	}
 
 	return nil

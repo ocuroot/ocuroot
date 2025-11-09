@@ -40,7 +40,7 @@ func (w *InRepoWorker) RecordStateUpdates(ctx context.Context) error {
 		func(ctx context.Context, ref string) {
 			r, err := refs.Parse(ref)
 			if err != nil {
-				log.Error("failed to parse ref", "error", err)
+				log.Error("parsing ref", "error", err)
 				return
 			}
 			w.StateChanges[r.String()] = struct{}{}
@@ -50,7 +50,7 @@ func (w *InRepoWorker) RecordStateUpdates(ctx context.Context) error {
 	)
 	w.Tracker.State = stateListener
 	if err != nil {
-		log.Error("failed to listen to state changes", "error", err)
+		log.Error("listening to state changes", "error", err)
 		return err
 	}
 
@@ -58,7 +58,7 @@ func (w *InRepoWorker) RecordStateUpdates(ctx context.Context) error {
 		func(ctx context.Context, ref string) {
 			r, err := refs.Parse(ref)
 			if err != nil {
-				log.Error("failed to parse ref", "error", err)
+				log.Error("parsing ref", "error", err)
 				return
 			}
 			w.IntentChanges[r.String()] = struct{}{}
@@ -68,7 +68,7 @@ func (w *InRepoWorker) RecordStateUpdates(ctx context.Context) error {
 	)
 	w.Tracker.Intent = intentListener
 	if err != nil {
-		log.Error("failed to listen to state changes", "error", err)
+		log.Error("listening to state changes", "error", err)
 		return err
 	}
 

@@ -35,17 +35,17 @@ var WorkerCmd = &cobra.Command{
 func devWorker(ctx context.Context) error {
 	ref, err := GetRef(nil, nil)
 	if err != nil {
-		return fmt.Errorf("failed to get ref: %w", err)
+		return fmt.Errorf("getting ref: %w", err)
 	}
 
 	worker, err := work.NewInRepoWorker(ctx, ref)
 	if err != nil {
-		return fmt.Errorf("failed to create worker: %w", err)
+		return fmt.Errorf("creating worker: %w", err)
 	}
 	defer worker.Cleanup()
 
 	if err := worker.Poll(ctx); err != nil {
-		return fmt.Errorf("failed to poll: %w", err)
+		return fmt.Errorf("polling: %w", err)
 	}
 
 	return nil

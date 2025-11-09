@@ -153,11 +153,11 @@ func (c *configLoader) refsBuiltins(backend Backend) starlark.Value {
 		refsBuiltins["absolute"] = JSONBuiltin("refs.absolute", func(ctx context.Context, ref string) (string, error) {
 			refParsed, err := refs.Parse(ref)
 			if err != nil {
-				return "", fmt.Errorf("failed to parse ref: %w", err)
+				return "", fmt.Errorf("parsing ref: %w", err)
 			}
 			absRef, err := refsBackend.Absolute(refParsed)
 			if err != nil {
-				return "", fmt.Errorf("failed to get absolute ref: %w", err)
+				return "", fmt.Errorf("getting absolute ref: %w", err)
 			}
 			return absRef.String(), nil
 		})
@@ -385,13 +385,13 @@ func JSONBuiltinWithThread[T any, R any](name string, callback func(*starlark.Th
 		var j string
 		err := starlark.UnpackArgs(name, args, kwargs, "json?", &j)
 		if err != nil {
-			return starlark.None, fmt.Errorf("builtin: failed to unpack arguments: %w", err)
+			return starlark.None, fmt.Errorf("builtin: unpacking arguments: %w", err)
 		}
 
 		var out T
 		if j != "" {
 			if err := json.Unmarshal([]byte(j), &out); err != nil {
-				return starlark.None, fmt.Errorf("builtin: failed to unmarshal JSON: %w", err)
+				return starlark.None, fmt.Errorf("builtin: unmarshaling JSON: %w", err)
 			}
 		}
 
@@ -402,7 +402,7 @@ func JSONBuiltinWithThread[T any, R any](name string, callback func(*starlark.Th
 
 		resJSON, err := json.Marshal(res)
 		if err != nil {
-			return starlark.None, fmt.Errorf("builtin: failed to marshal result: %w", err)
+			return starlark.None, fmt.Errorf("builtin: marshaling result: %w", err)
 		}
 
 		return starlark.String(string(resJSON)), nil
@@ -414,24 +414,24 @@ func JSONBuiltin[T any, R any](name string, callback func(context.Context, T) (R
 		var j string
 		err := starlark.UnpackArgs(name, args, kwargs, "json?", &j)
 		if err != nil {
-			return starlark.None, fmt.Errorf("%v> failed to unpack arguments: %w", name, err)
+			return starlark.None, fmt.Errorf("%v> unpacking arguments: %w", name, err)
 		}
 
 		var out T
 		if j != "" {
 			if err := json.Unmarshal([]byte(j), &out); err != nil {
-				return starlark.None, fmt.Errorf("%v> failed to unmarshal JSON: %w", name, err)
+				return starlark.None, fmt.Errorf("%v> unmarshaling JSON: %w", name, err)
 			}
 		}
 
 		res, err := callback(contextFromThread(thread), out)
 		if err != nil {
-			return starlark.None, fmt.Errorf("%v> failed to execute callback: %w", name, err)
+			return starlark.None, fmt.Errorf("%v> executing callback: %w", name, err)
 		}
 
 		resJSON, err := json.Marshal(res)
 		if err != nil {
-			return starlark.None, fmt.Errorf("%v> failed to marshal result: %w", name, err)
+			return starlark.None, fmt.Errorf("%v> marshaling result: %w", name, err)
 		}
 
 		return starlark.String(string(resJSON)), nil

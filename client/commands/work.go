@@ -27,7 +27,7 @@ var WorkContinueCmd = &cobra.Command{
 
 		ref, err := GetRef(cmd, args)
 		if err != nil {
-			return fmt.Errorf("failed to get ref: %w", err)
+			return fmt.Errorf("getting ref: %w", err)
 		}
 
 		dryRun := cmd.Flag("dryrun").Changed
@@ -35,7 +35,7 @@ var WorkContinueCmd = &cobra.Command{
 
 		worker, err := work.NewInRepoWorker(ctx, ref)
 		if err != nil {
-			return fmt.Errorf("failed to create worker: %w", err)
+			return fmt.Errorf("creating worker: %w", err)
 		}
 		defer worker.Cleanup()
 
@@ -43,13 +43,13 @@ var WorkContinueCmd = &cobra.Command{
 			GitFilter: work.GitFilterCurrentCommitOnly,
 		})
 		if err != nil {
-			return fmt.Errorf("failed to identify work: %w", err)
+			return fmt.Errorf("identifying work: %w", err)
 		}
 		reconcilableDeployments, err := worker.ReconcilableDeployments(ctx, work.IdentifyWorkRequest{
 			GitFilter: work.GitFilterCurrentCommitOnly,
 		})
 		if err != nil {
-			return fmt.Errorf("failed to get reconcilable deployments: %w", err)
+			return fmt.Errorf("getting reconcilable deployments: %w", err)
 		}
 		todo = append(todo, reconcilableDeployments...)
 
@@ -60,7 +60,7 @@ var WorkContinueCmd = &cobra.Command{
 
 			todoJSON, err := json.MarshalIndent(todo, "", "  ")
 			if err != nil {
-				return fmt.Errorf("failed to marshal todo: %w", err)
+				return fmt.Errorf("marshaling todo: %w", err)
 			}
 			fmt.Println(string(todoJSON))
 			return nil
@@ -96,14 +96,14 @@ finally it will trigger work for other commits ('ocuroot work trigger').
 
 		ref, err := GetRef(cmd, args)
 		if err != nil {
-			return fmt.Errorf("failed to get ref: %w", err)
+			return fmt.Errorf("getting ref: %w", err)
 		}
 
 		cmd.SilenceUsage = true
 
 		worker, err := work.NewInRepoWorker(ctx, ref)
 		if err != nil {
-			return fmt.Errorf("failed to create worker: %w", err)
+			return fmt.Errorf("creating worker: %w", err)
 		}
 		defer worker.Cleanup()
 
@@ -112,7 +112,7 @@ finally it will trigger work for other commits ('ocuroot work trigger').
 				GitFilter: work.GitFilterCurrentCommitOnly,
 			})
 			if err != nil {
-				return fmt.Errorf("failed to identify work: %w", err)
+				return fmt.Errorf("identifying work: %w", err)
 			}
 
 			log.Info("Identified work", "todo", toJSON(todo))
@@ -125,7 +125,7 @@ finally it will trigger work for other commits ('ocuroot work trigger').
 
 				todoJSON, err := json.MarshalIndent(todo, "", "  ")
 				if err != nil {
-					return fmt.Errorf("failed to marshal todo: %w", err)
+					return fmt.Errorf("marshaling todo: %w", err)
 				}
 				fmt.Println(string(todoJSON))
 				return nil
@@ -143,7 +143,7 @@ finally it will trigger work for other commits ('ocuroot work trigger').
 		log.Info("Starting trigger work")
 		todo, err := worker.IdentifyWork(ctx, work.IdentifyWorkRequest{})
 		if err != nil {
-			return fmt.Errorf("failed to identify work: %w", err)
+			return fmt.Errorf("identifying work: %w", err)
 		}
 		if err := worker.TriggerWork(ctx, todo); err != nil {
 			return err
@@ -162,12 +162,12 @@ var WorkTriggerCommand = &cobra.Command{
 
 		ref, err := GetRef(cmd, args)
 		if err != nil {
-			return fmt.Errorf("failed to get ref: %w", err)
+			return fmt.Errorf("getting ref: %w", err)
 		}
 
 		w, err := work.NewInRepoWorker(ctx, ref)
 		if err != nil {
-			return fmt.Errorf("failed to create worker: %w", err)
+			return fmt.Errorf("creating worker: %w", err)
 		}
 		w.Cleanup()
 
@@ -195,13 +195,13 @@ var WorkTriggerCommand = &cobra.Command{
 
 		todo, err := worker.IdentifyWork(ctx, work.IdentifyWorkRequest{})
 		if err != nil {
-			return fmt.Errorf("failed to identify work: %w", err)
+			return fmt.Errorf("identifying work: %w", err)
 		}
 
 		if dryRun {
 			todoJSON, err := json.MarshalIndent(todo, "", "  ")
 			if err != nil {
-				return fmt.Errorf("failed to marshal todo: %w", err)
+				return fmt.Errorf("marshaling todo: %w", err)
 			}
 			fmt.Println(string(todoJSON))
 			return nil
@@ -225,14 +225,14 @@ var WorkOpsCmd = &cobra.Command{
 
 		ref, err := GetRef(cmd, args)
 		if err != nil {
-			return fmt.Errorf("failed to get ref: %w", err)
+			return fmt.Errorf("getting ref: %w", err)
 		}
 
 		cmd.SilenceUsage = true
 
 		worker, err := work.NewInRepoWorker(ctx, ref)
 		if err != nil {
-			return fmt.Errorf("failed to create worker: %w", err)
+			return fmt.Errorf("creating worker: %w", err)
 		}
 		defer worker.Cleanup()
 
@@ -240,7 +240,7 @@ var WorkOpsCmd = &cobra.Command{
 			GitFilter: work.GitFilterCurrentCommitOnly,
 		})
 		if err != nil {
-			return fmt.Errorf("failed to identify work: %w", err)
+			return fmt.Errorf("identifying work: %w", err)
 		}
 
 		log.Info("Identified work", "todo", toJSON(todo))
@@ -250,14 +250,14 @@ var WorkOpsCmd = &cobra.Command{
 
 			todoJSON, err := json.MarshalIndent(todo, "", "  ")
 			if err != nil {
-				return fmt.Errorf("failed to marshal todo: %w", err)
+				return fmt.Errorf("marshaling todo: %w", err)
 			}
 			fmt.Println(string(todoJSON))
 			return nil
 		}
 
 		if err := worker.ExecuteWork(ctx, todo); err != nil {
-			return fmt.Errorf("failed to execute work: %w", err)
+			return fmt.Errorf("executing work: %w", err)
 		}
 
 		return nil
@@ -281,21 +281,21 @@ finally it will trigger work for other commits ('ocuroot work trigger').
 
 		ref, err := GetRef(cmd, args)
 		if err != nil {
-			return fmt.Errorf("failed to get ref: %w", err)
+			return fmt.Errorf("getting ref: %w", err)
 		}
 
 		cmd.SilenceUsage = true
 
 		worker, err := work.NewInRepoWorker(ctx, ref)
 		if err != nil {
-			return fmt.Errorf("failed to create worker: %w", err)
+			return fmt.Errorf("creating worker: %w", err)
 		}
 		defer worker.Cleanup()
 
 		for {
 			todo, err := worker.IdentifyWork(ctx, work.IdentifyWorkRequest{})
 			if err != nil {
-				return fmt.Errorf("failed to identify work: %w", err)
+				return fmt.Errorf("identifying work: %w", err)
 			}
 
 			log.Info("Identified work", "todo", toJSON(todo))
@@ -304,7 +304,7 @@ finally it will trigger work for other commits ('ocuroot work trigger').
 
 				todoJSON, err := json.MarshalIndent(todo, "", "  ")
 				if err != nil {
-					return fmt.Errorf("failed to marshal todo: %w", err)
+					return fmt.Errorf("marshaling todo: %w", err)
 				}
 				fmt.Println(string(todoJSON))
 				return nil

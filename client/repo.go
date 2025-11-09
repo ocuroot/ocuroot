@@ -133,12 +133,12 @@ func (r RepoInfo) GetReleaseConfigFiles() ([]string, error) {
 func uncomittedFiles(repoRootPath string) ([]string, error) {
 	repo, err := gittools.Open(repoRootPath)
 	if err != nil {
-		return nil, fmt.Errorf("failed to open repo: %w", err)
+		return nil, fmt.Errorf("opening repo: %w", err)
 	}
 	// Use git status --porcelain to detect any uncommitted or unstaged changes
 	stdout, _, err := repo.Client.Exec("status", "--porcelain")
 	if err != nil {
-		return nil, fmt.Errorf("failed to check repo status: %w", err)
+		return nil, fmt.Errorf("checking repo status: %w", err)
 	}
 	// If there's any output, the repo has uncommitted or unstaged changes
 	var out []string
@@ -196,11 +196,11 @@ func GetRepoURL(repoRootPath string) (string, error) {
 
 	repo, err = gittools.Open(repoRootPath)
 	if err != nil {
-		return "", fmt.Errorf("failed to open repo: %w", err)
+		return "", fmt.Errorf("opening repo: %w", err)
 	}
 	repoURL, err = repo.RemoteURL("origin", false)
 	if err != nil {
-		return "", fmt.Errorf("failed to get repo URL: %w", err)
+		return "", fmt.Errorf("getting repo URL: %w", err)
 	}
 	repoURL = strings.TrimRight(repoURL, "\n")
 	repoURL = GitURLToValidPath(repoURL)
@@ -236,7 +236,7 @@ func getRepoBranch(repoRootPath string) (string, error) {
 
 	repo, err = gittools.Open(repoRootPath)
 	if err != nil {
-		return "", fmt.Errorf("failed to open repo: %w", err)
+		return "", fmt.Errorf("opening repo: %w", err)
 	}
 
 	branchB, stderr, err := repo.Client.Exec("rev-parse", "--abbrev-ref", "HEAD")
@@ -246,7 +246,7 @@ func getRepoBranch(repoRootPath string) (string, error) {
 			return "null", nil
 		}
 
-		return "", fmt.Errorf("failed to get commit hash: %w\n%s", err, stderr)
+		return "", fmt.Errorf("getting commit hash: %w\n%s", err, stderr)
 	}
 	branch = strings.TrimRight(string(branchB), "\n")
 	return branch, nil
@@ -265,7 +265,7 @@ func getRepoCommit(repoRootPath string) (string, error) {
 
 	repo, err = gittools.Open(repoRootPath)
 	if err != nil {
-		return "", fmt.Errorf("failed to open repo: %w", err)
+		return "", fmt.Errorf("opening repo: %w", err)
 	}
 
 	commitB, stderr, err := repo.Client.Exec("rev-parse", "HEAD")
@@ -275,7 +275,7 @@ func getRepoCommit(repoRootPath string) (string, error) {
 			return "null", nil
 		}
 
-		return "", fmt.Errorf("failed to get commit hash: %w\n%s", err, stderr)
+		return "", fmt.Errorf("getting commit hash: %w\n%s", err, stderr)
 	}
 	commit = strings.TrimRight(string(commitB), "\n")
 	return commit, nil

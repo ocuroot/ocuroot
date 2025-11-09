@@ -48,7 +48,7 @@ var NewReleaseCmd = &cobra.Command{
 
 		ref, err := GetRef(cmd, args)
 		if err != nil {
-			return fmt.Errorf("failed to get ref: %w", err)
+			return fmt.Errorf("getting ref: %w", err)
 		}
 
 		cmd.SilenceUsage = true
@@ -201,7 +201,7 @@ var RetryReleaseCmd = &cobra.Command{
 		if !ref.HasRelease() {
 			releasesForCommit, err := releasesForCommit(ctx, worker.Tracker.State, worker.Tracker.Ref.Repo, worker.Tracker.Commit)
 			if err != nil {
-				return fmt.Errorf("failed to get releases for commit: %w", err)
+				return fmt.Errorf("getting releases for commit: %w", err)
 			}
 
 			if len(releasesForCommit) == 0 {
@@ -265,7 +265,7 @@ This involves loading state for environment lists, so the state and intent store
 			fmt.Println(msg)
 		})
 		if err != nil {
-			return fmt.Errorf("failed to load config %w", err)
+			return fmt.Errorf("loading config: %w", err)
 		}
 
 		worker.Cleanup()

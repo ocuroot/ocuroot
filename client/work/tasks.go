@@ -38,7 +38,7 @@ func (w *InRepoWorker) ReadyRuns(ctx context.Context, req IdentifyWorkRequest) (
 		prefix+"/@*/{deploy,task}/*/*/status/paused",
 	)
 	if err != nil {
-		return nil, fmt.Errorf("failed to match refs: %w", err)
+		return nil, fmt.Errorf("matching refs: %w", err)
 	}
 
 	for _, ref := range outstanding {
@@ -51,7 +51,7 @@ func (w *InRepoWorker) ReadyRuns(ctx context.Context, req IdentifyWorkRequest) (
 		// Filter by commit as needed
 		commit, valid, err := w.CheckCommit(ctx, runRef, req)
 		if err != nil {
-			return nil, fmt.Errorf("failed to check commit: %w", err)
+			return nil, fmt.Errorf("checking commit: %w", err)
 		}
 		if !valid {
 			continue
@@ -59,7 +59,7 @@ func (w *InRepoWorker) ReadyRuns(ctx context.Context, req IdentifyWorkRequest) (
 
 		valid, err = w.CheckRun(ctx, runRef, req)
 		if err != nil {
-			return nil, fmt.Errorf("failed to check run: %w", err)
+			return nil, fmt.Errorf("checking run: %w", err)
 		}
 		if !valid {
 			continue
@@ -68,7 +68,7 @@ func (w *InRepoWorker) ReadyRuns(ctx context.Context, req IdentifyWorkRequest) (
 		// Check if the run is ready
 		funcReady, err := release.RunIsReady(ctx, state, runRef)
 		if err != nil {
-			return nil, fmt.Errorf("failed to check run: %w", err)
+			return nil, fmt.Errorf("checking run: %w", err)
 		}
 		if !funcReady {
 			continue
@@ -76,7 +76,7 @@ func (w *InRepoWorker) ReadyRuns(ctx context.Context, req IdentifyWorkRequest) (
 
 		rp, err := refs.Parse(runRef)
 		if err != nil {
-			return nil, fmt.Errorf("failed to parse ref: %w", err)
+			return nil, fmt.Errorf("parsing ref: %w", err)
 		}
 		out = append(out, Work{
 			Ref:      rp,
@@ -105,7 +105,7 @@ func (w *InRepoWorker) CheckRun(ctx context.Context, ref string, req IdentifyWor
 
 	var run models.Run
 	if err := w.Tracker.State.Get(ctx, runRef, &run); err != nil {
-		return false, fmt.Errorf("failed to get function state at %s: %w", runRef, err)
+		return false, fmt.Errorf("getting function state at %s: %w", runRef, err)
 	}
 	if len(run.Functions) == 0 {
 		return false, fmt.Errorf("no functions in run")
@@ -116,7 +116,7 @@ func (w *InRepoWorker) CheckRun(ctx context.Context, ref string, req IdentifyWor
 	for _, dep := range lastFunction.Dependencies {
 		resolvedDep, err := w.Tracker.State.ResolveLink(ctx, dep.String())
 		if err != nil {
-			return false, fmt.Errorf("failed to resolve dependency %q: %w", dep.String(), err)
+			return false, fmt.Errorf("resolving dependency %q: %w", dep.String(), err)
 		}
 		if _, exists := req.StateChanges[resolvedDep]; exists {
 			return true, nil
@@ -128,11 +128,11 @@ func (w *InRepoWorker) CheckRun(ctx context.Context, ref string, req IdentifyWor
 		if input.Ref != nil {
 			resolvedInput, err := w.Tracker.State.ResolveLink(ctx, input.Ref.String())
 			if err != nil {
-				return false, fmt.Errorf("failed to resolve input %q: %w", input.Ref.String(), err)
+				return false, fmt.Errorf("resolving input %q: %w", input.Ref.String(), err)
 			}
 			parsedInput, err := refs.Parse(resolvedInput)
 			if err != nil {
-				return false, fmt.Errorf("failed to parse input %q: %w", resolvedInput, err)
+				return false, fmt.Errorf("parsing input %q: %w", resolvedInput, err)
 			}
 			if _, exists := req.StateChanges[parsedInput.SetFragment("").String()]; exists {
 				return true, nil
@@ -146,7 +146,7 @@ func (w *InRepoWorker) CheckRun(ctx context.Context, ref string, req IdentifyWor
 func (w *InRepoWorker) CheckCommit(ctx context.Context, ref string, req IdentifyWorkRequest) (string, bool, error) {
 	resolvedRef, err := w.Tracker.State.ResolveLink(ctx, ref)
 	if err != nil {
-		return "", false, fmt.Errorf("failed to resolve ref: %w", err)
+		return "", false, fmt.Errorf("resolving ref: %w", err)
 	}
 
 	releaseRef, err := refs.Reduce(resolvedRef, release.GlobRelease)
@@ -155,7 +155,7 @@ func (w *InRepoWorker) CheckCommit(ctx context.Context, ref string, req Identify
 	}
 	var r release.ReleaseInfo
 	if err := w.Tracker.State.Get(ctx, releaseRef, &r); err != nil {
-		return "", false, fmt.Errorf("failed to get release %q: %w", ref, err)
+		return "", false, fmt.Errorf("getting release %q: %w", ref, err)
 	}
 
 	var valid bool
@@ -179,13 +179,13 @@ func (w *InRepoWorker) ReconcilableDeployments(ctx context.Context, req Identify
 	}
 	allDeployments, err := w.Tracker.State.Match(ctx, prefix+"/@/deploy/*")
 	if err != nil {
-		return nil, fmt.Errorf("failed to match deployments: %w", err)
+		return nil, fmt.Errorf("matching deployments: %w", err)
 	}
 
 	for _, ref := range allDeployments {
 		commit, valid, err := w.CheckCommit(ctx, ref, req)
 		if err != nil {
-			return nil, fmt.Errorf("failed to check commit: %w", err)
+			return nil, fmt.Errorf("checking commit: %w", err)
 		}
 		if !valid {
 			continue
@@ -225,7 +225,7 @@ func (w *InRepoWorker) Ops(ctx context.Context, req IdentifyWorkRequest) ([]Work
 		g,
 	)
 	if err != nil {
-		return nil, fmt.Errorf("failed to match refs: %w", err)
+		return nil, fmt.Errorf("matching refs: %w", err)
 	}
 
 	for _, ref := range outstanding {
@@ -237,14 +237,14 @@ func (w *InRepoWorker) Ops(ctx context.Context, req IdentifyWorkRequest) ([]Work
 
 		commit, valid, err := w.CheckCommit(ctx, ref, req)
 		if err != nil {
-			return nil, fmt.Errorf("failed to check commit: %w", err)
+			return nil, fmt.Errorf("checking commit: %w", err)
 		}
 		if !valid {
 			continue
 		}
 		parsedRef, err := refs.Parse(ref)
 		if err != nil {
-			return nil, fmt.Errorf("failed to parse ref: %w", err)
+			return nil, fmt.Errorf("parsing ref: %w", err)
 		}
 		log.Info("Found outstanding op", "ref", parsedRef.String())
 		out = append(out, Work{
@@ -263,26 +263,26 @@ func (w *InRepoWorker) reconcileDeployment(ctx context.Context, ref string, req 
 	store := w.Tracker.State
 	var deployment models.Task
 	if err := store.Get(ctx, ref, &deployment); err != nil {
-		return nil, fmt.Errorf("failed to get deployment at %s: %w", ref, err)
+		return nil, fmt.Errorf("getting deployment at %s: %w", ref, err)
 	}
 	var run models.Run
 	if err := store.Get(ctx, deployment.RunRef.String(), &run); err != nil {
-		return nil, fmt.Errorf("failed to get run at %s: %w", deployment.RunRef.String(), err)
+		return nil, fmt.Errorf("getting run at %s: %w", deployment.RunRef.String(), err)
 	}
 
 	resolvedDeployment, err := store.ResolveLink(ctx, ref)
 	if err != nil {
-		return nil, fmt.Errorf("failed to resolve inputs at %s: %w", ref, err)
+		return nil, fmt.Errorf("resolving inputs at %s: %w", ref, err)
 	}
 	parsedResolvedDeployment, err := refs.Parse(resolvedDeployment)
 	if err != nil {
-		return nil, fmt.Errorf("failed to parse resolved deployment at %s: %w", ref, err)
+		return nil, fmt.Errorf("parsing resolved deployment at %s: %w", ref, err)
 	}
 
 	entryFunction := run.Functions[0]
 	dependenciesSatisfied, err := release.CheckDependencies(ctx, store, entryFunction)
 	if err != nil {
-		return nil, fmt.Errorf("failed to check dependencies: %w", err)
+		return nil, fmt.Errorf("checking dependencies: %w", err)
 	}
 	// Don't attempt to trigger if the dependencies haven't been satisfied
 	if !dependenciesSatisfied {
@@ -293,7 +293,7 @@ func (w *InRepoWorker) reconcileDeployment(ctx context.Context, ref string, req 
 	entryFunctionInputs := entryFunction.Inputs
 	inputs, err := release.PopulateInputs(ctx, store, entryFunctionInputs)
 	if err != nil {
-		return nil, fmt.Errorf("failed to populate inputs: %w", err)
+		return nil, fmt.Errorf("populating inputs: %w", err)
 	}
 
 	var changed bool
@@ -308,11 +308,11 @@ func (w *InRepoWorker) reconcileDeployment(ctx context.Context, ref string, req 
 		if v.Ref != nil && req.StateChanges != nil {
 			resolvedV, err := store.ResolveLink(ctx, v.Ref.String())
 			if err != nil {
-				return nil, fmt.Errorf("failed to resolve inputs %q: %w", v.Ref.String(), err)
+				return nil, fmt.Errorf("resolving inputs %q: %w", v.Ref.String(), err)
 			}
 			parsedResolvedV, err := refs.Parse(resolvedV)
 			if err != nil {
-				return nil, fmt.Errorf("failed to parse resolved inputs %q: %w", resolvedV, err)
+				return nil, fmt.Errorf("parsing resolved inputs %q: %w", resolvedV, err)
 			}
 			if _, ok := req.StateChanges[parsedResolvedV.SetFragment("").String()]; !ok {
 				log.Debug("Resolved input was not in changed state", "inputRef", v.Ref, "inputRefResolved", parsedResolvedV, "stateChanges", req.StateChanges)

@@ -47,7 +47,7 @@ func (w *InRepoWorker) TriggerAll(ctx context.Context) error {
 		ctx,
 		mr)
 	if err != nil {
-		return fmt.Errorf("failed to match refs: %w", err)
+		return fmt.Errorf("matching refs: %w", err)
 	}
 
 	log.Info("Repo matches", "count", len(repo), "repo", repo)
@@ -55,11 +55,11 @@ func (w *InRepoWorker) TriggerAll(ctx context.Context) error {
 	for _, ref := range repo {
 		resolvedRepo, err := w.Tracker.State.ResolveLink(ctx, ref)
 		if err != nil {
-			return fmt.Errorf("failed to resolve repo ref (%v): %w", ref, err)
+			return fmt.Errorf("resolving repo ref (%v): %w", ref, err)
 		}
 		pr, err := refs.Parse(resolvedRepo)
 		if err != nil {
-			return fmt.Errorf("failed to parse resolved repo ref (%v): %w", resolvedRepo, err)
+			return fmt.Errorf("parsing resolved repo ref (%v): %w", resolvedRepo, err)
 		}
 		commit := pr.Release
 
@@ -76,13 +76,13 @@ func (w *InRepoWorker) RepoConfigFromState(ctx context.Context, repo string) (st
 
 	configWithCommit, err := w.Tracker.State.ResolveLink(ctx, configRef)
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to resolve config ref (%v): %w", configRef, err)
+		return nil, nil, fmt.Errorf("resolving config ref (%v): %w", configRef, err)
 	}
 
 	log.Info("Loading repo config from state", "ref", configWithCommit)
 	var repoConfig models.RepoConfig
 	if err := w.Tracker.State.Get(ctx, configWithCommit, &repoConfig); err != nil {
-		return nil, nil, fmt.Errorf("failed to get repo config (%v): %w", configWithCommit, err)
+		return nil, nil, fmt.Errorf("getting repo config (%v): %w", configWithCommit, err)
 	}
 
 	backend, be := local.BackendForRepo()
@@ -96,7 +96,7 @@ func (w *InRepoWorker) RepoConfigFromState(ctx context.Context, repo string) (st
 		func(thread *starlark.Thread, msg string) {},
 	)
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to load repo: %w", err)
+		return nil, nil, fmt.Errorf("loading repo: %w", err)
 	}
 
 	return globals, be, nil
@@ -114,7 +114,7 @@ func (w *InRepoWorker) TriggerCommit(ctx context.Context, repo, commit string) e
 	if err != nil {
 		tuiEvent := tuiwork.GetTriggerEvent(repo, commit, w.Tui, tuiwork.TriggerStatusFailed, w.Tracker)
 		w.Tui.UpdateTask(tuiEvent)
-		return fmt.Errorf("failed to resolve config ref (%v): %w", configRef, err)
+		return fmt.Errorf("resolving config ref (%v): %w", configRef, err)
 	}
 
 	log.Info("Triggering work for repo", "ref", configWithCommit)
@@ -122,7 +122,7 @@ func (w *InRepoWorker) TriggerCommit(ctx context.Context, repo, commit string) e
 	if err := w.Tracker.State.Get(ctx, configWithCommit, &repoConfig); err != nil {
 		tuiEvent := tuiwork.GetTriggerEvent(repo, commit, w.Tui, tuiwork.TriggerStatusFailed, w.Tracker)
 		w.Tui.UpdateTask(tuiEvent)
-		return fmt.Errorf("failed to get repo config (%v): %w", configWithCommit, err)
+		return fmt.Errorf("getting repo config (%v): %w", configWithCommit, err)
 	}
 
 	backend, be := local.BackendForRepo()
@@ -138,13 +138,13 @@ func (w *InRepoWorker) TriggerCommit(ctx context.Context, repo, commit string) e
 	if err != nil {
 		tuiEvent := tuiwork.GetTriggerEvent(repo, commit, w.Tui, tuiwork.TriggerStatusFailed, w.Tracker)
 		w.Tui.UpdateTask(tuiEvent)
-		return fmt.Errorf("failed to load repo: %w", err)
+		return fmt.Errorf("loading repo: %w", err)
 	}
 
 	// Load globals from repo into settings
 	w.Settings, err = LoadSettings(be, globals, os.Environ())
 	if err != nil {
-		return fmt.Errorf("failed to load settings: %w", err)
+		return fmt.Errorf("loading settings: %w", err)
 	}
 
 	if be.RepoTrigger != nil {
@@ -172,7 +172,7 @@ func (w *InRepoWorker) TriggerCommit(ctx context.Context, repo, commit string) e
 		if err != nil {
 			tuiEvent := tuiwork.GetTriggerEvent(repo, commit, w.Tui, tuiwork.TriggerStatusFailed, w.Tracker)
 			w.Tui.UpdateTask(tuiEvent)
-			return fmt.Errorf("failed to call repo trigger: %w", err)
+			return fmt.Errorf("calling repo trigger: %w", err)
 		}
 	} else {
 		tLog(sdk.Log{

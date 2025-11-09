@@ -26,13 +26,13 @@ import (
 func (w *InRepoWorker) InitTrackerFromStateRepo(ctx context.Context, ref refs.Ref, wd, storeRootPath string) error {
 	fs, err := refstore.NewFSRefStore(storeRootPath, stateTags)
 	if err != nil {
-		return fmt.Errorf("failed to create fs ref store: %w", err)
+		return fmt.Errorf("creating fs ref store: %w", err)
 	}
 
 	readOnlyStore := refstore.NewReadOnlyStore(fs)
 	repoRefs, err := readOnlyStore.Match(ctx, "**/-/repo.ocu.star/@")
 	if err != nil {
-		return fmt.Errorf("failed to match repo refs: %w", err)
+		return fmt.Errorf("matching repo refs: %w", err)
 	}
 	if len(repoRefs) == 0 {
 		return fmt.Errorf("no repos registered in store")
@@ -55,13 +55,13 @@ func (w *InRepoWorker) InitTrackerFromStateRepo(ctx context.Context, ref refs.Re
 		}
 		globals, be, err := w.RepoConfigFromState(ctx, repoRefParsed.Repo)
 		if err != nil {
-			return fmt.Errorf("failed to get repo config: %w", err)
+			return fmt.Errorf("getting repo config: %w", err)
 		}
 
 		// Load globals from repo into settings
 		w.Settings, err = LoadSettings(be, globals, os.Environ())
 		if err != nil {
-			return fmt.Errorf("failed to load settings: %w", err)
+			return fmt.Errorf("loading settings: %w", err)
 		}
 
 		if ref.IsRelative() && !ref.IsEmpty() && !ref.Global {
@@ -79,7 +79,7 @@ func (w *InRepoWorker) InitTrackerFromStateRepo(ctx context.Context, ref refs.Re
 			"",
 		)
 		if err != nil {
-			return fmt.Errorf("failed to create ref store: %w", err)
+			return fmt.Errorf("creating ref store: %w", err)
 		}
 
 		w.Tracker = release.TrackerConfig{
@@ -100,14 +100,14 @@ func (w *InRepoWorker) InitTrackerFromStateRepo(ctx context.Context, ref refs.Re
 				&w.Index,
 			)
 			if err != nil && !errors.Is(err, refstore.ErrRefNotFound) {
-				return fmt.Errorf("failed to get push index: %w", err)
+				return fmt.Errorf("getting push index: %w", err)
 			}
 		}
 
 		return nil
 	}
 
-	return fmt.Errorf("failed to init tracker from state repo\n%v", errorsByRepo)
+	return fmt.Errorf("initializing tracker from state repo\n%v", errorsByRepo)
 }
 
 func (w *InRepoWorker) InitTrackerFromSourceRepo(ctx context.Context, ref refs.Ref, wd, repoRootPath string, saveConfig bool) error {
@@ -141,12 +141,12 @@ func (w *InRepoWorker) InitTrackerFromSourceRepo(ctx context.Context, ref refs.R
 	if err != nil {
 		re := tuiwork.GetRepoEvent(repoRootPath, ref, w.Tui, tuiwork.WorkStatusFailed)
 		w.Tui.UpdateTask(re)
-		return fmt.Errorf("failed to load repo: %w", err)
+		return fmt.Errorf("loading repo: %w", err)
 	}
 	// Load globals from repo into settings
 	w.Settings, err = LoadSettings(be, globals, os.Environ())
 	if err != nil {
-		return fmt.Errorf("failed to load settings: %w", err)
+		return fmt.Errorf("loading settings: %w", err)
 	}
 
 	w.RepoName = w.Settings.RepoAlias
@@ -193,7 +193,7 @@ func (w *InRepoWorker) InitTrackerFromSourceRepo(ctx context.Context, ref refs.R
 		repoRootPath,
 	)
 	if err != nil {
-		return fmt.Errorf("failed to create ref store: %w", err)
+		return fmt.Errorf("creating ref store: %w", err)
 	}
 
 	tc := release.TrackerConfig{
@@ -224,7 +224,7 @@ func (w *InRepoWorker) InitTrackerFromSourceRepo(ctx context.Context, ref refs.R
 		&w.Index,
 	)
 	if err != nil && !errors.Is(err, refstore.ErrRefNotFound) {
-		return fmt.Errorf("failed to get push index: %w", err)
+		return fmt.Errorf("getting push index: %w", err)
 	}
 
 	return nil
@@ -241,7 +241,7 @@ func (w *InRepoWorker) TrackerForNewRelease(ctx context.Context) (*librelease.Re
 
 	tc.Ref, err = release.NextReleaseID(ctx, tc.State, tc.Ref)
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to get next release ID: %w", err)
+		return nil, nil, fmt.Errorf("getting next release ID: %w", err)
 	}
 
 	backend, outputs := release.NewBackend(tc)
@@ -265,7 +265,7 @@ func (w *InRepoWorker) TrackerForNewRelease(ctx context.Context) (*librelease.Re
 	if err != nil {
 		configEvent = tuiwork.GetConfigEvent(tc.Ref, w.Tui, tuiwork.WorkStatusFailed, nil)
 		w.Tui.UpdateTask(configEvent)
-		return nil, nil, fmt.Errorf("failed to load config for %v: %w", tc.Ref.String(), err)
+		return nil, nil, fmt.Errorf("loading config for %v: %w", tc.Ref.String(), err)
 	}
 
 	configEvent = tuiwork.GetConfigEvent(tc.Ref, w.Tui, tuiwork.WorkStatusDone, config)
@@ -284,12 +284,12 @@ func (w *InRepoWorker) TrackerForNewRelease(ctx context.Context) (*librelease.Re
 
 	tracker, err := librelease.NewReleaseTracker(ctx, config, config.Package, tc.Ref, tc.Intent, tc.State)
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to create release tracker: %w", err)
+		return nil, nil, fmt.Errorf("creating release tracker: %w", err)
 	}
 
 	err = tracker.InitRelease(ctx, tc.Commit)
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to init release: %w", err)
+		return nil, nil, fmt.Errorf("initializing release: %w", err)
 	}
 
 	return tracker, nil, nil
@@ -319,7 +319,7 @@ func (w *InRepoWorker) TrackerForExistingRelease(ctx context.Context) (*librelea
 	if err != nil {
 		configEvent := tuiwork.GetConfigEvent(tc.Ref, w.Tui, tuiwork.WorkStatusFailed, nil)
 		w.Tui.UpdateTask(configEvent)
-		return nil, fmt.Errorf("failed to load config %w", err)
+		return nil, fmt.Errorf("loading config: %w", err)
 	}
 
 	configEvent = tuiwork.GetConfigEvent(tc.Ref, w.Tui, tuiwork.WorkStatusDone, config)
@@ -335,12 +335,12 @@ func (w *InRepoWorker) TrackerForExistingRelease(ctx context.Context) (*librelea
 
 	tracker, err := librelease.NewReleaseTracker(ctx, config, config.Package, tc.Ref, tc.Intent, tc.State)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create release tracker: %w", err)
+		return nil, fmt.Errorf("creating release tracker: %w", err)
 	}
 
 	releaseSummary, err := tracker.GetReleaseInfo(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get release info: %w", err)
+		return nil, fmt.Errorf("getting release info: %w", err)
 	}
 
 	if tc.Commit != releaseSummary.Commit {
@@ -354,16 +354,16 @@ func saveRepoConfig(ctx context.Context, tc release.TrackerConfig, repoPath, rep
 	// Write the repo file to the state stores for later use
 	repoRef, err := refs.Parse(fmt.Sprintf("%s/-/repo.ocu.star/@%s", repoName, commit))
 	if err != nil {
-		return fmt.Errorf("failed to parse repo ref: %w", err)
+		return fmt.Errorf("parsing repo ref: %w", err)
 	}
 	r, err := gittools.Open(repoPath)
 	if err != nil {
-		return fmt.Errorf("failed to open repo: %w", err)
+		return fmt.Errorf("opening repo: %w", err)
 	}
 
 	remotes, err := r.Remotes()
 	if err != nil {
-		return fmt.Errorf("failed to get remotes: %w", err)
+		return fmt.Errorf("getting remotes: %w", err)
 	}
 
 	repoConfig := models.RepoConfig{
@@ -373,11 +373,11 @@ func saveRepoConfig(ctx context.Context, tc release.TrackerConfig, repoPath, rep
 
 	err = tc.State.StartTransaction(ctx, "Save repo config")
 	if err != nil {
-		return fmt.Errorf("failed to start transaction: %w", err)
+		return fmt.Errorf("starting transaction: %w", err)
 	}
 	err = tc.Intent.StartTransaction(ctx, "Save repo config")
 	if err != nil {
-		return fmt.Errorf("failed to start transaction: %w", err)
+		return fmt.Errorf("starting transaction: %w", err)
 	}
 
 	defer func() {
@@ -386,11 +386,11 @@ func saveRepoConfig(ctx context.Context, tc release.TrackerConfig, repoPath, rep
 			stateErr := tc.State.CommitTransaction(ctx)
 			intentErr := tc.Intent.CommitTransaction(ctx)
 			if stateErr != nil && intentErr != nil {
-				err = fmt.Errorf("failed to commit transaction: %w, %w", stateErr, intentErr)
+				err = fmt.Errorf("committing transaction: %w, %w", stateErr, intentErr)
 			} else if stateErr != nil {
-				err = fmt.Errorf("failed to commit transaction: %w", stateErr)
+				err = fmt.Errorf("committing transaction: %w", stateErr)
 			} else if intentErr != nil {
-				err = fmt.Errorf("failed to commit transaction: %w", intentErr)
+				err = fmt.Errorf("committing transaction: %w", intentErr)
 			}
 		}
 	}()

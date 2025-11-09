@@ -28,12 +28,12 @@ func (w *InRepoWorker) Diff(ctx context.Context, req IdentifyWorkRequest) ([]Wor
 
 	stateRefs, err := state.Match(ctx, prefix+"/@/{deploy}/*", prefix+"/@*/custom/*", "@/{custom,environment}/*")
 	if err != nil {
-		return nil, fmt.Errorf("failed to match state refs: %w", err)
+		return nil, fmt.Errorf("matching state refs: %w", err)
 	}
 
 	intentRefs, err := intent.Match(ctx, prefix+"/@/{deploy}/*", prefix+"/@*/custom/*", "@/{custom,environment}/*")
 	if err != nil {
-		return nil, fmt.Errorf("failed to match intent refs: %w", err)
+		return nil, fmt.Errorf("matching intent refs: %w", err)
 	}
 
 	log.Debug("Diffing", "stateRefs", stateRefs, "intentRefs", intentRefs)
@@ -81,7 +81,7 @@ func (w *InRepoWorker) Diff(ctx context.Context, req IdentifyWorkRequest) ([]Wor
 		if _, exists := intentRefsMap[ref]; !exists {
 			ir, err := refs.Parse(ref)
 			if err != nil {
-				return nil, fmt.Errorf("failed to parse state ref: %w", err)
+				return nil, fmt.Errorf("parsing state ref: %w", err)
 			}
 			out = append(out, Work{
 				Ref:      ir,
@@ -99,11 +99,11 @@ func (w *InRepoWorker) Diff(ctx context.Context, req IdentifyWorkRequest) ([]Wor
 		}
 		sr, err := refs.Parse(stateRef)
 		if err != nil {
-			return nil, fmt.Errorf("failed to parse state ref: %w", err)
+			return nil, fmt.Errorf("parsing state ref: %w", err)
 		}
 		match, err := compareIntent(ctx, state, intent, ir, sr)
 		if err != nil {
-			return nil, fmt.Errorf("failed to compare intent: %w", err)
+			return nil, fmt.Errorf("comparing intent: %w", err)
 		}
 		if !match {
 			out = append(out, Work{
@@ -121,7 +121,7 @@ func (w *InRepoWorker) Diff(ctx context.Context, req IdentifyWorkRequest) ([]Wor
 	for ref := range req.IntentChanges {
 		resolvedRef, err := state.ResolveLink(ctx, ref)
 		if err != nil {
-			return nil, fmt.Errorf("failed to resolve intent ref: %w", err)
+			return nil, fmt.Errorf("resolving intent ref: %w", err)
 		}
 		resolvedIntentChanges[resolvedRef] = struct{}{}
 	}
@@ -168,13 +168,13 @@ func compareExplicitIntent(
 			// It's ok if the state exists but the intent doesn't
 			return false, nil
 		}
-		return false, fmt.Errorf("failed to get intent content: %w", err)
+		return false, fmt.Errorf("getting intent content: %w", err)
 	}
 	if err := state.Get(ctx, stateRef.String(), &stateContent); err != nil {
 		if err == refstore.ErrRefNotFound {
 			return false, nil
 		}
-		return false, fmt.Errorf("failed to get state content: %w", err)
+		return false, fmt.Errorf("getting state content: %w", err)
 	}
 
 	if !reflect.DeepEqual(intentContent, stateContent) {
@@ -198,13 +198,13 @@ func compareDeployIntent(
 		if err == refstore.ErrRefNotFound {
 			return false, nil
 		}
-		return false, fmt.Errorf("failed to get intent content: %w", err)
+		return false, fmt.Errorf("getting intent content: %w", err)
 	}
 	if err := state.Get(ctx, stateRef.String(), &stateContent); err != nil {
 		if err == refstore.ErrRefNotFound {
 			return false, nil
 		}
-		return false, fmt.Errorf("failed to get state content: %w", err)
+		return false, fmt.Errorf("getting state content: %w", err)
 	}
 
 	log.Debug("Comparing deploy", "intentRef", intentRef.String(), "stateRef", stateRef.String(), "intentContent", intentContent, "stateContent", stateContent)

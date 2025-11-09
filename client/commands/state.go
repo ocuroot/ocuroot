@@ -32,7 +32,7 @@ var StateGetCmd = &cobra.Command{
 		ref, err := GetRef(cmd, args)
 		if err != nil {
 			log.Error("Failed to get ref", "error", err)
-			return fmt.Errorf("failed to get ref: %w", err)
+			return fmt.Errorf("getting ref: %w", err)
 		}
 
 		cmd.SilenceUsage = true
@@ -40,7 +40,7 @@ var StateGetCmd = &cobra.Command{
 		w, err := work.NewInRepoWorker(ctx, ref)
 		if err != nil {
 			log.Error("Failed to create worker", "error", err)
-			return fmt.Errorf("failed to create worker: %w", err)
+			return fmt.Errorf("creating worker: %w", err)
 		}
 		w.Cleanup()
 
@@ -48,13 +48,13 @@ var StateGetCmd = &cobra.Command{
 		err = w.Tracker.State.Get(cmd.Context(), w.Tracker.Ref.String(), &v)
 		if err != nil {
 			log.Error("Failed to get state", "ref", w.Tracker.Ref.String(), "error", err)
-			return fmt.Errorf("failed to get state: %w", err)
+			return fmt.Errorf("getting state: %w", err)
 		}
 
 		jv, err := json.MarshalIndent(v, "", "  ")
 		if err != nil {
 			log.Error("Failed to marshal state", "error", err)
-			return fmt.Errorf("failed to marshal state: %w", err)
+			return fmt.Errorf("marshaling state: %w", err)
 		}
 
 		log.Info("Returning state", "value", string(jv))
@@ -73,12 +73,12 @@ var StateMatchCmd = &cobra.Command{
 
 		ref, err := GetRef(cmd, args)
 		if err != nil {
-			return fmt.Errorf("failed to get ref: %w", err)
+			return fmt.Errorf("getting ref: %w", err)
 		}
 
 		w, err := work.NewInRepoWorker(ctx, ref)
 		if err != nil {
-			return fmt.Errorf("failed to create worker: %w", err)
+			return fmt.Errorf("creating worker: %w", err)
 		}
 		w.Cleanup()
 
@@ -89,7 +89,7 @@ var StateMatchCmd = &cobra.Command{
 
 		noLinks, err := cmd.Flags().GetBool("no-links")
 		if err != nil {
-			return fmt.Errorf("failed to get no-links flag: %w", err)
+			return fmt.Errorf("getting no-links flag: %w", err)
 		}
 
 		cmd.SilenceUsage = true
@@ -98,7 +98,7 @@ var StateMatchCmd = &cobra.Command{
 			NoLinks: noLinks,
 		}, glob)
 		if err != nil {
-			return fmt.Errorf("failed to match refs: %w", err)
+			return fmt.Errorf("matching refs: %w", err)
 		}
 
 		for _, ref := range refs {
@@ -118,12 +118,12 @@ var StateDiffCmd = &cobra.Command{
 
 		ref, err := GetRef(cmd, args)
 		if err != nil {
-			return fmt.Errorf("failed to get ref: %w", err)
+			return fmt.Errorf("getting ref: %w", err)
 		}
 
 		w, err := work.NewInRepoWorker(ctx, ref)
 		if err != nil {
-			return fmt.Errorf("failed to create worker: %w", err)
+			return fmt.Errorf("creating worker: %w", err)
 		}
 		w.Cleanup()
 
@@ -133,7 +133,7 @@ var StateDiffCmd = &cobra.Command{
 			GitFilter: work.GitFilterCurrentCommitOnly,
 		})
 		if err != nil {
-			return fmt.Errorf("failed to diff: %w", err)
+			return fmt.Errorf("diffing: %w", err)
 		}
 
 		for _, diff := range diffs {
@@ -154,12 +154,12 @@ var StateDeleteIntentCmd = &cobra.Command{
 
 		ref, err := GetRef(cmd, args)
 		if err != nil {
-			return fmt.Errorf("failed to get ref: %w", err)
+			return fmt.Errorf("getting ref: %w", err)
 		}
 
 		w, err := work.NewInRepoWorker(ctx, ref)
 		if err != nil {
-			return fmt.Errorf("failed to create worker: %w", err)
+			return fmt.Errorf("creating worker: %w", err)
 		}
 		w.Cleanup()
 
@@ -170,7 +170,7 @@ var StateDeleteIntentCmd = &cobra.Command{
 		cmd.SilenceUsage = true
 
 		if err := intent.Delete(ctx, w.Tracker.Ref.String()); err != nil {
-			return fmt.Errorf("failed to delete intent: %w", err)
+			return fmt.Errorf("deleting intent: %w", err)
 		}
 
 		return nil
@@ -190,7 +190,7 @@ Set value to '-' to pass the value from stdin.
 
 		format, err := cmd.Flags().GetString("format")
 		if err != nil {
-			return fmt.Errorf("failed to get format flag: %w", err)
+			return fmt.Errorf("getting format flag: %w", err)
 		}
 		switch format {
 		case "json", "starlark", "string":
@@ -200,12 +200,12 @@ Set value to '-' to pass the value from stdin.
 
 		ref, err := GetRef(cmd, args)
 		if err != nil {
-			return fmt.Errorf("failed to get ref: %w", err)
+			return fmt.Errorf("getting ref: %w", err)
 		}
 
 		w, err := work.NewInRepoWorker(ctx, ref)
 		if err != nil {
-			return fmt.Errorf("failed to create worker: %w", err)
+			return fmt.Errorf("creating worker: %w", err)
 		}
 		w.Cleanup()
 
@@ -229,18 +229,18 @@ Set value to '-' to pass the value from stdin.
 		if format == "json" {
 			err = json.Unmarshal([]byte(valueStr), &value)
 			if err != nil {
-				return fmt.Errorf("failed to unmarshal value: %w", err)
+				return fmt.Errorf("unmarshaling value: %w", err)
 			}
 		}
 		if format == "starlark" {
 			value, err = evalValue(ctx, valueStr)
 			if err != nil {
-				return fmt.Errorf("failed to evaluate value: %w", err)
+				return fmt.Errorf("evaluating value: %w", err)
 			}
 		}
 
 		if err := intent.Set(ctx, w.Tracker.Ref.String(), value); err != nil {
-			return fmt.Errorf("failed to set intent: %w", err)
+			return fmt.Errorf("setting intent: %w", err)
 		}
 
 		return nil
@@ -263,7 +263,7 @@ var StateApplyIntentCmd = &cobra.Command{
 		ctx := cmd.Context()
 		ref, err := GetRef(cmd, args)
 		if err != nil {
-			return fmt.Errorf("failed to get ref: %w", err)
+			return fmt.Errorf("getting ref: %w", err)
 		}
 		cascade := cmd.Flags().Changed("cascade")
 
@@ -271,12 +271,12 @@ var StateApplyIntentCmd = &cobra.Command{
 
 		worker, err := work.NewInRepoWorker(ctx, ref)
 		if err != nil {
-			return fmt.Errorf("failed to create worker: %w", err)
+			return fmt.Errorf("creating worker: %w", err)
 		}
 		defer worker.Cleanup()
 
 		if err := worker.ApplyIntent(ctx, worker.Tracker.Ref); err != nil {
-			return fmt.Errorf("failed to apply intent: %w", err)
+			return fmt.Errorf("applying intent: %w", err)
 		}
 
 		if cascade {
@@ -298,19 +298,19 @@ var StateViewCmd = &cobra.Command{
 		ctx := cmd.Context()
 		ref, err := GetRef(cmd, args)
 		if err != nil {
-			return fmt.Errorf("failed to get ref: %w", err)
+			return fmt.Errorf("getting ref: %w", err)
 		}
 
 		w, err := work.NewInRepoWorker(ctx, ref)
 		if err != nil {
-			return fmt.Errorf("failed to create worker: %w", err)
+			return fmt.Errorf("creating worker: %w", err)
 		}
 		w.Cleanup()
 
 		cmd.SilenceUsage = true
 
 		if err := state.View(cmd.Context(), w.Tracker.State, w.Tracker.Intent); err != nil {
-			return fmt.Errorf("failed to view state: %w", err)
+			return fmt.Errorf("viewing state: %w", err)
 		}
 		return nil
 	},

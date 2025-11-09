@@ -34,7 +34,7 @@ func StartViewServer(ctx context.Context, store refstore.Store, port int) error 
 		var err error
 		port, err = findAvailablePort(3000, 3100) // Try ports 3000-3100
 		if err != nil {
-			return fmt.Errorf("failed to find available port: %w", err)
+			return fmt.Errorf("finding available port: %w", err)
 		}
 	}
 
@@ -167,7 +167,7 @@ func StartViewServer(ctx context.Context, store refstore.Store, port int) error 
 	}()
 
 	if err := srv.ListenAndServe(); err != nil {
-		return fmt.Errorf("failed to start server: %w", err)
+		return fmt.Errorf("starting server: %w", err)
 	}
 	return nil
 }

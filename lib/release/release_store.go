@@ -46,7 +46,7 @@ func (r *releaseStore) GetReleaseInfo(ctx context.Context) (*ReleaseInfo, error)
 	var releaseInfo ReleaseInfo
 	err := r.Store.Get(ctx, r.ReleaseRef.String(), &releaseInfo)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get release state: %w", err)
+		return nil, fmt.Errorf("getting release state: %w", err)
 	}
 	return &releaseInfo, nil
 }
@@ -54,19 +54,19 @@ func (r *releaseStore) GetReleaseInfo(ctx context.Context) (*ReleaseInfo, error)
 func (w *releaseStore) InitDeploymentUp(ctx context.Context, env string) error {
 	err := w.Store.StartTransaction(ctx, "initializing deployment")
 	if err != nil {
-		return fmt.Errorf("failed to start transaction: %w", err)
+		return fmt.Errorf("starting transaction: %w", err)
 	}
 
 	defer func() {
 		commitErr := w.Store.CommitTransaction(ctx)
 		if commitErr != nil {
-			log.Error("failed to commit transaction", "error", commitErr)
+			log.Error("committing transaction", "error", commitErr)
 		}
 	}()
 
 	ri, err := w.GetReleaseInfo(ctx)
 	if err != nil {
-		return fmt.Errorf("failed to get release state: %w", err)
+		return fmt.Errorf("getting release state: %w", err)
 	}
 
 	var task *sdk.Task
@@ -87,11 +87,11 @@ func (w *releaseStore) InitDeploymentUp(ctx context.Context, env string) error {
 
 	ref, run, fs, err := w.sdkTaskToRunAndFunction(ctx, *task)
 	if err != nil {
-		return fmt.Errorf("failed to get run: %w", err)
+		return fmt.Errorf("getting run: %w", err)
 	}
 	err = w.InitializeFunction(ctx, run, ref, fs)
 	if err != nil {
-		return fmt.Errorf("failed to initialize function: %w", err)
+		return fmt.Errorf("initializing function: %w", err)
 	}
 	return nil
 }
@@ -105,18 +105,18 @@ func (w *releaseStore) InitDeploymentDown(ctx context.Context, env string) error
 			log.Info("no current deployment found. nothing to be done", "environment", env)
 			return nil
 		}
-		return fmt.Errorf("failed to get current deployment: %w", err)
+		return fmt.Errorf("getting current deployment: %w", err)
 	}
 	var run models.Run
 	if err := w.Store.Get(ctx, currentDeployment.RunRef.String(), &run); err != nil {
-		return fmt.Errorf("failed to get run at %s: %w", currentDeployment.RunRef.String(), err)
+		return fmt.Errorf("getting run at %s: %w", currentDeployment.RunRef.String(), err)
 	}
 
 	entrypoint := run.Functions[0]
 
 	ri, err := w.GetReleaseInfo(ctx)
 	if err != nil {
-		return fmt.Errorf("failed to get release state: %w", err)
+		return fmt.Errorf("getting release state: %w", err)
 	}
 
 	var downFunc *sdk.FunctionDef
@@ -137,24 +137,24 @@ func (w *releaseStore) InitDeploymentDown(ctx context.Context, env string) error
 
 	err = w.Store.StartTransaction(ctx, "initializing deployment (down)")
 	if err != nil {
-		return fmt.Errorf("failed to start transaction: %w", err)
+		return fmt.Errorf("starting transaction: %w", err)
 	}
 
 	defer func() {
 		commitErr := w.Store.CommitTransaction(ctx)
 		if commitErr != nil {
-			log.Error("failed to commit transaction", "error", commitErr)
+			log.Error("committing transaction", "error", commitErr)
 		}
 	}()
 
 	ref, fnRun, fs, err := w.sdkTaskToDownRun(ctx, env, entrypoint, *downFunc)
 	if err != nil {
-		return fmt.Errorf("failed to get run: %w", err)
+		return fmt.Errorf("getting run: %w", err)
 	}
 
 	err = w.InitializeFunction(ctx, fnRun, ref, fs)
 	if err != nil {
-		return fmt.Errorf("failed to initialize function: %w", err)
+		return fmt.Errorf("initializing function: %w", err)
 	}
 	return nil
 }
@@ -167,7 +167,7 @@ func RunIsReady(ctx context.Context, state refstore.Store, ref string) (bool, er
 
 	var run models.Run
 	if err := state.Get(ctx, runRef, &run); err != nil {
-		return false, fmt.Errorf("failed to get function state at %s: %w", runRef, err)
+		return false, fmt.Errorf("getting function state at %s: %w", runRef, err)
 	}
 	if len(run.Functions) == 0 {
 		return false, fmt.Errorf("no functions in run")
@@ -175,7 +175,7 @@ func RunIsReady(ctx context.Context, state refstore.Store, ref string) (bool, er
 	lastFunction := run.Functions[len(run.Functions)-1]
 	dependenciesSatisfied, err := CheckDependencies(ctx, state, lastFunction)
 	if err != nil {
-		return false, fmt.Errorf("failed to check dependencies: %w", err)
+		return false, fmt.Errorf("checking dependencies: %w", err)
 	}
 
 	if !dependenciesSatisfied {
@@ -184,7 +184,7 @@ func RunIsReady(ctx context.Context, state refstore.Store, ref string) (bool, er
 
 	inputs, err := PopulateInputs(ctx, state, lastFunction.Inputs)
 	if err != nil {
-		return false, fmt.Errorf("failed to populate inputs: %w", err)
+		return false, fmt.Errorf("populating inputs: %w", err)
 	}
 
 	for _, input := range inputs {
@@ -370,11 +370,11 @@ func (w *releaseStore) InitializeFunction(
 	runState.Functions = append(runState.Functions, fn)
 
 	if err := w.Store.Set(ctx, runRef.String(), runState); err != nil {
-		return fmt.Errorf("failed to set run state: %w", err)
+		return fmt.Errorf("setting run state: %w", err)
 	}
 
 	if err := saveStatus(ctx, w.Store, runRef, models.StatusPending); err != nil {
-		return fmt.Errorf("failed to save status: %w", err)
+		return fmt.Errorf("saving status: %w", err)
 	}
 
 	return nil
@@ -403,12 +403,12 @@ func InitializeRun(
 
 	log.Info("Initializing run", "ref", runRef.String(), "runState", run)
 	if err := store.Set(ctx, runRef.String(), run); err != nil {
-		return fmt.Errorf("failed to set run state: %w", err)
+		return fmt.Errorf("setting run state: %w", err)
 	}
 
 	log.Info("Saving status", "ref", runRef.String(), "status", models.StatusPending)
 	if err := saveStatus(ctx, store, runRef, models.StatusPending); err != nil {
-		return fmt.Errorf("failed to save status: %w", err)
+		return fmt.Errorf("saving status: %w", err)
 	}
 	return nil
 }
@@ -419,7 +419,7 @@ func saveStatus(ctx context.Context, store refstore.Store, ref refs.Ref, status 
 	// Remove any existing status markers
 	existingStatuses, err := store.Match(ctx, functionStatusRef.String()+"/*")
 	if err != nil {
-		return fmt.Errorf("failed to match function status: %w", err)
+		return fmt.Errorf("matching function status: %w", err)
 	}
 	for _, status := range existingStatuses {
 		store.Delete(ctx, status)
@@ -427,7 +427,7 @@ func saveStatus(ctx context.Context, store refstore.Store, ref refs.Ref, status 
 
 	functionStateRef := functionStatusRef.JoinSubPath(string(status))
 	if err := store.Set(ctx, functionStateRef.String(), models.NewMarker()); err != nil {
-		return fmt.Errorf("failed to set function state: %w", err)
+		return fmt.Errorf("setting function state: %w", err)
 	}
 
 	log.Debug("saved status", "status", status, "ref", ref.String(), "fsr", functionStateRef.String())
@@ -476,11 +476,11 @@ func (r *releaseStore) sdkTaskToRunAndFunction(ctx context.Context, task sdk.Tas
 
 	runRefString, err := refstore.IncrementPath(ctx, r.Store, fmt.Sprintf("%s/", runRef.String()))
 	if err != nil {
-		return refs.Ref{}, models.Run{}, nil, fmt.Errorf("failed to increment path: %w", err)
+		return refs.Ref{}, models.Run{}, nil, fmt.Errorf("incrementing path: %w", err)
 	}
 	runRef, err = refs.Parse(runRefString)
 	if err != nil {
-		return refs.Ref{}, models.Run{}, nil, fmt.Errorf("failed to parse path: %w", err)
+		return refs.Ref{}, models.Run{}, nil, fmt.Errorf("parsing path: %w", err)
 	}
 
 	return runRef, mRun, fs, nil
@@ -509,17 +509,17 @@ func (r *releaseStore) sdkTaskToDownRun(
 	// Populate inputs to resolve and reevaluate any refs
 	populatedInputs, err := PopulateInputs(ctx, r.Store, fn.Inputs)
 	if err != nil {
-		return refs.Ref{}, models.Run{}, nil, fmt.Errorf("failed to populate inputs: %w", err)
+		return refs.Ref{}, models.Run{}, nil, fmt.Errorf("populating inputs: %w", err)
 	}
 	fs.Inputs = populatedInputs
 
 	runRefString, err := refstore.IncrementPath(ctx, r.Store, fmt.Sprintf("%s/", taskRef.String()))
 	if err != nil {
-		return refs.Ref{}, models.Run{}, nil, fmt.Errorf("failed to increment path: %w", err)
+		return refs.Ref{}, models.Run{}, nil, fmt.Errorf("incrementing path: %w", err)
 	}
 	runRef, err := refs.Parse(runRefString)
 	if err != nil {
-		return refs.Ref{}, models.Run{}, nil, fmt.Errorf("failed to parse path: %w", err)
+		return refs.Ref{}, models.Run{}, nil, fmt.Errorf("parsing path: %w", err)
 	}
 
 	return runRef, run, fs, nil

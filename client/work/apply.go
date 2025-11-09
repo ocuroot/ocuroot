@@ -47,13 +47,13 @@ func applyEnvironmentIntent(ctx context.Context, ref refs.Ref, state, intent ref
 
 	err := state.StartTransaction(ctx, "apply environment intent")
 	if err != nil {
-		return fmt.Errorf("failed to start transaction: %w", err)
+		return fmt.Errorf("starting transaction: %w", err)
 	}
 
 	defer func() {
 		commitErr := state.CommitTransaction(ctx)
 		if commitErr != nil {
-			log.Error("failed to commit transaction", "error", commitErr)
+			log.Error("committing transaction", "error", commitErr)
 		}
 	}()
 
@@ -62,7 +62,7 @@ func applyEnvironmentIntent(ctx context.Context, ref refs.Ref, state, intent ref
 		if err == refstore.ErrRefNotFound {
 			return applyDeletedEnvironmentIntent(ctx, ref, state, intent)
 		}
-		return fmt.Errorf("failed to get environment intent: %w", err)
+		return fmt.Errorf("getting environment intent: %w", err)
 	}
 
 	if err := release.ValidateEnvironment(content); err != nil {
@@ -73,30 +73,30 @@ func applyEnvironmentIntent(ctx context.Context, ref refs.Ref, state, intent ref
 	}
 
 	if err := state.Set(ctx, ref.String(), content); err != nil {
-		return fmt.Errorf("failed to set state: %w", err)
+		return fmt.Errorf("setting state: %w", err)
 	}
 
 	// Add an operation to releases with deployments or the latest with no deployments
 	releases, err := findReleasesForEnvironmentCheck(ctx, state)
 	if err != nil {
-		return fmt.Errorf("failed to find releases for environment check: %w", err)
+		return fmt.Errorf("finding releases for environment check: %w", err)
 	}
 	for _, release := range releases {
 		log.Info("Applying environment intent to release", "release", release)
 
 		resolvedRelease, err := state.ResolveLink(ctx, release)
 		if err != nil {
-			return fmt.Errorf("failed to resolve release: %w", err)
+			return fmt.Errorf("resolving release: %w", err)
 		}
 		parsedRelease, err := refs.Parse(resolvedRelease)
 		if err != nil {
-			return fmt.Errorf("failed to parse release: %w", err)
+			return fmt.Errorf("parsing release: %w", err)
 		}
 		parsedRelease = parsedRelease.SetSubPathType(refs.SubPathTypeOp).SetSubPath("check_envs")
 
 		log.Info("Setting op", "ref", parsedRelease.String())
 		if err := state.Set(ctx, parsedRelease.String(), models.NewMarker()); err != nil {
-			return fmt.Errorf("failed to set operation: %w", err)
+			return fmt.Errorf("setting operation: %w", err)
 		}
 	}
 
@@ -107,7 +107,7 @@ func findReleasesForEnvironmentCheck(ctx context.Context, state refstore.Store) 
 	var releasesToCheck = make(map[string]string)
 	deployments, err := state.Match(ctx, "**/@/deploy/*")
 	if err != nil {
-		return nil, fmt.Errorf("failed to match deployments: %w", err)
+		return nil, fmt.Errorf("matching deployments: %w", err)
 	}
 	for _, deployment := range deployments {
 		log.Info("Checking deployment", "deployment", deployment)
@@ -116,15 +116,15 @@ func findReleasesForEnvironmentCheck(ctx context.Context, state refstore.Store) 
 
 		resolvedDeployment, err := state.ResolveLink(ctx, deployment)
 		if err != nil {
-			return nil, fmt.Errorf("failed to resolve deployment: %w", err)
+			return nil, fmt.Errorf("resolving deployment: %w", err)
 		}
 		releaseRef, err := refs.Reduce(resolvedDeployment, librelease.GlobRelease)
 		if err != nil {
-			return nil, fmt.Errorf("failed to reduce deployment: %w", err)
+			return nil, fmt.Errorf("reducing deployment: %w", err)
 		}
 		resolvedReleaseRef, err := refs.Parse(releaseRef)
 		if err != nil {
-			return nil, fmt.Errorf("failed to parse deployment: %w", err)
+			return nil, fmt.Errorf("parsing deployment: %w", err)
 		}
 
 		releasesToCheck[pkgName] = resolvedReleaseRef.String()
@@ -132,7 +132,7 @@ func findReleasesForEnvironmentCheck(ctx context.Context, state refstore.Store) 
 
 	releases, err := state.Match(ctx, "**/@*/commit/*")
 	if err != nil {
-		return nil, fmt.Errorf("failed to match releases: %w", err)
+		return nil, fmt.Errorf("matching releases: %w", err)
 	}
 
 	for _, release := range releases {
@@ -145,15 +145,15 @@ func findReleasesForEnvironmentCheck(ctx context.Context, state refstore.Store) 
 
 		resolvedRelease, err := state.ResolveLink(ctx, release)
 		if err != nil {
-			return nil, fmt.Errorf("failed to resolve release: %w", err)
+			return nil, fmt.Errorf("resolving release: %w", err)
 		}
 		releaseRef, err := refs.Reduce(resolvedRelease, librelease.GlobRelease)
 		if err != nil {
-			return nil, fmt.Errorf("failed to reduce release: %w", err)
+			return nil, fmt.Errorf("reducing release: %w", err)
 		}
 		resolvedReleaseRef, err := refs.Parse(releaseRef)
 		if err != nil {
-			return nil, fmt.Errorf("failed to parse release: %w", err)
+			return nil, fmt.Errorf("parsing release: %w", err)
 		}
 
 		releasesToCheck[pkgName] = resolvedReleaseRef.String()
@@ -172,23 +172,23 @@ func applyDeletedEnvironmentIntent(ctx context.Context, ref refs.Ref, state, int
 	// Undeploy everything in this environment
 	deployments, err := state.Match(ctx, fmt.Sprintf("**/@/deploy/%v", ref.SubPath))
 	if err != nil {
-		return fmt.Errorf("failed to match deployments: %w", err)
+		return fmt.Errorf("matching deployments: %w", err)
 	}
 	for _, deployment := range deployments {
 		dp, err := refs.Parse(deployment)
 		if err != nil {
-			return fmt.Errorf("failed to parse deployment: %w", err)
+			return fmt.Errorf("parsing deployment: %w", err)
 		}
 
 		err = applyDeletedDeployIntent(ctx, dp, state, intent)
 		if err != nil {
-			return fmt.Errorf("failed to apply deleted deploy intent: %w", err)
+			return fmt.Errorf("applying deleted deploy intent: %w", err)
 		}
 	}
 
 	// Finally, delete the actual environment
 	if err := state.Delete(ctx, ref.String()); err != nil {
-		return fmt.Errorf("failed to delete state: %w", err)
+		return fmt.Errorf("deleting state: %w", err)
 	}
 
 	return nil
@@ -202,11 +202,11 @@ func applyCustomIntent(ctx context.Context, ref refs.Ref, state, intent refstore
 		if err == refstore.ErrRefNotFound {
 			return applyDeletedCustomIntent(ctx, ref, state)
 		}
-		return fmt.Errorf("failed to get intent at %s: %w", ref.String(), err)
+		return fmt.Errorf("getting intent at %s: %w", ref.String(), err)
 	}
 
 	if err := state.Set(ctx, ref.String(), content); err != nil {
-		return fmt.Errorf("failed to set state at %s: %w", ref.String(), err)
+		return fmt.Errorf("setting state at %s: %w", ref.String(), err)
 	}
 
 	return nil
@@ -215,7 +215,7 @@ func applyCustomIntent(ctx context.Context, ref refs.Ref, state, intent refstore
 func applyDeletedCustomIntent(ctx context.Context, ref refs.Ref, state refstore.Store) error {
 	log.Info("Applying deleted custom intent", "ref", ref.String())
 	if err := state.Delete(ctx, ref.String()); err != nil {
-		return fmt.Errorf("failed to delete state at %s: %w", ref.String(), err)
+		return fmt.Errorf("deleting state at %s: %w", ref.String(), err)
 	}
 	return nil
 }
@@ -227,12 +227,12 @@ func applyDeployIntent(ctx context.Context, ref refs.Ref, state, intent refstore
 		if err == refstore.ErrRefNotFound {
 			return applyDeletedDeployIntent(ctx, ref, state, intent)
 		}
-		return fmt.Errorf("failed to get intent: %w", err)
+		return fmt.Errorf("getting intent: %w", err)
 	}
 
 	var releaseInfo librelease.ReleaseInfo
 	if err := state.Get(ctx, intentContent.Release.String(), &releaseInfo); err != nil {
-		return fmt.Errorf("failed to get release info: %w", err)
+		return fmt.Errorf("getting release info: %w", err)
 	}
 
 	var deployment *sdk.Deployment
@@ -261,7 +261,7 @@ func applyDeployIntent(ctx context.Context, ref refs.Ref, state, intent refstore
 	// Check that there is a change to apply
 	match, err := compareDeployIntent(ctx, state, intent, ref, deployRef)
 	if err != nil {
-		return fmt.Errorf("failed to compare deploy intent: %w", err)
+		return fmt.Errorf("comparing deploy intent: %w", err)
 	}
 	if match {
 		log.Info("Intent already applied")
@@ -272,7 +272,7 @@ func applyDeployIntent(ctx context.Context, ref refs.Ref, state, intent refstore
 	matchStr := deployRef.String() + "/*/status/{pending,paused,running}"
 	existingDeployments, err := state.Match(ctx, matchStr)
 	if err != nil {
-		return fmt.Errorf("failed to match pending deployments: %w", err)
+		return fmt.Errorf("matching pending deployments: %w", err)
 	}
 
 	if len(existingDeployments) > 0 {
@@ -283,12 +283,12 @@ func applyDeployIntent(ctx context.Context, ref refs.Ref, state, intent refstore
 
 			existingDeploymentRef, err := refs.Parse(existingDeployment)
 			if err != nil {
-				return fmt.Errorf("failed to parse existing deployment: %w", err)
+				return fmt.Errorf("parsing existing deployment: %w", err)
 			}
 
 			match, err := compareDeployIntent(ctx, state, intent, ref, existingDeploymentRef)
 			if err != nil {
-				return fmt.Errorf("failed to compare deploy intent: %w", err)
+				return fmt.Errorf("comparing deploy intent: %w", err)
 			}
 			if match {
 				log.Info("Deploy intent already pending or in progress")
@@ -299,16 +299,16 @@ func applyDeployIntent(ctx context.Context, ref refs.Ref, state, intent refstore
 
 	rs, err := librelease.ReleaseStore(ctx, intentContent.Release.String(), state)
 	if err != nil {
-		return fmt.Errorf("failed to initialize release store: %w", err)
+		return fmt.Errorf("initializing release store: %w", err)
 	}
 
 	runRefString, err := refstore.IncrementPath(ctx, state, fmt.Sprintf("%s/", deployRef.String()))
 	if err != nil {
-		return fmt.Errorf("failed to increment path: %w", err)
+		return fmt.Errorf("incrementing path: %w", err)
 	}
 	runRef, err := refs.Parse(runRefString)
 	if err != nil {
-		return fmt.Errorf("failed to parse run ref: %w", err)
+		return fmt.Errorf("parsing run ref: %w", err)
 	}
 	err = rs.InitializeFunction(
 		ctx,
@@ -322,7 +322,7 @@ func applyDeployIntent(ctx context.Context, ref refs.Ref, state, intent refstore
 		},
 	)
 	if err != nil {
-		return fmt.Errorf("failed to initialize function: %w", err)
+		return fmt.Errorf("initializing function: %w", err)
 	}
 
 	return nil
@@ -342,13 +342,13 @@ func applyDeletedDeployIntent(ctx context.Context, ref refs.Ref, state, intent r
 
 	releaseStore, err := librelease.ReleaseStore(ctx, ref.String(), state)
 	if err != nil {
-		return fmt.Errorf("failed to get release store: %w", err)
+		return fmt.Errorf("getting release store: %w", err)
 	}
 
 	log.Info("Initing deployment down", "env", envName)
 	err = releaseStore.InitDeploymentDown(ctx, envName)
 	if err != nil {
-		return fmt.Errorf("failed to init deployment: %w", err)
+		return fmt.Errorf("initializing deployment: %w", err)
 	}
 
 	return nil

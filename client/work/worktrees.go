@@ -37,7 +37,7 @@ func (w *InRepoWorker) WorkerForWork(ctx context.Context, todo Work) (*InRepoWor
 func CloneRepo(ctx context.Context, repoRemotes []string, commit string) (string, error) {
 	log.Info("CloneRepo", "remotes", repoRemotes, "commit", commit)
 	if err := os.MkdirAll(repoCloneBaseDir(), 0755); err != nil {
-		return "", fmt.Errorf("failed to mkdir: %w", err)
+		return "", fmt.Errorf("creating directory: %w", err)
 	}
 	repoCloneDir := path.Join(repoCloneBaseDir(), ulid.MustNew(ulid.Now(), rand.Reader).String())
 
@@ -78,20 +78,20 @@ func (w *InRepoWorker) CopyInRepoClone(ctx context.Context, ref refs.Ref, repoNa
 	log.Info("Getting repo info", "repoRef", repoRef)
 	err := w.Tracker.State.Get(ctx, repoRef, &repoInfo)
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to get repo info for %s: %w", repoRef, err)
+		return nil, nil, fmt.Errorf("getting repo info for %s: %w", repoRef, err)
 	}
 
 	log.Info("Repo info", "remotes", repoInfo.Remotes, "source", string(repoInfo.Source))
 
 	globals, be, err := w.RepoConfigFromState(ctx, repoName)
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to get repo config: %w", err)
+		return nil, nil, fmt.Errorf("getting repo config: %w", err)
 	}
 
 	// Load globals from repo into settings
 	w.Settings, err = LoadSettings(be, globals, os.Environ())
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to load settings: %w", err)
+		return nil, nil, fmt.Errorf("loading settings: %w", err)
 	}
 
 	var remotes []string
@@ -106,7 +106,7 @@ func (w *InRepoWorker) CopyInRepoClone(ctx context.Context, ref refs.Ref, repoNa
 
 	repoCloneDir, err := CloneRepo(ctx, remotes, commit)
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to clone repo: %w", err)
+		return nil, nil, fmt.Errorf("cloning repo: %w", err)
 	}
 
 	wc := *w
@@ -120,19 +120,19 @@ func (w *InRepoWorker) CopyInRepoClone(ctx context.Context, ref refs.Ref, repoNa
 		// We don't save the repo config here since it should already exist
 		err := newWorker.InitTrackerFromSourceRepo(ctx, ref, repoCloneDir, repoCloneDir, false)
 		if err != nil {
-			return nil, nil, fmt.Errorf("failed to init tracker from source repo: %w", err)
+			return nil, nil, fmt.Errorf("initializing tracker from source repo: %w", err)
 		}
 	}
 
 	// Check that the worktree is as expected
 	wtr, err := gittools.Open(repoCloneDir)
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to open worktree: %w", err)
+		return nil, nil, fmt.Errorf("opening worktree: %w", err)
 	}
 
 	head, stderr, err := wtr.Client.Exec("rev-parse", "HEAD")
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to get head: %w\n%v", err, string(stderr))
+		return nil, nil, fmt.Errorf("getting head: %w\n%v", err, string(stderr))
 	}
 	if strings.TrimSpace(string(head)) != commit {
 		return nil, nil, fmt.Errorf("commit in worktree does not match expected commit: %s != %s", string(head), commit)
@@ -148,12 +148,12 @@ func (w *InRepoWorker) CopyInRepoClone(ctx context.Context, ref refs.Ref, repoNa
 
 func (w *InRepoWorker) CopyInWorktree(ctx context.Context, todo Work) (*InRepoWorker, func(), error) {
 	if err := os.MkdirAll(workTreeBaseDir(), 0755); err != nil {
-		return nil, nil, fmt.Errorf("failed to mkdir: %w", err)
+		return nil, nil, fmt.Errorf("creating directory: %w", err)
 	}
 
 	r, err := gittools.Open(w.Tracker.RepoPath)
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to open repo: %w", err)
+		return nil, nil, fmt.Errorf("opening repo: %w", err)
 	}
 
 	workTreePath := path.Join(workTreeBaseDir(), ulid.MustNew(ulid.Now(), rand.Reader).String())
@@ -161,7 +161,7 @@ func (w *InRepoWorker) CopyInWorktree(ctx context.Context, todo Work) (*InRepoWo
 	// Estimate the size of the worktree and don't create the worktree if it'll fill the remaining space on disk
 	spaceAvailable, err := w.checkSpaceForWorktree(r, todo.Commit)
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to check space for worktree: %w", err)
+		return nil, nil, fmt.Errorf("checking space for worktree: %w", err)
 	}
 	if !spaceAvailable {
 		return nil, nil, fmt.Errorf("not enough space to create worktree")
@@ -170,7 +170,7 @@ func (w *InRepoWorker) CopyInWorktree(ctx context.Context, todo Work) (*InRepoWo
 	// TODO: We may want an option to do this in-place for the sake of performance
 	// So just a checkout of the appropriate commit, then `git reset --hard`, `git clean -fdxx`
 	if _, stderr, err := r.Client.Exec("worktree", "add", workTreePath, todo.Commit); err != nil {
-		return nil, nil, fmt.Errorf("failed to add worktree: %w\nworkTreePath=%q, commit=%q, todo=%+v\n%v", err, workTreePath, todo.Commit, todo, string(stderr))
+		return nil, nil, fmt.Errorf("adding worktree: %w\nworkTreePath=%q, commit=%q, todo=%+v\n%v", err, workTreePath, todo.Commit, todo, string(stderr))
 	}
 
 	newWorker := &InRepoWorker{
@@ -184,12 +184,12 @@ func (w *InRepoWorker) CopyInWorktree(ctx context.Context, todo Work) (*InRepoWo
 	// Check that the worktree is as expected
 	wtr, err := gittools.Open(workTreePath)
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to open worktree: %w", err)
+		return nil, nil, fmt.Errorf("opening worktree: %w", err)
 	}
 
 	head, stderr, err := wtr.Client.Exec("rev-parse", "HEAD")
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to get head: %w\n%v", err, string(stderr))
+		return nil, nil, fmt.Errorf("getting head: %w\n%v", err, string(stderr))
 	}
 	if strings.TrimSpace(string(head)) != todo.Commit {
 		return nil, nil, fmt.Errorf("commit in worktree does not match expected commit: %s != %s", string(head), todo.Commit)
@@ -203,7 +203,7 @@ func (w *InRepoWorker) CopyInWorktree(ctx context.Context, todo Work) (*InRepoWo
 func (w *InRepoWorker) checkSpaceForWorktree(repo *gittools.Repo, commit string) (bool, error) {
 	counts, stderr, err := repo.Client.Exec("ls-tree", "-r", "--format=%(objectsize)", commit)
 	if err != nil {
-		return false, fmt.Errorf("failed to get counts: %w\n%v", err, string(stderr))
+		return false, fmt.Errorf("getting counts: %w\n%v", err, string(stderr))
 	}
 	var totalSize uint64
 	for _, count := range strings.Split(string(counts), "\n") {
@@ -229,7 +229,7 @@ func (w *InRepoWorker) ExecuteWorkInCleanWorktrees(ctx context.Context, todos []
 	for _, t := range todos {
 		if t.WorkType == WorkTypeUpdate || t.WorkType == WorkTypeCreate || t.WorkType == WorkTypeDelete {
 			if err := w.ApplyIntent(ctx, t.Ref); err != nil {
-				return fmt.Errorf("failed to apply intent (%s): %w", t.Ref.String(), err)
+				return fmt.Errorf("applying intent (%s): %w", t.Ref.String(), err)
 			}
 		}
 	}
@@ -271,7 +271,7 @@ func (w *InRepoWorker) ExecuteWorkInCleanWorktrees(ctx context.Context, todos []
 		for _, t := range workGroups[g] {
 			if t.WorkType == WorkTypeRun || t.WorkType == WorkTypeOp || t.WorkType == WorkTypeRelease {
 				if err := newWorker.ExecuteWork(ctx, []Work{t}); err != nil {
-					return fmt.Errorf("failed to execute work: %w", err)
+					return fmt.Errorf("executing work: %w", err)
 				}
 			}
 		}

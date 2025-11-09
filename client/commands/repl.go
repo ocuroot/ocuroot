@@ -65,7 +65,7 @@ func runSingleCommand(ctx context.Context, filePath string, command string) erro
 		Filename: filePath,
 	})
 	if err != nil {
-		return fmt.Errorf("failed to create worker: %w", err)
+		return fmt.Errorf("creating worker: %w", err)
 	}
 	// We don't need the TUI after this
 	w.Cleanup()
@@ -96,7 +96,7 @@ func runSingleCommand(ctx context.Context, filePath string, command string) erro
 			},
 		)
 		if err != nil {
-			return fmt.Errorf("failed to load config: %w", err)
+			return fmt.Errorf("loading config: %w", err)
 		}
 
 		// Get SDK version for evaluation
@@ -109,7 +109,7 @@ func runSingleCommand(ctx context.Context, filePath string, command string) erro
 		// Create globals that combine SDK builtins with user-defined functions
 		globals, err = createGlobalsWithUserFunctions(ctx, backend, latestVersion, config)
 		if err != nil {
-			return fmt.Errorf("failed to create globals: %w", err)
+			return fmt.Errorf("creating globals: %w", err)
 		}
 
 		fmt.Printf("File loaded successfully\n")
@@ -124,7 +124,7 @@ func runSingleCommand(ctx context.Context, filePath string, command string) erro
 		// Get just SDK builtins
 		_, globals, err = sdk.EvalWithGlobals(ctx, backend, latestVersion, "None", make(starlark.StringDict))
 		if err != nil {
-			return fmt.Errorf("failed to get SDK builtins: %w", err)
+			return fmt.Errorf("getting SDK builtins: %w", err)
 		}
 	}
 
@@ -167,7 +167,7 @@ func runStarlarkReplWithFile(ctx context.Context, filePath string) error {
 		Filename: filePath,
 	})
 	if err != nil {
-		return fmt.Errorf("failed to create worker: %w", err)
+		return fmt.Errorf("creating worker: %w", err)
 	}
 	// We don't need the TUI after this
 	w.Cleanup()
@@ -193,7 +193,7 @@ func runStarlarkReplWithFile(ctx context.Context, filePath string) error {
 		},
 	)
 	if err != nil {
-		return fmt.Errorf("failed to load config: %w", err)
+		return fmt.Errorf("loading config: %w", err)
 	}
 
 	// Get SDK version for evaluation
@@ -206,7 +206,7 @@ func runStarlarkReplWithFile(ctx context.Context, filePath string) error {
 	// Create globals that combine SDK builtins with user-defined functions
 	globals, err := createGlobalsWithUserFunctions(ctx, backend, latestVersion, config)
 	if err != nil {
-		return fmt.Errorf("failed to create globals: %w", err)
+		return fmt.Errorf("creating globals: %w", err)
 	}
 
 	fmt.Println("Starting Starlark REPL with Ocuroot SDK")
@@ -223,7 +223,7 @@ func createGlobalsWithUserFunctions(ctx context.Context, backend sdk.Backend, sd
 	// Get SDK builtins using EvalWithGlobals
 	_, globals, err := sdk.EvalWithGlobals(ctx, backend, sdkVersion, "None", make(starlark.StringDict))
 	if err != nil {
-		return nil, fmt.Errorf("failed to get SDK builtins: %w", err)
+		return nil, fmt.Errorf("getting SDK builtins: %w", err)
 	}
 
 	// Add user-defined functions from the config

@@ -23,12 +23,12 @@ var PreviewCmd = &cobra.Command{
 
 		ref, err := GetRef(cmd, args)
 		if err != nil {
-			return fmt.Errorf("failed to get ref: %w", err)
+			return fmt.Errorf("getting ref: %w", err)
 		}
 
 		w, err := work.NewInRepoWorker(ctx, ref)
 		if err != nil {
-			return fmt.Errorf("failed to create worker: %w", err)
+			return fmt.Errorf("creating worker: %w", err)
 		}
 		w.Cleanup()
 
@@ -44,7 +44,7 @@ var PreviewCmd = &cobra.Command{
 			if os.IsNotExist(err) {
 				return fmt.Errorf("package path does not exist: %w", err)
 			}
-			return fmt.Errorf("failed to stat package path: %w", err)
+			return fmt.Errorf("stat for package path: %w", err)
 		}
 
 		// Start web server

@@ -22,14 +22,14 @@ func releasesForCommit(ctx context.Context, state refstore.Store, repo string, c
 	)
 	releasesForCommit, err := state.Match(ctx, mr)
 	if err != nil {
-		return nil, fmt.Errorf("failed to match refs: %w", err)
+		return nil, fmt.Errorf("matching refs: %w", err)
 	}
 
 	var out []refs.Ref
 	for _, ref := range releasesForCommit {
 		pr, err := refs.Parse(ref)
 		if err != nil {
-			return nil, fmt.Errorf("failed to parse ref: %w", err)
+			return nil, fmt.Errorf("parsing ref: %w", err)
 		}
 		pr = pr.SetSubPathType(refs.SubPathTypeNone).
 			SetSubPath("").

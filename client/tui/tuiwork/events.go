@@ -20,7 +20,7 @@ func WatchForStateUpdates(ctx context.Context, store refstore.Store, tuiWork tui
 		func(ctx context.Context, ref string) {
 			r, err := refs.Parse(ref)
 			if err != nil {
-				log.Error("failed to parse ref", "error", err)
+				log.Error("parsing ref", "error", err)
 				return
 			}
 
@@ -30,7 +30,7 @@ func WatchForStateUpdates(ctx context.Context, store refstore.Store, tuiWork tui
 		"**/{task,deploy}/*/*/status/*",
 	)
 	if err != nil {
-		log.Error("failed to listen to state changes", "error", err)
+		log.Error("listening to state changes", "error", err)
 		return store
 	}
 
@@ -39,7 +39,7 @@ func WatchForStateUpdates(ctx context.Context, store refstore.Store, tuiWork tui
 		func(ctx context.Context, ref string) {
 			r, err := refs.Parse(ref)
 			if err != nil {
-				log.Error("failed to parse ref", "error", err)
+				log.Error("parsing ref", "error", err)
 				return
 			}
 
@@ -49,7 +49,7 @@ func WatchForStateUpdates(ctx context.Context, store refstore.Store, tuiWork tui
 		"**/@*/custom/*", "@/custom/*", "@/environment/*",
 	)
 	if err != nil {
-		log.Error("failed to listen to state changes", "error", err)
+		log.Error("listening to state changes", "error", err)
 		return store
 	}
 
@@ -60,7 +60,7 @@ func TuiLogger(tuiWork tui.Tui) func(fnRef refs.Ref, msg sdk.Log) {
 	return func(fnRef refs.Ref, msg sdk.Log) {
 		wr, err := librelease.ReduceToTaskRef(fnRef)
 		if err != nil {
-			log.Error("failed to get work ref", "error", err)
+			log.Error("getting work ref", "error", err)
 			return
 		}
 		log.Info("function log", "ref", wr.String(), "msg", msg)
@@ -76,7 +76,7 @@ func updateStatus(ctx context.Context, store refstore.Store, ref refs.Ref, ev *R
 	runRef := librelease.ReduceToRunRef(ref)
 	runStatus, err := librelease.GetRunStatus(ctx, store, runRef)
 	if err != nil {
-		log.Error("failed to get work status", "runRef", ref.String(), "error", err)
+		log.Error("getting work status", "runRef", ref.String(), "error", err)
 		return
 	}
 

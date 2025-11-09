@@ -271,19 +271,19 @@ func (w *InRepoWorker) Push(ctx context.Context) error {
 
 		err = w.Tracker.State.Set(ctx, fmt.Sprintf("%v/-/repo.ocu.star/@%v/push/index", w.RepoName, w.RepoInfo.Commit), w.Index)
 		if err != nil {
-			return fmt.Errorf("failed to set push index: %w", err)
+			return fmt.Errorf("setting push index: %w", err)
 		}
 
 		err = w.Tracker.State.Link(ctx, fmt.Sprintf("%v/-/repo.ocu.star/@/push/index", w.RepoName), fmt.Sprintf("%v/-/repo.ocu.star/@%v/push/index", w.RepoName, w.RepoInfo.Commit))
 		if err != nil {
-			return fmt.Errorf("failed to link push index: %w", err)
+			return fmt.Errorf("linking push index: %w", err)
 		}
 	}
 
 	if w.Index != nil && w.RepoInfo.Type == client.RepoTypeIntent {
 		err = w.Tracker.State.Set(ctx, intentCommitRecordRef, w.Index)
 		if err != nil {
-			return fmt.Errorf("failed to set push index: %w", err)
+			return fmt.Errorf("setting push index: %w", err)
 		}
 	}
 

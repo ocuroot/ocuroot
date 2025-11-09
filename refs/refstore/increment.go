@@ -10,7 +10,7 @@ import (
 func IncrementPath(ctx context.Context, store Store, pathPrefix string) (string, error) {
 	matches, err := store.Match(ctx, fmt.Sprintf("%s*", pathPrefix))
 	if err != nil {
-		return "", fmt.Errorf("failed to match prefix: %w", err)
+		return "", fmt.Errorf("matching prefix: %w", err)
 	}
 
 	if len(matches) == 0 {

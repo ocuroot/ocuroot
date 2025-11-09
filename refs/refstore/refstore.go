@@ -35,7 +35,7 @@ func NewRefStore(ctx context.Context, backend DocumentBackend, tags map[string]s
 	if infoBytes != nil {
 		info = &StoreInfo{}
 		if err := json.Unmarshal(infoBytes, info); err != nil {
-			return nil, fmt.Errorf("failed to unmarshal store info: %w", err)
+			return nil, fmt.Errorf("unmarshaling store info: %w", err)
 		}
 	}
 
@@ -175,7 +175,7 @@ func (r *RefStore) Delete(ctx context.Context, ref string) error {
 func (r *RefStore) Get(ctx context.Context, ref string, v any) error {
 	parsedRef, err := refs.Parse(ref)
 	if err != nil {
-		return fmt.Errorf("failed to parse ref: %w", err)
+		return fmt.Errorf("parsing ref: %w", err)
 	}
 
 	refWithoutFragment := parsedRef
@@ -295,7 +295,7 @@ func (r *RefStore) Link(ctx context.Context, ref string, target string) error {
 	if existing != nil && existing.Kind == StorageKindLink {
 		unlinkReqs, err := r.unlinkRequests(ctx, ref)
 		if err != nil {
-			return fmt.Errorf("failed to unlink: %w", err)
+			return fmt.Errorf("unlinking: %w", err)
 		}
 		requests = append(requests, unlinkReqs...)
 	}
@@ -435,7 +435,7 @@ func (r *RefStore) ResolveLink(ctx context.Context, ref string) (string, error) 
 func (r *RefStore) getLinkTarget(ctx context.Context, ref string) (*string, error) {
 	parsedRef, err := refs.Parse(ref)
 	if err != nil {
-		return nil, fmt.Errorf("failed to parse ref: %w", err)
+		return nil, fmt.Errorf("parsing ref: %w", err)
 	}
 
 	refWithoutFragment := parsedRef

@@ -28,14 +28,14 @@ Example:
 
 		ref, err := GetRef(cmd, args)
 		if err != nil {
-			return fmt.Errorf("failed to get ref: %w", err)
+			return fmt.Errorf("getting ref: %w", err)
 		}
 
 		cmd.SilenceUsage = true
 
 		w, err := work.NewInRepoWorker(ctx, ref)
 		if err != nil {
-			return fmt.Errorf("failed to create worktree: %w", err)
+			return fmt.Errorf("creating worktree: %w", err)
 		}
 
 		defer w.Cleanup()
@@ -49,7 +49,7 @@ Example:
 		// Open the repository
 		repo, err := gittools.Open(repoPath)
 		if err != nil {
-			return fmt.Errorf("failed to open git repository: %w", err)
+			return fmt.Errorf("opening git repository: %w", err)
 		}
 
 		searchOpts := &gittools.GetCommitsBetweenOptions{
@@ -59,7 +59,7 @@ Example:
 
 		commits, err := repo.GetCommitsBetween(startCommit, endCommit, searchOpts)
 		if err != nil {
-			return fmt.Errorf("failed to search for commit %s: %w", startCommit, err)
+			return fmt.Errorf("searching for commit %s: %w", startCommit, err)
 		}
 
 		refsToDeployment := make(map[string]models.Run)
@@ -68,28 +68,28 @@ Example:
 		// Find all deploys from this repo
 		reploymentRefs, err := w.Tracker.State.Match(ctx, fmt.Sprintf("%v/-/**/@/deploy/*", w.Tracker.Ref.Repo))
 		if err != nil {
-			return fmt.Errorf("failed to match refs: %w", err)
+			return fmt.Errorf("matching refs: %w", err)
 		}
 		for _, ref := range reploymentRefs {
 			resolvedRef, err := w.Tracker.State.ResolveLink(ctx, ref)
 			if err != nil {
-				return fmt.Errorf("failed to resolve ref: %w", err)
+				return fmt.Errorf("resolving ref ref: %w", err)
 			}
 
 			var run models.Run
 			if err := w.Tracker.State.Get(ctx, resolvedRef, &run); err != nil {
-				return fmt.Errorf("failed to get run: %w", err)
+				return fmt.Errorf("getting run: %w", err)
 			}
 			refsToDeployment[ref] = run
 
 			pr, err := refs.Parse(resolvedRef)
 			if err != nil {
-				return fmt.Errorf("failed to parse ref: %w", err)
+				return fmt.Errorf("parsing ref: %w", err)
 			}
 			releaseRef := pr.SetSubPathType(refs.SubPathTypeNone).SetSubPath("").SetFragment("")
 			var releaseInfo librelease.ReleaseInfo
 			if err := w.Tracker.State.Get(ctx, releaseRef.String(), &releaseInfo); err != nil {
-				return fmt.Errorf("failed to get release info (%v): %w", releaseRef.String(), err)
+				return fmt.Errorf("getting release info (%v): %w", releaseRef.String(), err)
 			}
 			releaseToDeployment[releaseRef.String()] = releaseInfo
 

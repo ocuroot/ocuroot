@@ -49,20 +49,20 @@ func NewRefStore(
 
 	stateStore, err := newRefStoreFromBackend(&storeConfig.State, stateTags, repoURL, repoPath, statePrefix)
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to create state store: %w", err)
+		return nil, nil, fmt.Errorf("creating state store: %w", err)
 	}
 
 	if storeConfig.Intent != nil {
 		intentStore, err := newRefStoreFromBackend(storeConfig.Intent, intentTags, repoURL, repoPath, intentPrefix)
 		if err != nil {
-			return nil, nil, fmt.Errorf("failed to create intent store: %w", err)
+			return nil, nil, fmt.Errorf("creating intent store: %w", err)
 		}
 		return stateStore, intentStore, nil
 	}
 
 	intentStore, err := newRefStoreFromBackend(&storeConfig.State, intentTags, repoURL, repoPath, intentPrefix)
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to create intent store: %w", err)
+		return nil, nil, fmt.Errorf("creating intent store: %w", err)
 	}
 	return stateStore, intentStore, nil
 }
@@ -85,7 +85,7 @@ func newRefStoreFromBackend(
 		}
 		store, err = refstore.NewFSRefStore(statePath, tags)
 		if err != nil {
-			return nil, fmt.Errorf("failed to create state store: %w", err)
+			return nil, fmt.Errorf("creating state store: %w", err)
 		}
 	}
 
@@ -117,7 +117,7 @@ func newRefStoreFromBackend(
 			},
 		)
 		if err != nil {
-			return nil, fmt.Errorf("failed to create state store: %w", err)
+			return nil, fmt.Errorf("creating state store: %w", err)
 		}
 	}
 
@@ -143,7 +143,7 @@ func newRefStoreFromBackend(
 			},
 		)
 		if err != nil {
-			return nil, fmt.Errorf("failed to create state store: %w", err)
+			return nil, fmt.Errorf("creating state store: %w", err)
 		}
 	}
 	store = refstore.StoreWithOtel(store)

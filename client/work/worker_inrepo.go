@@ -47,12 +47,12 @@ func NewInRepoWorker(ctx context.Context, ref refs.Ref) (w *InRepoWorker, err er
 	if w.RepoInfo.Type == client.RepoTypeSource {
 		err := w.InitTrackerFromSourceRepo(ctx, ref, wd, w.RepoInfo.Root, true)
 		if err != nil {
-			return nil, fmt.Errorf("failed to init tracker: %w", err)
+			return nil, fmt.Errorf("initializing tracker: %w", err)
 		}
 	} else {
 		err = w.InitTrackerFromStateRepo(ctx, ref, wd, w.RepoInfo.Root)
 		if err != nil {
-			return nil, fmt.Errorf("failed to init tracker from state repo: %w", err)
+			return nil, fmt.Errorf("initializing tracker from state repo: %w", err)
 		}
 	}
 
@@ -105,25 +105,25 @@ func (w *InRepoWorker) IdentifyWork(ctx context.Context, req IdentifyWorkRequest
 
 	diffs, err := w.Diff(ctx, req)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get diff: %w", err)
+		return nil, fmt.Errorf("getting diff: %w", err)
 	}
 	out = append(out, diffs...)
 
 	readyRuns, err := w.ReadyRuns(ctx, req)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get ready runs: %w", err)
+		return nil, fmt.Errorf("getting ready runs: %w", err)
 	}
 	out = append(out, readyRuns...)
 
 	reconcilableDeployments, err := w.ReconcilableDeployments(ctx, req)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get reconcilable deployments: %w", err)
+		return nil, fmt.Errorf("getting reconcilable deployments: %w", err)
 	}
 	out = append(out, reconcilableDeployments...)
 
 	ops, err := w.Ops(ctx, req)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get ops: %w", err)
+		return nil, fmt.Errorf("getting ops: %w", err)
 	}
 	out = append(out, ops...)
 
@@ -135,7 +135,7 @@ func (w *InRepoWorker) ExecuteWork(ctx context.Context, todos []Work) error {
 	for _, t := range todos {
 		if t.WorkType == WorkTypeUpdate || t.WorkType == WorkTypeCreate || t.WorkType == WorkTypeDelete {
 			if err := w.ApplyIntent(ctx, t.Ref); err != nil {
-				return fmt.Errorf("failed to apply intent (%s): %w", t.Ref.String(), err)
+				return fmt.Errorf("applying intent (%s): %w", t.Ref.String(), err)
 			}
 		}
 	}
@@ -144,7 +144,7 @@ func (w *InRepoWorker) ExecuteWork(ctx context.Context, todos []Work) error {
 	for _, t := range todos {
 		if t.WorkType == WorkTypeOp {
 			if err := w.runOp(ctx, t.Ref.String()); err != nil {
-				return fmt.Errorf("failed to run op (%s): %w", t.Ref.String(), err)
+				return fmt.Errorf("running op (%s): %w", t.Ref.String(), err)
 			}
 		}
 	}
@@ -153,7 +153,7 @@ func (w *InRepoWorker) ExecuteWork(ctx context.Context, todos []Work) error {
 	for _, t := range todos {
 		if t.WorkType == WorkTypeRelease {
 			if err := w.startRelease(ctx, t.Ref); err != nil {
-				return fmt.Errorf("failed to start release (%s): %w", t.Ref.String(), err)
+				return fmt.Errorf("starting release (%s): %w", t.Ref.String(), err)
 			}
 		}
 	}
@@ -173,7 +173,7 @@ func (w *InRepoWorker) ExecuteWork(ctx context.Context, todos []Work) error {
 			}
 			pr, err := refs.Parse(releaseRef)
 			if err != nil {
-				return fmt.Errorf("failed to parse ref: %w", err)
+				return fmt.Errorf("parsing ref: %w", err)
 			}
 			w.Tracker.Ref = pr
 			if err := w.continueRelease(ctx, w.Tui); err != nil {
@@ -189,7 +189,7 @@ func (w *InRepoWorker) runOp(ctx context.Context, ref string) error {
 
 	w.Tracker.Ref, err = refs.Parse(ref)
 	if err != nil {
-		return fmt.Errorf("failed to parse ref: %w", err)
+		return fmt.Errorf("parsing ref: %w", err)
 	}
 	w.Tracker.Ref.SubPath = ""
 	w.Tracker.Ref.SubPathType = refs.SubPathTypeNone
@@ -201,7 +201,7 @@ func (w *InRepoWorker) runOp(ctx context.Context, ref string) error {
 			log.Error("The specified release was not found", "ref", w.Tracker.Ref.String())
 			return nil
 		}
-		return fmt.Errorf("failed to get tracker: %w", err)
+		return fmt.Errorf("getting tracker: %w", err)
 	}
 
 	err = tracker.Op(ctx, ref, nil)
@@ -243,31 +243,31 @@ func (w *InRepoWorker) addRunForDeployment(ctx context.Context, ref string) erro
 	log.Info("Adding run for deployment if needed", "ref", ref)
 	var deployment models.Task
 	if err := state.Get(ctx, ref, &deployment); err != nil {
-		return fmt.Errorf("failed to get deployment %q: %w", ref, err)
+		return fmt.Errorf("getting deployment %q: %w", ref, err)
 	}
 	var run models.Run
 	if err := state.Get(ctx, deployment.RunRef.String(), &run); err != nil {
-		return fmt.Errorf("failed to get run %q: %w", deployment.RunRef.String(), err)
+		return fmt.Errorf("getting run %q: %w", deployment.RunRef.String(), err)
 	}
 
 	resolvedDeployment, err := state.ResolveLink(ctx, ref)
 	if err != nil {
-		return fmt.Errorf("failed to resolve inputs %q: %w", ref, err)
+		return fmt.Errorf("resolving inputs %q: %w", ref, err)
 	}
 	parsedResolvedTask, err := refs.Parse(resolvedDeployment)
 	if err != nil {
-		return fmt.Errorf("failed to parse resolved deployment %q: %w", ref, err)
+		return fmt.Errorf("parsing resolved deployment %q: %w", ref, err)
 	}
 
 	var release librelease.ReleaseInfo
 	if err := state.Get(ctx, parsedResolvedTask.SetSubPathType(refs.SubPathTypeNone).SetSubPath("").SetFragment("").String(), &release); err != nil {
-		return fmt.Errorf("failed to get release %q: %w", ref, err)
+		return fmt.Errorf("getting release %q: %w", ref, err)
 	}
 
 	entryFunctionInputs := deployment.Inputs
 	inputs, err := librelease.PopulateInputs(ctx, state, entryFunctionInputs)
 	if err != nil {
-		return fmt.Errorf("failed to populate inputs %q: %w", ref, err)
+		return fmt.Errorf("populating inputs %q: %w", ref, err)
 	}
 
 	var changed bool
@@ -291,23 +291,23 @@ func (w *InRepoWorker) addRunForDeployment(ctx context.Context, ref string) erro
 	log.Info("Duplicating deployment", "ref", resolvedDeployment)
 	parsedResolvedTask, err = refs.Parse(resolvedDeployment)
 	if err != nil {
-		return fmt.Errorf("failed to parse resolved deployment %q: %w", ref, err)
+		return fmt.Errorf("parsing resolved deployment %q: %w", ref, err)
 	}
 	newRunRefString, err := refstore.IncrementPath(ctx, state, fmt.Sprintf("%s/", parsedResolvedTask.String()))
 	if err != nil {
-		return fmt.Errorf("failed to increment path %q: %w", ref, err)
+		return fmt.Errorf("incrementing path %q: %w", ref, err)
 	}
 	log.Info("Incremented path", "ref", ref, "newRef", newRunRefString)
 	newRunRef, err := refs.Parse(newRunRefString)
 	if err != nil {
-		return fmt.Errorf("failed to parse path %q: %w", ref, err)
+		return fmt.Errorf("parsing path %q: %w", ref, err)
 	}
 	err = librelease.InitializeRun(ctx, state, newRunRef, &models.Function{
 		Fn:     run.Functions[0].Fn,
 		Inputs: inputs,
 	})
 	if err != nil {
-		return fmt.Errorf("failed to initialize run %q: %w", ref, err)
+		return fmt.Errorf("initializing run %q: %w", ref, err)
 	}
 
 	log.Info("Duplicated deployment", "oldRef", resolvedDeployment, "newRef", newRunRef)

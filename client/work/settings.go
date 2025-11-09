@@ -34,12 +34,12 @@ func LoadSettings(be *local.BackendOutputs, globals starlark.StringDict, envVars
 
 	err := UnmarshalFromStringDict(globals, &s)
 	if err != nil {
-		return s, fmt.Errorf("failed to unmarshal repo config: %w", err)
+		return s, fmt.Errorf("unmarshaling repo config: %w", err)
 	}
 
 	err = UnmarshalFromEnvVars(envVars, &s)
 	if err != nil {
-		return s, fmt.Errorf("failed to unmarshal env vars: %w", err)
+		return s, fmt.Errorf("unmarshaling env vars: %w", err)
 	}
 
 	return s, nil
@@ -90,7 +90,7 @@ func UnmarshalFromEnvVars(in []string, out any) error {
 
 		// Parse and set the value based on field type
 		if err := parseEnvValue(envValue, fieldValue, field.Name); err != nil {
-			return fmt.Errorf("failed to parse env var %s for field %s: %w", envTag, field.Name, err)
+			return fmt.Errorf("parsing env var %s for field %s: %w", envTag, field.Name, err)
 		}
 	}
 
@@ -373,7 +373,7 @@ func UnmarshalFromValue(v starlark.Value, out any) error {
 		for _, attrName := range attrNames {
 			attrValue, err := v.Attr(attrName)
 			if err != nil {
-				return fmt.Errorf("failed to get attribute %s: %w", attrName, err)
+				return fmt.Errorf("getting attribute %s: %w", attrName, err)
 			}
 
 			// Find the corresponding Go struct field by starlark or json tag
