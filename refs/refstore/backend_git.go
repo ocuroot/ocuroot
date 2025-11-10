@@ -8,29 +8,13 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
-	"sync"
+
+	"github.com/oklog/ulid/v2"
 )
 
-// Global mutex map to ensure only one operation per worktree
-var (
-	worktreeMutexes   = make(map[string]*sync.Mutex)
-	worktreeMutexesMu sync.Mutex
-)
+// No global mutexes needed - each backend instance has its own clone
 
-func getWorktreeMutex(worktreePath string) *sync.Mutex {
-	worktreeMutexesMu.Lock()
-	defer worktreeMutexesMu.Unlock()
-	
-	if mu, exists := worktreeMutexes[worktreePath]; exists {
-		return mu
-	}
-	
-	mu := &sync.Mutex{}
-	worktreeMutexes[worktreePath] = mu
-	return mu
-}
-
-// NewGitBackend creates a new git backend using a local bare repository with worktrees.
+// NewGitBackend creates a new git backend using a unique clone of the repository.
 // bareRepoPath: path to the bare repository (will be created if it doesn't exist)
 // remoteURL: the remote repository URL to fetch from and push to
 // branch: the branch name (without refs/heads/ prefix)
@@ -38,7 +22,7 @@ func getWorktreeMutex(worktreePath string) *sync.Mutex {
 // gitUserName: git author name (optional, defaults to system config)
 // gitUserEmail: git author email (optional, defaults to system config)
 func NewGitBackend(ctx context.Context, bareRepoPath string, remoteURL string, branch string, pathPrefix string, gitUserName string, gitUserEmail string) (DocumentBackend, error) {
-	// Ensure branch doesn't have refs/heads/ prefix for worktree operations
+	// Ensure branch doesn't have refs/heads/ prefix
 	branch = strings.TrimPrefix(branch, "refs/heads/")
 	
 	// Validate branch name
@@ -56,17 +40,18 @@ func NewGitBackend(ctx context.Context, bareRepoPath string, remoteURL string, b
 		return nil, fmt.Errorf("fetching remote: %w", err)
 	}
 	
-	// Create worktree for this branch in a separate directory outside the bare repo
-	// This prevents worktree metadata from being committed to the repository
-	worktreeBaseDir := filepath.Join(filepath.Dir(bareRepoPath), "worktrees")
-	worktreePath := filepath.Join(worktreeBaseDir, filepath.Base(bareRepoPath), branch)
-	if err := ensureWorktree(bareRepoPath, worktreePath, branch); err != nil {
-		return nil, fmt.Errorf("ensuring worktree: %w", err)
+	// Create a unique clone directory using ULID to avoid collisions
+	cloneID := ulid.Make().String()
+	clonesBaseDir := filepath.Join(filepath.Dir(bareRepoPath), "clones")
+	clonePath := filepath.Join(clonesBaseDir, cloneID)
+	
+	if err := cloneRepo(remoteURL, clonePath, branch); err != nil {
+		return nil, fmt.Errorf("cloning repo: %w", err)
 	}
 
 	return &gitBackend{
 		bareRepoPath: bareRepoPath,
-		worktreePath: worktreePath,
+		clonePath:    clonePath,
 		remoteURL:    remoteURL,
 		branch:       branch,
 		pathPrefix:   pathPrefix,
@@ -79,7 +64,7 @@ var _ DocumentBackend = (*gitBackend)(nil)
 
 type gitBackend struct {
 	bareRepoPath string
-	worktreePath string
+	clonePath    string
 	remoteURL    string
 	branch       string
 	pathPrefix   string
@@ -89,7 +74,7 @@ type gitBackend struct {
 
 // GetBytes implements DocumentBackend.
 func (g *gitBackend) GetBytes(ctx context.Context, path string) ([]byte, error) {
-	filePath := filepath.Join(g.worktreePath, g.pathPrefix, path)
+	filePath := filepath.Join(g.clonePath, g.pathPrefix, path)
 	
 	data, err := os.ReadFile(filePath)
 	if err != nil {
@@ -109,22 +94,17 @@ func (g *gitBackend) SetBytes(ctx context.Context, path string, content []byte) 
 
 // setBytesWithPrefix writes a file with optional path prefix
 func (g *gitBackend) setBytesWithPrefix(ctx context.Context, path string, content []byte, usePrefix bool) error {
-	// Use mutex to prevent concurrent operations on the same worktree
-	mu := getWorktreeMutex(g.worktreePath)
-	mu.Lock()
-	defer mu.Unlock()
-
 	// Pull latest changes from remote
-	if err := g.pullWorktree(); err != nil {
+	if err := g.pullClone(); err != nil {
 		return fmt.Errorf("pulling: %w", err)
 	}
 
 	// Write directly to file
 	var filePath string
 	if usePrefix {
-		filePath = filepath.Join(g.worktreePath, g.pathPrefix, path)
+		filePath = filepath.Join(g.clonePath, g.pathPrefix, path)
 	} else {
-		filePath = filepath.Join(g.worktreePath, path)
+		filePath = filepath.Join(g.clonePath, path)
 	}
 	
 	if err := os.MkdirAll(filepath.Dir(filePath), 0755); err != nil {
@@ -161,7 +141,7 @@ func (g *gitBackend) Get(ctx context.Context, refs []string) ([]GetResult, error
 	var out []GetResult
 
 	for _, ref := range refs {
-		filePath := filepath.Join(g.worktreePath, g.pathPrefix, ref)
+		filePath := filepath.Join(g.clonePath, g.pathPrefix, ref)
 		
 		// Check if file exists
 		data, err := os.ReadFile(filePath)
@@ -205,9 +185,9 @@ func (g *gitBackend) Match(ctx context.Context, reqs []MatchRequest) ([]string, 
 
 	var out []string
 	for _, req := range compiledReqs {
-		searchPath := filepath.Join(g.worktreePath, g.pathPrefix)
+		searchPath := filepath.Join(g.clonePath, g.pathPrefix)
 		if req.prefix != "" {
-			searchPath = filepath.Join(g.worktreePath, g.pathPrefix, req.prefix)
+			searchPath = filepath.Join(g.clonePath, g.pathPrefix, req.prefix)
 		}
 
 		// Check if search path exists
@@ -230,7 +210,7 @@ func (g *gitBackend) Match(ctx context.Context, reqs []MatchRequest) ([]string, 
 			}
 
 			// Get relative path from pathPrefix root
-			relPath, err := filepath.Rel(filepath.Join(g.worktreePath, g.pathPrefix), filePath)
+			relPath, err := filepath.Rel(filepath.Join(g.clonePath, g.pathPrefix), filePath)
 			if err != nil {
 				return err
 			}
@@ -260,19 +240,14 @@ func (g *gitBackend) Match(ctx context.Context, reqs []MatchRequest) ([]string, 
 
 // Set implements DocumentBackend.
 func (g *gitBackend) Set(ctx context.Context, marker []byte, message string, reqs []SetRequest) error {
-	// Use mutex to prevent concurrent operations on the same worktree
-	mu := getWorktreeMutex(g.worktreePath)
-	mu.Lock()
-	defer mu.Unlock()
-
 	// Pull latest changes from remote
-	if err := g.pullWorktree(); err != nil {
+	if err := g.pullClone(); err != nil {
 		return fmt.Errorf("pulling: %w", err)
 	}
 
 	// Apply changes to worktree
 	for _, req := range reqs {
-		filePath := filepath.Join(g.worktreePath, g.pathPrefix, req.Path)
+		filePath := filepath.Join(g.clonePath, g.pathPrefix, req.Path)
 		
 		if req.Doc == nil {
 			// Delete file
@@ -344,51 +319,63 @@ func initBareRepo(bareRepoPath string, remoteURL string) error {
 }
 
 func fetchRemote(bareRepoPath string) error {
-	cmd := exec.Command("git", "-C", bareRepoPath, "fetch", "origin")
+	// Use --force to handle cases where local refs are out of sync with remote
+	// This can happen in test scenarios or when multiple processes access the repo
+	cmd := exec.Command("git", "-C", bareRepoPath, "fetch", "--force", "origin")
 	if output, err := cmd.CombinedOutput(); err != nil {
 		return fmt.Errorf("git fetch failed: %w: %s", err, output)
 	}
 	return nil
 }
 
-func ensureWorktree(bareRepoPath string, worktreePath string, branch string) error {
-	// Check if worktree already exists
-	if _, err := os.Stat(filepath.Join(worktreePath, ".git")); err == nil {
-		return nil // Already exists
+func cloneRepo(remoteURL string, clonePath string, branch string) error {
+	// Create clone directory parent
+	if err := os.MkdirAll(filepath.Dir(clonePath), 0755); err != nil {
+		return fmt.Errorf("creating clone directory: %w", err)
 	}
 
-	// Get absolute paths
-	absBareRepoPath, err := filepath.Abs(bareRepoPath)
-	if err != nil {
-		return err
-	}
-	absWorktreePath, err := filepath.Abs(worktreePath)
-	if err != nil {
-		return err
-	}
-
-	// Create worktree directory parent
-	if err := os.MkdirAll(filepath.Dir(absWorktreePath), 0755); err != nil {
-		return err
-	}
-
-	// Try to create worktree from existing remote branch
-	cmd := exec.Command("git", "-C", absBareRepoPath, "worktree", "add", absWorktreePath, "-b", branch, "origin/"+branch)
-	if err := cmd.Run(); err != nil {
-		// If branch doesn't exist on remote, create orphan branch
-		cmd = exec.Command("git", "-C", absBareRepoPath, "worktree", "add", "--orphan", "-b", branch, absWorktreePath)
-		if output, err := cmd.CombinedOutput(); err != nil {
-			return fmt.Errorf("git worktree add --orphan failed: %w: %s", err, output)
+	// Try to clone the specific branch
+	cmd := exec.Command("git", "clone", "--branch", branch, "--single-branch", remoteURL, clonePath)
+	if _, err := cmd.CombinedOutput(); err != nil {
+		// Branch doesn't exist, try cloning without specifying a branch
+		cmd = exec.Command("git", "clone", remoteURL, clonePath)
+		if _, err := cmd.CombinedOutput(); err != nil {
+			// Empty bare repo, initialize a new clone manually
+			if err := os.MkdirAll(clonePath, 0755); err != nil {
+				return fmt.Errorf("creating clone directory: %w", err)
+			}
+			
+			// Initialize new repo
+			cmd = exec.Command("git", "-C", clonePath, "init")
+			if output, err := cmd.CombinedOutput(); err != nil {
+				return fmt.Errorf("git init failed: %w: %s", err, output)
+			}
+			
+			// Add remote
+			cmd = exec.Command("git", "-C", clonePath, "remote", "add", "origin", remoteURL)
+			if output, err := cmd.CombinedOutput(); err != nil {
+				return fmt.Errorf("git remote add failed: %w: %s", err, output)
+			}
 		}
 
-		// Create initial commit in the worktree
-		cmd = exec.Command("git", "-C", absWorktreePath, "commit", "--allow-empty", "-m", "Initial commit")
+		// Create and checkout orphan branch
+		cmd = exec.Command("git", "-C", clonePath, "checkout", "--orphan", branch)
+		if output, err := cmd.CombinedOutput(); err != nil {
+			return fmt.Errorf("git checkout --orphan failed: %w: %s", err, output)
+		}
+
+		// Remove all files from index
+		cmd = exec.Command("git", "-C", clonePath, "rm", "-rf", ".")
+		cmd.Run() // Ignore error if there are no files
+
+		// Make initial commit
+		cmd = exec.Command("git", "-C", clonePath, "commit", "--allow-empty", "-m", "Initial commit")
 		if output, err := cmd.CombinedOutput(); err != nil {
 			return fmt.Errorf("git commit failed: %w: %s", err, output)
 		}
 
 		// Push to create branch on remote
-		cmd = exec.Command("git", "-C", absWorktreePath, "push", "-u", "origin", branch)
+		cmd = exec.Command("git", "-C", clonePath, "push", "-u", "origin", branch)
 		if output, err := cmd.CombinedOutput(); err != nil {
 			return fmt.Errorf("git push failed: %w: %s", err, output)
 		}
@@ -397,22 +384,71 @@ func ensureWorktree(bareRepoPath string, worktreePath string, branch string) err
 	return nil
 }
 
-func (g *gitBackend) pullWorktree() error {
-	// Check if there are any local changes
-	cmd := exec.Command("git", "-C", g.worktreePath, "diff", "--quiet")
-	hasChanges := cmd.Run() != nil
+func (g *gitBackend) pullClone() error {
+	// Check if there are any unstaged changes
+	cmd := exec.Command("git", "-C", g.clonePath, "diff", "--quiet")
+	hasUnstagedChanges := cmd.Run() != nil
 	
-	cmd = exec.Command("git", "-C", g.worktreePath, "diff", "--cached", "--quiet")
+	// Check if there are any staged changes
+	cmd = exec.Command("git", "-C", g.clonePath, "diff", "--cached", "--quiet")
 	hasStagedChanges := cmd.Run() != nil
 	
-	if hasChanges || hasStagedChanges {
+	if hasUnstagedChanges || hasStagedChanges {
 		// If there are local changes, skip the pull
 		// The changes will be committed and pushed in this Set operation
 		return nil
 	}
 	
-	cmd = exec.Command("git", "-C", g.worktreePath, "pull", "--rebase")
-	if output, err := cmd.CombinedOutput(); err != nil {
+	// Use --autostash to handle any unexpected staged changes
+	// This can happen if there's a race between the check above and the pull
+	cmd = exec.Command("git", "-C", g.clonePath, "pull", "--rebase", "--autostash")
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		// Check if this is a rebase conflict
+		outputStr := string(output)
+		if strings.Contains(outputStr, "CONFLICT") {
+			// Auto-resolve conflicts by accepting our version (--ours)
+			// This is safe when multiple workers are writing identical or compatible content
+			
+			// Use checkout --ours to resolve all conflicts in favor of our changes
+			checkoutCmd := exec.Command("git", "-C", g.clonePath, "checkout", "--ours", ".")
+			if checkoutErr := checkoutCmd.Run(); checkoutErr != nil {
+				// If that fails, abort the rebase
+				abortCmd := exec.Command("git", "-C", g.clonePath, "rebase", "--abort")
+				abortCmd.Run()
+				return fmt.Errorf("git checkout --ours failed: %w", checkoutErr)
+			}
+			
+			// Stage the resolved files
+			addCmd := exec.Command("git", "-C", g.clonePath, "add", "-A")
+			if addErr := addCmd.Run(); addErr != nil {
+				abortCmd := exec.Command("git", "-C", g.clonePath, "rebase", "--abort")
+				abortCmd.Run()
+				return fmt.Errorf("git add after conflict resolution failed: %w", addErr)
+			}
+			
+			// Continue the rebase
+			continueCmd := exec.Command("git", "-C", g.clonePath, "rebase", "--continue")
+			continueCmd.Env = append(os.Environ(), "GIT_EDITOR=true") // Skip commit message editing
+			if continueOutput, continueErr := continueCmd.CombinedOutput(); continueErr != nil {
+				// Check if it's just "no changes" which is fine
+				if !strings.Contains(string(continueOutput), "No changes") {
+					abortCmd := exec.Command("git", "-C", g.clonePath, "rebase", "--abort")
+					abortCmd.Run()
+					return fmt.Errorf("git rebase --continue failed: %w: %s", continueErr, continueOutput)
+				}
+				// If no changes, skip this commit
+				skipCmd := exec.Command("git", "-C", g.clonePath, "rebase", "--skip")
+				if skipErr := skipCmd.Run(); skipErr != nil {
+					abortCmd := exec.Command("git", "-C", g.clonePath, "rebase", "--abort")
+					abortCmd.Run()
+					return fmt.Errorf("git rebase --skip failed: %w", skipErr)
+				}
+			}
+			
+			return nil
+		}
+		
 		return fmt.Errorf("git pull failed: %w: %s", err, output)
 	}
 	return nil
@@ -428,9 +464,9 @@ func (g *gitBackend) gitAdd() error {
 		// 2. Files at the root (support files like .gitignore, support.txt, etc.)
 		
 		// First, add files from the pathPrefix directory if it exists
-		prefixFullPath := filepath.Join(g.worktreePath, g.pathPrefix)
+		prefixFullPath := filepath.Join(g.clonePath, g.pathPrefix)
 		if _, err := os.Stat(prefixFullPath); err == nil {
-			cmd := exec.Command("git", "-C", g.worktreePath, "add", "-A", g.pathPrefix)
+			cmd := exec.Command("git", "-C", g.clonePath, "add", "-A", g.pathPrefix)
 			if output, err := cmd.CombinedOutput(); err != nil {
 				return fmt.Errorf("git add failed: %w: %s", err, output)
 			}
@@ -438,7 +474,7 @@ func (g *gitBackend) gitAdd() error {
 		
 		// Then, add any root-level files (but not directories, to avoid metadata)
 		// List files in the root directory
-		entries, err := os.ReadDir(g.worktreePath)
+		entries, err := os.ReadDir(g.clonePath)
 		if err != nil {
 			return fmt.Errorf("reading worktree: %w", err)
 		}
@@ -450,14 +486,14 @@ func (g *gitBackend) gitAdd() error {
 			}
 			
 			// Add this root-level file
-			cmd := exec.Command("git", "-C", g.worktreePath, "add", entry.Name())
+			cmd := exec.Command("git", "-C", g.clonePath, "add", entry.Name())
 			if output, err := cmd.CombinedOutput(); err != nil {
 				return fmt.Errorf("git add %s failed: %w: %s", entry.Name(), err, output)
 			}
 		}
 	} else {
 		// No pathPrefix, add everything from current directory
-		cmd := exec.Command("git", "-C", g.worktreePath, "add", "-A", ".")
+		cmd := exec.Command("git", "-C", g.clonePath, "add", "-A", ".")
 		if output, err := cmd.CombinedOutput(); err != nil {
 			return fmt.Errorf("git add failed: %w: %s", err, output)
 		}
@@ -468,7 +504,7 @@ func (g *gitBackend) gitAdd() error {
 
 func (g *gitBackend) gitCommit(message string) error {
 	// Check if there are changes to commit
-	cmd := exec.Command("git", "-C", g.worktreePath, "diff", "--cached", "--quiet")
+	cmd := exec.Command("git", "-C", g.clonePath, "diff", "--cached", "--quiet")
 	if err := cmd.Run(); err == nil {
 		// No changes to commit
 		return nil
@@ -480,7 +516,7 @@ func (g *gitBackend) gitCommit(message string) error {
 	}
 
 	// Build commit command with author if provided
-	args := []string{"-C", g.worktreePath, "commit", "-m", message}
+	args := []string{"-C", g.clonePath, "commit", "-m", message}
 	if g.gitUserName != "" && g.gitUserEmail != "" {
 		args = append(args, "--author", fmt.Sprintf("%s <%s>", g.gitUserName, g.gitUserEmail))
 	}
@@ -493,9 +529,38 @@ func (g *gitBackend) gitCommit(message string) error {
 }
 
 func (g *gitBackend) gitPush() error {
-	cmd := exec.Command("git", "-C", g.worktreePath, "push")
-	if output, err := cmd.CombinedOutput(); err != nil {
+	// Retry push with pull-rebase if it fails due to remote changes
+	maxRetries := 3
+	for attempt := 0; attempt < maxRetries; attempt++ {
+		cmd := exec.Command("git", "-C", g.clonePath, "push")
+		output, err := cmd.CombinedOutput()
+		if err == nil {
+			return nil
+		}
+		
+		// Check if the error is due to remote changes
+		outputStr := string(output)
+		if strings.Contains(outputStr, "rejected") || strings.Contains(outputStr, "fetch first") || strings.Contains(outputStr, "failed to update ref") {
+			// Pull with rebase and retry
+			if attempt < maxRetries-1 {
+				if err := g.pullClone(); err != nil {
+					return fmt.Errorf("pull before retry failed: %w", err)
+				}
+				continue
+			}
+		}
+		
 		return fmt.Errorf("git push failed: %w: %s", err, output)
+	}
+	return fmt.Errorf("git push failed after %d retries", maxRetries)
+}
+
+// Close cleans up the clone directory
+func (g *gitBackend) Close() error {
+	if g.clonePath != "" {
+		if err := os.RemoveAll(g.clonePath); err != nil {
+			return fmt.Errorf("removing clone directory: %w", err)
+		}
 	}
 	return nil
 }

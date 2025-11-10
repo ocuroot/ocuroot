@@ -36,6 +36,11 @@ func (w *InRepoWorker) WorkerForWork(ctx context.Context, todo Work) (*InRepoWor
 
 func CloneRepo(ctx context.Context, repoRemotes []string, commit string) (string, error) {
 	log.Info("CloneRepo", "remotes", repoRemotes, "commit", commit)
+	
+	if commit == "" {
+		return "", fmt.Errorf("commit hash cannot be empty")
+	}
+	
 	if err := os.MkdirAll(repoCloneBaseDir(), 0755); err != nil {
 		return "", fmt.Errorf("creating directory: %w", err)
 	}

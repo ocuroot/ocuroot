@@ -64,9 +64,9 @@ func TestGitBackendInfoFileFormat(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// Read the raw file from the worktree to verify format
+	// Read the raw file from the clone to verify format
 	gitBackend := backend.(*gitBackend)
-	infoFilePath := filepath.Join(gitBackend.worktreePath, storeInfoFile)
+	infoFilePath := filepath.Join(gitBackend.clonePath, storeInfoFile)
 	
 	rawContent, err := os.ReadFile(infoFilePath)
 	if err != nil {
@@ -125,6 +125,7 @@ func TestGitBackend_WorktreePollutesRemote(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create backend: %v", err)
 	}
+	defer backend.(*gitBackend).Close()
 	
 	// Write some data to the backend
 	bodyData := map[string]interface{}{
@@ -147,31 +148,12 @@ func TestGitBackend_WorktreePollutesRemote(t *testing.T) {
 		t.Fatalf("Failed to set data: %v", err)
 	}
 	
-	// Clone the remote repo to verify what's actually in it
-	clonePath := filepath.Join("testdata", "clones", "pollution-check")
-	exec.Command("rm", "-rf", clonePath).Run()
-	
-	// Extract the file path from file:// URL
+	// List files directly from the bare repo using git ls-tree
 	remoteFilePath := remoteURL[7:] // Remove "file://"
-	
-	cmd := exec.Command("git", "clone", remoteFilePath, clonePath)
+	cmd := exec.Command("git", "-C", remoteFilePath, "ls-tree", "-r", "--name-only", "state")
 	output, err := cmd.CombinedOutput()
 	if err != nil {
-		t.Fatalf("Failed to clone remote: %v\nOutput: %s", err, output)
-	}
-	
-	// Switch to the state branch
-	cmd = exec.Command("git", "-C", clonePath, "checkout", "state")
-	output, err = cmd.CombinedOutput()
-	if err != nil {
-		t.Fatalf("Failed to checkout state branch: %v\nOutput: %s", err, output)
-	}
-	
-	// List all files in the clone
-	cmd = exec.Command("git", "-C", clonePath, "ls-files")
-	output, err = cmd.CombinedOutput()
-	if err != nil {
-		t.Fatalf("Failed to list files: %v", err)
+		t.Fatalf("Failed to list files in state branch: %v\nOutput: %s", err, output)
 	}
 	
 	// Parse the list of files
@@ -221,6 +203,217 @@ func TestGitBackend_WorktreePollutesRemote(t *testing.T) {
 	// Verify file count matches
 	if len(actualFiles) != len(expectedFiles) {
 		t.Errorf("Expected %d files in remote, found %d", len(expectedFiles), len(actualFiles))
+	}
+}
+
+// TestGitBackend_SerialAccess tests multiple backends accessing the same remote in series
+func TestGitBackend_SerialAccess(t *testing.T) {
+	bareRepoPath, remoteURL := setupTestRepo(t, "serial-test")
+	
+	// Create first backend and write data
+	backend1, err := NewGitBackend(context.Background(), bareRepoPath, remoteURL, "main", "data", "", "")
+	if err != nil {
+		t.Fatalf("Failed to create backend1: %v", err)
+	}
+	defer backend1.(*gitBackend).Close()
+	
+	doc1 := &StorageObject{
+		Kind: "test",
+		Body: []byte(`{"value": "from backend1"}`),
+	}
+	
+	err = backend1.Set(context.Background(), nil, "Backend1 commit", []SetRequest{
+		{Path: "file1.json", Doc: doc1},
+	})
+	if err != nil {
+		t.Fatalf("Backend1 Set failed: %v", err)
+	}
+	
+	// Create second backend and verify it sees the first backend's changes
+	backend2, err := NewGitBackend(context.Background(), bareRepoPath, remoteURL, "main", "data", "", "")
+	if err != nil {
+		t.Fatalf("Failed to create backend2: %v", err)
+	}
+	defer backend2.(*gitBackend).Close()
+	
+	data, err := backend2.GetBytes(context.Background(), "file1.json")
+	if err != nil {
+		t.Fatalf("Backend2 GetBytes failed: %v", err)
+	}
+	
+	var retrieved StorageObject
+	if err := json.Unmarshal(data, &retrieved); err != nil {
+		t.Fatalf("Failed to unmarshal: %v", err)
+	}
+	
+	if string(retrieved.Body) != `{"value":"from backend1"}` {
+		t.Errorf("Backend2 didn't see Backend1's changes. Got: %s", string(retrieved.Body))
+	}
+	
+	// Backend2 makes its own change
+	doc2 := &StorageObject{
+		Kind: "test",
+		Body: []byte(`{"value": "from backend2"}`),
+	}
+	
+	err = backend2.Set(context.Background(), nil, "Backend2 commit", []SetRequest{
+		{Path: "file2.json", Doc: doc2},
+	})
+	if err != nil {
+		t.Fatalf("Backend2 Set failed: %v", err)
+	}
+	
+	// Create third backend and verify it sees both changes
+	backend3, err := NewGitBackend(context.Background(), bareRepoPath, remoteURL, "main", "data", "", "")
+	if err != nil {
+		t.Fatalf("Failed to create backend3: %v", err)
+	}
+	defer backend3.(*gitBackend).Close()
+	
+	data1, err := backend3.GetBytes(context.Background(), "file1.json")
+	if err != nil {
+		t.Fatalf("Backend3 GetBytes file1 failed: %v", err)
+	}
+	
+	data2, err := backend3.GetBytes(context.Background(), "file2.json")
+	if err != nil {
+		t.Fatalf("Backend3 GetBytes file2 failed: %v", err)
+	}
+	
+	if string(data1) != string(data) {
+		t.Error("Backend3 didn't see Backend1's file")
+	}
+	
+	var retrieved2 StorageObject
+	if err := json.Unmarshal(data2, &retrieved2); err != nil {
+		t.Fatalf("Failed to unmarshal file2: %v", err)
+	}
+	
+	if string(retrieved2.Body) != `{"value":"from backend2"}` {
+		t.Errorf("Backend3 didn't see Backend2's changes. Got: %s", string(retrieved2.Body))
+	}
+}
+
+// TestGitBackend_UpstreamChanges tests that backends can handle external changes to the remote
+func TestGitBackend_UpstreamChanges(t *testing.T) {
+	bareRepoPath, remoteURL := setupTestRepo(t, "upstream-test")
+	
+	// Create a backend and write initial data
+	backend1, err := NewGitBackend(context.Background(), bareRepoPath, remoteURL, "main", "data", "", "")
+	if err != nil {
+		t.Fatalf("Failed to create backend1: %v", err)
+	}
+	defer backend1.(*gitBackend).Close()
+	
+	doc1 := &StorageObject{
+		Kind: "test",
+		Body: []byte(`{"value": "initial"}`),
+	}
+	
+	err = backend1.Set(context.Background(), nil, "Initial commit", []SetRequest{
+		{Path: "file.json", Doc: doc1},
+	})
+	if err != nil {
+		t.Fatalf("Backend1 Set failed: %v", err)
+	}
+	
+	// Simulate an external change to the remote by cloning, modifying, and pushing
+	remoteFilePath := remoteURL[7:] // Remove "file://"
+	externalClone := filepath.Join("testdata", "clones", "external")
+	exec.Command("rm", "-rf", externalClone).Run()
+	
+	cmd := exec.Command("git", "clone", remoteFilePath, externalClone)
+	if output, err := cmd.CombinedOutput(); err != nil {
+		t.Fatalf("Failed to clone for external change: %v\nOutput: %s", err, output)
+	}
+	defer exec.Command("rm", "-rf", externalClone).Run()
+	
+	// Make an external change
+	externalFile := filepath.Join(externalClone, "data", "external.json")
+	externalDoc := &StorageObject{
+		Kind: "test",
+		Body: []byte(`{"value": "external change"}`),
+	}
+	externalJSON, _ := json.Marshal(externalDoc)
+	
+	if err := os.MkdirAll(filepath.Dir(externalFile), 0755); err != nil {
+		t.Fatalf("Failed to create dir: %v", err)
+	}
+	if err := os.WriteFile(externalFile, externalJSON, 0644); err != nil {
+		t.Fatalf("Failed to write external file: %v", err)
+	}
+	
+	cmd = exec.Command("git", "-C", externalClone, "add", ".")
+	if output, err := cmd.CombinedOutput(); err != nil {
+		t.Fatalf("External git add failed: %v\nOutput: %s", err, output)
+	}
+	
+	cmd = exec.Command("git", "-C", externalClone, "commit", "-m", "External change")
+	if output, err := cmd.CombinedOutput(); err != nil {
+		t.Fatalf("External git commit failed: %v\nOutput: %s", err, output)
+	}
+	
+	cmd = exec.Command("git", "-C", externalClone, "push")
+	if output, err := cmd.CombinedOutput(); err != nil {
+		t.Fatalf("External git push failed: %v\nOutput: %s", err, output)
+	}
+	
+	// Now backend1 should be able to pull the external change and make another commit
+	doc2 := &StorageObject{
+		Kind: "test",
+		Body: []byte(`{"value": "after external change"}`),
+	}
+	
+	err = backend1.Set(context.Background(), nil, "After external change", []SetRequest{
+		{Path: "file.json", Doc: doc2},
+	})
+	if err != nil {
+		t.Fatalf("Backend1 Set after external change failed: %v", err)
+	}
+	
+	// Verify backend1 can see the external file
+	externalData, err := backend1.GetBytes(context.Background(), "external.json")
+	if err != nil {
+		t.Fatalf("Backend1 GetBytes external.json failed: %v", err)
+	}
+	
+	var retrievedExternal StorageObject
+	if err := json.Unmarshal(externalData, &retrievedExternal); err != nil {
+		t.Fatalf("Failed to unmarshal external: %v", err)
+	}
+	
+	if string(retrievedExternal.Body) != `{"value":"external change"}` {
+		t.Errorf("Backend1 didn't see external change. Got: %s", string(retrievedExternal.Body))
+	}
+	
+	// Create a new backend and verify it sees all changes
+	backend2, err := NewGitBackend(context.Background(), bareRepoPath, remoteURL, "main", "data", "", "")
+	if err != nil {
+		t.Fatalf("Failed to create backend2: %v", err)
+	}
+	defer backend2.(*gitBackend).Close()
+	
+	fileData, err := backend2.GetBytes(context.Background(), "file.json")
+	if err != nil {
+		t.Fatalf("Backend2 GetBytes file.json failed: %v", err)
+	}
+	
+	var retrievedFile StorageObject
+	if err := json.Unmarshal(fileData, &retrievedFile); err != nil {
+		t.Fatalf("Failed to unmarshal file: %v", err)
+	}
+	
+	if string(retrievedFile.Body) != `{"value":"after external change"}` {
+		t.Errorf("Backend2 didn't see latest change. Got: %s", string(retrievedFile.Body))
+	}
+	
+	externalData2, err := backend2.GetBytes(context.Background(), "external.json")
+	if err != nil {
+		t.Fatalf("Backend2 GetBytes external.json failed: %v", err)
+	}
+	
+	if string(externalData2) != string(externalData) {
+		t.Error("Backend2 didn't see external file")
 	}
 }
 

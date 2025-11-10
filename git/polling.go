@@ -81,7 +81,9 @@ func PollRemote(
 	if err != nil {
 		return err
 	}
-	callback(lastHash)
+	if lastHash != "" {
+		callback(lastHash)
+	}
 
 	// Invalidate after initial callback
 	remote.InvalidateConnection()
@@ -106,7 +108,7 @@ func PollRemote(
 				continue
 			}
 
-			if currentHash != lastHash {
+			if currentHash != lastHash && currentHash != "" {
 				log.Info("Branch hash changed", "endpoint", remote.Endpoint(), "branch", branch, "lastHash", lastHash, "currentHash", currentHash)
 				lastHash = currentHash
 				callback(currentHash)
