@@ -164,7 +164,7 @@ func (w *InRepoWorker) ExecuteWork(ctx context.Context, todos []Work) error {
 			if t.Ref.SubPathType == refs.SubPathTypeDeploy {
 				if err := w.addRunForDeployment(ctx, t.Ref.String()); err != nil {
 					// If a run is not needed this will error out because the deploy isn't there
-					log.Info("failed to add run for deployment", "ref", t.Ref.String(), "error", err)
+					log.Info("did not add run for deployment", "ref", t.Ref.String(), "reason", err)
 				}
 			}
 			releaseRef, err := refs.Reduce(t.Ref.String(), librelease.GlobRelease)
