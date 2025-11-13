@@ -3,6 +3,7 @@ package release
 import (
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 
 	"github.com/ocuroot/ocuroot/client"
@@ -101,6 +102,20 @@ func newRefStoreFromBackend(
 	if storeConfig.Local != nil {
 		statePath := filepath.Join(client.HomeDir(), "local_state", storeConfig.Local.ID, pathPrefix)
 
+		// Initialize bare repo if the directory doesn't exist or is empty
+		_, err = os.Stat(statePath)
+		if os.IsNotExist(err) {
+			err = os.MkdirAll(statePath, 0755)
+			if err != nil {
+				return nil, fmt.Errorf("creating state directory: %w", err)
+			}
+			cmd := exec.Command("git", "init", "--bare", statePath)
+			err = cmd.Run()
+			if err != nil {
+				return nil, fmt.Errorf("initializing bare git repo: %w", err)
+			}
+		}
+
 		// The git backend will handle initialization and branch creation
 		store, err = refstore.NewGitRefStore(
 			filepath.Join(client.HomeDir(), "state"),
@@ -126,7 +141,7 @@ func newRefStoreFromBackend(
 		if branch == "" {
 			branch = "main"
 		}
-		
+
 		store, err = refstore.NewGitRefStore(
 			filepath.Join(client.HomeDir(), "state"),
 			tags,
