@@ -84,6 +84,8 @@ wait_for_ref() {
         elapsed=$((elapsed + 5))
     done
 
+    ocuroot state match "**"
+
     echo "$error_message (waited ${elapsed}s)"
     exit 1
 }

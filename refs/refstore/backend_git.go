@@ -9,10 +9,9 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/gofrs/flock"
 	"github.com/oklog/ulid/v2"
 )
-
-// No global mutexes needed - each backend instance has its own clone
 
 // NewGitBackend creates a new git backend using a unique clone of the repository.
 // bareRepoPath: path to the bare repository (will be created if it doesn't exist)
@@ -24,27 +23,43 @@ import (
 func NewGitBackend(ctx context.Context, bareRepoPath string, remoteURL string, branch string, pathPrefix string, gitUserName string, gitUserEmail string) (DocumentBackend, error) {
 	// Ensure branch doesn't have refs/heads/ prefix
 	branch = strings.TrimPrefix(branch, "refs/heads/")
-	
+
 	// Validate branch name
 	if branch == "" {
 		return nil, fmt.Errorf("branch name cannot be empty")
 	}
-	
+
+	lockDir := filepath.Dir(bareRepoPath)
+	if err := os.MkdirAll(lockDir, 0755); err != nil {
+		return nil, fmt.Errorf("creating lock directory: %w", err)
+	}
+
+	bareRepoLock := flock.New(filepath.Join(lockDir, ".lock"))
+	err := bareRepoLock.Lock()
+	if err != nil {
+		return nil, fmt.Errorf("locking bare repo: %w", err)
+	}
+
 	// Initialize bare repo if it doesn't exist
 	if err := initBareRepo(bareRepoPath, remoteURL); err != nil {
 		return nil, fmt.Errorf("initializing bare repo: %w", err)
 	}
-	
+
 	// Fetch from remote to ensure we have latest refs
 	if err := fetchRemote(bareRepoPath); err != nil {
 		return nil, fmt.Errorf("fetching remote: %w", err)
 	}
-	
+
+	err = bareRepoLock.Unlock()
+	if err != nil {
+		return nil, fmt.Errorf("unlocking bare repo: %w", err)
+	}
+
 	// Create a unique clone directory using ULID to avoid collisions
 	cloneID := ulid.Make().String()
 	clonesBaseDir := filepath.Join(filepath.Dir(bareRepoPath), "clones")
 	clonePath := filepath.Join(clonesBaseDir, cloneID)
-	
+
 	if err := cloneRepo(remoteURL, clonePath, branch); err != nil {
 		return nil, fmt.Errorf("cloning repo: %w", err)
 	}
@@ -57,6 +72,7 @@ func NewGitBackend(ctx context.Context, bareRepoPath string, remoteURL string, b
 		pathPrefix:   pathPrefix,
 		gitUserName:  gitUserName,
 		gitUserEmail: gitUserEmail,
+		bareRepoLock: bareRepoLock,
 	}, nil
 }
 
@@ -70,12 +86,14 @@ type gitBackend struct {
 	pathPrefix   string
 	gitUserName  string
 	gitUserEmail string
+
+	bareRepoLock *flock.Flock
 }
 
 // GetBytes implements DocumentBackend.
 func (g *gitBackend) GetBytes(ctx context.Context, path string) ([]byte, error) {
 	filePath := filepath.Join(g.clonePath, g.pathPrefix, path)
-	
+
 	data, err := os.ReadFile(filePath)
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -106,11 +124,11 @@ func (g *gitBackend) setBytesWithPrefix(ctx context.Context, path string, conten
 	} else {
 		filePath = filepath.Join(g.clonePath, path)
 	}
-	
+
 	if err := os.MkdirAll(filepath.Dir(filePath), 0755); err != nil {
 		return fmt.Errorf("creating directory: %w", err)
 	}
-	
+
 	if err := os.WriteFile(filePath, content, 0644); err != nil {
 		return fmt.Errorf("writing file %s: %w", path, err)
 	}
@@ -142,7 +160,7 @@ func (g *gitBackend) Get(ctx context.Context, refs []string) ([]GetResult, error
 
 	for _, ref := range refs {
 		filePath := filepath.Join(g.clonePath, g.pathPrefix, ref)
-		
+
 		// Check if file exists
 		data, err := os.ReadFile(filePath)
 		if err != nil {
@@ -167,7 +185,7 @@ func (g *gitBackend) Get(ctx context.Context, refs []string) ([]GetResult, error
 			Doc:  &doc,
 		})
 	}
-	
+
 	return out, nil
 }
 
@@ -248,7 +266,7 @@ func (g *gitBackend) Set(ctx context.Context, marker []byte, message string, req
 	// Apply changes to worktree
 	for _, req := range reqs {
 		filePath := filepath.Join(g.clonePath, g.pathPrefix, req.Path)
-		
+
 		if req.Doc == nil {
 			// Delete file
 			if err := os.Remove(filePath); err != nil && !os.IsNotExist(err) {
@@ -260,12 +278,12 @@ func (g *gitBackend) Set(ctx context.Context, marker []byte, message string, req
 			if err != nil {
 				return fmt.Errorf("marshaling doc: %w", err)
 			}
-			
+
 			// Ensure directory exists
 			if err := os.MkdirAll(filepath.Dir(filePath), 0755); err != nil {
 				return fmt.Errorf("creating directory: %w", err)
 			}
-			
+
 			if err := os.WriteFile(filePath, docContent, 0644); err != nil {
 				return fmt.Errorf("writing file: %w", err)
 			}
@@ -344,13 +362,13 @@ func cloneRepo(remoteURL string, clonePath string, branch string) error {
 			if err := os.MkdirAll(clonePath, 0755); err != nil {
 				return fmt.Errorf("creating clone directory: %w", err)
 			}
-			
+
 			// Initialize new repo
 			cmd = exec.Command("git", "-C", clonePath, "init")
 			if output, err := cmd.CombinedOutput(); err != nil {
 				return fmt.Errorf("git init failed: %w: %s", err, output)
 			}
-			
+
 			// Add remote
 			cmd = exec.Command("git", "-C", clonePath, "remote", "add", "origin", remoteURL)
 			if output, err := cmd.CombinedOutput(); err != nil {
@@ -358,27 +376,57 @@ func cloneRepo(remoteURL string, clonePath string, branch string) error {
 			}
 		}
 
-		// Create and checkout orphan branch
-		cmd = exec.Command("git", "-C", clonePath, "checkout", "--orphan", branch)
-		if output, err := cmd.CombinedOutput(); err != nil {
-			return fmt.Errorf("git checkout --orphan failed: %w: %s", err, output)
-		}
+		// Try to create the branch
+		if err := createBranch(clonePath, remoteURL, branch); err != nil {
+			// If branch creation failed, check if the branch now exists (race condition)
+			cmd = exec.Command("git", "-C", clonePath, "fetch", "origin", branch)
+			if fetchErr := cmd.Run(); fetchErr != nil {
+				// Branch still doesn't exist, return original error
+				return err
+			}
 
-		// Remove all files from index
-		cmd = exec.Command("git", "-C", clonePath, "rm", "-rf", ".")
-		cmd.Run() // Ignore error if there are no files
-
-		// Make initial commit
-		cmd = exec.Command("git", "-C", clonePath, "commit", "--allow-empty", "-m", "Initial commit")
-		if output, err := cmd.CombinedOutput(); err != nil {
-			return fmt.Errorf("git commit failed: %w: %s", err, output)
+			// Branch exists now, checkout the fetched branch
+			// Try to checkout existing local branch first
+			cmd = exec.Command("git", "-C", clonePath, "checkout", branch)
+			if err := cmd.Run(); err != nil {
+				// Local branch doesn't exist, create it tracking the remote
+				cmd = exec.Command("git", "-C", clonePath, "checkout", "-b", branch, "origin/"+branch)
+				if output, err := cmd.CombinedOutput(); err != nil {
+					return fmt.Errorf("git checkout failed: %w: %s", err, output)
+				}
+			} else {
+				// Local branch exists, ensure it's tracking the remote
+				cmd = exec.Command("git", "-C", clonePath, "branch", "--set-upstream-to=origin/"+branch, branch)
+				cmd.Run() // Ignore error if already set
+			}
 		}
+	}
 
-		// Push to create branch on remote
-		cmd = exec.Command("git", "-C", clonePath, "push", "-u", "origin", branch)
-		if output, err := cmd.CombinedOutput(); err != nil {
-			return fmt.Errorf("git push failed: %w: %s", err, output)
-		}
+	return nil
+}
+
+// createBranch creates a new orphan branch and pushes it to the remote
+func createBranch(clonePath string, remoteURL string, branch string) error {
+	// Create and checkout orphan branch
+	cmd := exec.Command("git", "-C", clonePath, "checkout", "--orphan", branch)
+	if output, err := cmd.CombinedOutput(); err != nil {
+		return fmt.Errorf("git checkout --orphan failed: %w: %s", err, output)
+	}
+
+	// Remove all files from index
+	cmd = exec.Command("git", "-C", clonePath, "rm", "-rf", ".")
+	cmd.Run() // Ignore error if there are no files
+
+	// Make initial commit
+	cmd = exec.Command("git", "-C", clonePath, "commit", "--allow-empty", "-m", "Initial commit")
+	if output, err := cmd.CombinedOutput(); err != nil {
+		return fmt.Errorf("git commit failed: %w: %s", err, output)
+	}
+
+	// Push to create branch on remote
+	cmd = exec.Command("git", "-C", clonePath, "push", "-u", "origin", branch)
+	if output, err := cmd.CombinedOutput(); err != nil {
+		return fmt.Errorf("git push failed: %w: %s", err, output)
 	}
 
 	return nil
@@ -388,17 +436,17 @@ func (g *gitBackend) pullClone() error {
 	// Check if there are any unstaged changes
 	cmd := exec.Command("git", "-C", g.clonePath, "diff", "--quiet")
 	hasUnstagedChanges := cmd.Run() != nil
-	
+
 	// Check if there are any staged changes
 	cmd = exec.Command("git", "-C", g.clonePath, "diff", "--cached", "--quiet")
 	hasStagedChanges := cmd.Run() != nil
-	
+
 	if hasUnstagedChanges || hasStagedChanges {
 		// If there are local changes, skip the pull
 		// The changes will be committed and pushed in this Set operation
 		return nil
 	}
-	
+
 	// Use --autostash to handle any unexpected staged changes
 	// This can happen if there's a race between the check above and the pull
 	cmd = exec.Command("git", "-C", g.clonePath, "pull", "--rebase", "--autostash")
@@ -409,7 +457,7 @@ func (g *gitBackend) pullClone() error {
 		if strings.Contains(outputStr, "CONFLICT") {
 			// Auto-resolve conflicts by accepting our version (--ours)
 			// This is safe when multiple workers are writing identical or compatible content
-			
+
 			// Use checkout --ours to resolve all conflicts in favor of our changes
 			checkoutCmd := exec.Command("git", "-C", g.clonePath, "checkout", "--ours", ".")
 			if checkoutErr := checkoutCmd.Run(); checkoutErr != nil {
@@ -418,7 +466,7 @@ func (g *gitBackend) pullClone() error {
 				abortCmd.Run()
 				return fmt.Errorf("git checkout --ours failed: %w", checkoutErr)
 			}
-			
+
 			// Stage the resolved files
 			addCmd := exec.Command("git", "-C", g.clonePath, "add", "-A")
 			if addErr := addCmd.Run(); addErr != nil {
@@ -426,7 +474,7 @@ func (g *gitBackend) pullClone() error {
 				abortCmd.Run()
 				return fmt.Errorf("git add after conflict resolution failed: %w", addErr)
 			}
-			
+
 			// Continue the rebase
 			continueCmd := exec.Command("git", "-C", g.clonePath, "rebase", "--continue")
 			continueCmd.Env = append(os.Environ(), "GIT_EDITOR=true") // Skip commit message editing
@@ -445,10 +493,10 @@ func (g *gitBackend) pullClone() error {
 					return fmt.Errorf("git rebase --skip failed: %w", skipErr)
 				}
 			}
-			
+
 			return nil
 		}
-		
+
 		return fmt.Errorf("git pull failed: %w: %s", err, output)
 	}
 	return nil
@@ -457,12 +505,12 @@ func (g *gitBackend) pullClone() error {
 func (g *gitBackend) gitAdd() error {
 	// Add files, being careful to only add data files and not worktree metadata
 	// Strategy: explicitly add files that should be tracked, avoiding metadata files
-	
+
 	if g.pathPrefix != "" {
 		// When using a pathPrefix, add both:
 		// 1. Files in the pathPrefix directory (data files)
 		// 2. Files at the root (support files like .gitignore, support.txt, etc.)
-		
+
 		// First, add files from the pathPrefix directory if it exists
 		prefixFullPath := filepath.Join(g.clonePath, g.pathPrefix)
 		if _, err := os.Stat(prefixFullPath); err == nil {
@@ -471,20 +519,20 @@ func (g *gitBackend) gitAdd() error {
 				return fmt.Errorf("git add failed: %w: %s", err, output)
 			}
 		}
-		
+
 		// Then, add any root-level files (but not directories, to avoid metadata)
 		// List files in the root directory
 		entries, err := os.ReadDir(g.clonePath)
 		if err != nil {
 			return fmt.Errorf("reading worktree: %w", err)
 		}
-		
+
 		for _, entry := range entries {
 			// Skip directories and .git
 			if entry.IsDir() || entry.Name() == ".git" {
 				continue
 			}
-			
+
 			// Add this root-level file
 			cmd := exec.Command("git", "-C", g.clonePath, "add", entry.Name())
 			if output, err := cmd.CombinedOutput(); err != nil {
@@ -498,7 +546,7 @@ func (g *gitBackend) gitAdd() error {
 			return fmt.Errorf("git add failed: %w: %s", err, output)
 		}
 	}
-	
+
 	return nil
 }
 
@@ -529,6 +577,12 @@ func (g *gitBackend) gitCommit(message string) error {
 }
 
 func (g *gitBackend) gitPush() error {
+	err := g.bareRepoLock.Lock()
+	if err != nil {
+		return fmt.Errorf("locking: %w", err)
+	}
+	defer g.bareRepoLock.Unlock()
+
 	// Retry push with pull-rebase if it fails due to remote changes
 	maxRetries := 3
 	for attempt := 0; attempt < maxRetries; attempt++ {
@@ -537,7 +591,7 @@ func (g *gitBackend) gitPush() error {
 		if err == nil {
 			return nil
 		}
-		
+
 		// Check if the error is due to remote changes
 		outputStr := string(output)
 		if strings.Contains(outputStr, "rejected") || strings.Contains(outputStr, "fetch first") || strings.Contains(outputStr, "failed to update ref") {
@@ -549,7 +603,7 @@ func (g *gitBackend) gitPush() error {
 				continue
 			}
 		}
-		
+
 		return fmt.Errorf("git push failed: %w: %s", err, output)
 	}
 	return fmt.Errorf("git push failed after %d retries", maxRetries)
