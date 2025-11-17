@@ -1,15 +1,26 @@
 #!/usr/bin/env bash
 
-export OCUROOT_HOME=$(pwd)/$(dirname "$0")/testdata/.ocuroot
 export TESTDATA_DIR=$(pwd)/$(dirname "$0")/testdata
+rm -rf $TESTDATA_DIR
+mkdir -p $TESTDATA_DIR
+export TESTDATA_DIR=$(realpath "$TESTDATA_DIR")
+
+export OCUROOT_HOME=$TESTDATA_DIR/.ocuroot
 export OCUROOT_DEBUG=true
+# Default values
+export DEPLOY_DIR=$TESTDATA_DIR/deploys
+export WORKER_ID=worker 
 
 source $(dirname "$0")/../test_helpers.sh
 source $(dirname "$0")/../git_helpers.sh
 
+# Something about recent changes has broken this
 test_worker_push() {
      # Clean up test data
-    rm -rf ./testdata
+    rm -rf $TESTDATA_DIR
+
+    # Make sure there are no dangling workers
+    pkill -9 ocuroot
 
     # Call the init function to create repositories and set environment variables
     export REPO_REMOTE=$(init_repo "./testdata/remote")
@@ -32,8 +43,8 @@ test_worker_push() {
     git commit -m "Add source"
 
     # Wait until deploys are complete
-    wait_for_ref "push/-/a.ocu.star/@/deploy/production"
-    wait_for_ref "push/-/b.ocu.star/@/deploy/production"
+    wait_for_ref "push/-/a.ocu.star/@/deploy/production/1/status/complete"
+    wait_for_ref "push/-/b.ocu.star/@/deploy/production/1/status/complete"
 
     assert_deployed "a.ocu.star" "production"
     assert_deployed "b.ocu.star" "production"
@@ -47,7 +58,8 @@ test_worker_push() {
     git commit -m "Update message"
 
     # Wait until deploys are complete
-    wait_for_ref "push/-/a.ocu.star/@r2/deploy/production"
+    wait_for_ref "push/-/a.ocu.star/@r2/deploy/production/1/status/complete"
+    wait_for_ref "push/-/b.ocu.star/@r1/deploy/production/2/status/complete"
 
     assert_deployed "a.ocu.star" "production"
     assert_deployed "b.ocu.star" "production"
@@ -62,10 +74,12 @@ test_worker_push() {
     echo ""
 }
 
-
 test_multi_worker_push() {
      # Clean up test data
-    rm -rf ./testdata
+    rm -rf $TESTDATA_DIR
+
+    # Make sure there are no dangling workers
+    pkill -9 ocuroot
 
     # Call the init function to create repositories and set environment variables
     export REPO_REMOTE=$(init_repo "./testdata/remote")
@@ -79,11 +93,11 @@ test_multi_worker_push() {
 
     # Start worker in the source directory, with dev mode
     echo "Starting 3 workers, will log to: ../worker{1,2,3}.log"
-    OCUROOT_HOME=$TESTDATA_DIR/worker1 ocuroot start worker --dev --interval 1s > ../worker1.log 2>&1 &
+    WORKER_ID=worker1 OCUROOT_HOME=$TESTDATA_DIR/worker1 ocuroot start worker --dev --interval 1s > ../worker1.log 2>&1 &
     worker1_pid=$!
-    OCUROOT_HOME=$TESTDATA_DIR/worker2 ocuroot start worker --dev --interval 1s > ../worker2.log 2>&1 &
+    WORKER_ID=worker2 OCUROOT_HOME=$TESTDATA_DIR/worker2 ocuroot start worker --dev --interval 1s > ../worker2.log 2>&1 &
     worker2_pid=$!
-    OCUROOT_HOME=$TESTDATA_DIR/worker3 ocuroot start worker --dev --interval 1s > ../worker3.log 2>&1 &
+    WORKER_ID=worker3 OCUROOT_HOME=$TESTDATA_DIR/worker3 ocuroot start worker --dev --interval 1s > ../worker3.log 2>&1 &
     worker3_pid=$!
     sleep 3 # Allow the workers to come up
 
@@ -92,13 +106,17 @@ test_multi_worker_push() {
     git commit -m "Add source"
 
     # Wait until deploys are complete
-    wait_for_ref "push/-/a.ocu.star/@/deploy/production"
-    wait_for_ref "push/-/b.ocu.star/@/deploy/production"
+    wait_for_ref "push/-/a.ocu.star/@/deploy/production/1/status/complete" 30 "commit1: wait for a in production"
+    wait_for_ref "push/-/b.ocu.star/@/deploy/production/1/status/complete" 30 "commit1: wait for b in production"
 
-    assert_deployed "a.ocu.star" "production"
-    assert_deployed "b.ocu.star" "production"
+    assert_deployed "a.ocu.star" "production" "commit1: a not in production"
+    assert_deployed "b.ocu.star" "production" "commit1: b not in production"
     assert_ref_equals "push/-/a.ocu.star/@/deploy/production#output/message" "Message at commit 1"
     assert_ref_equals "push/-/b.ocu.star/@/deploy/production#output/message" "Message at commit 1"
+
+    # Check there was only one deploy for each
+    check_file_count $DEPLOY_DIR/a/production 1 "after first commit"
+    check_file_count $DEPLOY_DIR/b/production 1 "after first commit"
 
     # Apply second commit
     cp ../../src/repo1/commit2/* "./"
@@ -107,10 +125,11 @@ test_multi_worker_push() {
     git commit -m "Update message"
 
     # Wait until deploys are complete
-    wait_for_ref "push/-/a.ocu.star/@r2/deploy/production"
+    wait_for_ref "push/-/a.ocu.star/@r2/deploy/production/1/status/complete" 30 "commit2: wait for a r2 in production"
+    wait_for_ref "push/-/b.ocu.star/@r1/deploy/production/2/status/complete" 30 "commit2: wait for b r2 in production"
 
-    assert_deployed "a.ocu.star" "production"
-    assert_deployed "b.ocu.star" "production"
+    assert_deployed "a.ocu.star" "production" "commit2: a not in production"
+    assert_deployed "b.ocu.star" "production" "commit2: b not in production"
     assert_ref_equals "push/-/a.ocu.star/@/deploy/production#output/message" "Message at commit 2"
     assert_ref_equals "push/-/b.ocu.star/@/deploy/production#output/message" "Message at commit 2"
 
@@ -135,6 +154,8 @@ test_multi_worker_push() {
         exit 1
     fi
 
+    check_file_count $DEPLOY_DIR/a/production 1 "after second commit"
+    check_file_count $DEPLOY_DIR/b/production 1 "after second commit"
 
     echo "Test succeeded"
     echo ""
@@ -143,6 +164,9 @@ test_multi_worker_push() {
 test_worker_intent() {
     # Clean up test data
     rm -rf ./testdata
+
+    # Make sure there are no dangling workers
+    pkill -9 ocuroot
 
     # Call the init function to create repositories and set environment variables
     export REPO_REMOTE=$(init_repo "./testdata/remote")
@@ -165,8 +189,8 @@ test_worker_intent() {
     git commit -m "Add source"
 
     # Wait until deploys are complete
-    wait_for_ref "push/-/a.ocu.star/@/deploy/production"
-    wait_for_ref "push/-/b.ocu.star/@/deploy/production"
+    wait_for_ref "push/-/a.ocu.star/@/deploy/production/1/status/complete"
+    wait_for_ref "push/-/b.ocu.star/@/deploy/production/1/status/complete"
 
     assert_deployed "a.ocu.star" "production"
     assert_deployed "b.ocu.star" "production"
@@ -191,8 +215,8 @@ build_ocuroot
 
 pushd "$(dirname "$0")" > /dev/null
 
-# test_worker_push
+test_worker_push
+test_worker_intent
 test_multi_worker_push
-# test_worker_intent
 
 popd

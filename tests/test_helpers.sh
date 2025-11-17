@@ -165,3 +165,14 @@ assert_not_equal() {
     return 0
 }
 
+check_file_count() {
+    local dir=$1
+    local expected_count=$2
+    local message=$3
+    local count=$(find $dir -type f | wc -l | xargs)
+    if [ "$count" -ne "$expected_count" ]; then
+        echo "$message"
+        echo "Expected $expected_count files $dir, but found $count"
+        exit 1
+    fi
+}
