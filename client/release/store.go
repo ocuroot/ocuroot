@@ -86,7 +86,7 @@ func newRefStoreFromBackend(
 		}
 		store, err = refstore.NewFSRefStore(statePath, tags)
 		if err != nil {
-			return nil, fmt.Errorf("creating state store: %w", err)
+			return nil, fmt.Errorf("new fs store: %w", err)
 		}
 	}
 
@@ -132,7 +132,7 @@ func newRefStoreFromBackend(
 			},
 		)
 		if err != nil {
-			return nil, fmt.Errorf("creating state store: %w", err)
+			return nil, fmt.Errorf("new local store: %w", err)
 		}
 	}
 
@@ -158,7 +158,7 @@ func newRefStoreFromBackend(
 			},
 		)
 		if err != nil {
-			return nil, fmt.Errorf("creating state store: %w", err)
+			return nil, fmt.Errorf("new git store: %w", err)
 		}
 	}
 	store = refstore.StoreWithOtel(store)

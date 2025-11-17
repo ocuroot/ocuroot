@@ -51,51 +51,6 @@ func (r *releaseStore) GetReleaseInfo(ctx context.Context) (*ReleaseInfo, error)
 	return &releaseInfo, nil
 }
 
-func (w *releaseStore) InitDeploymentUp(ctx context.Context, env string) error {
-	err := w.Store.StartTransaction(ctx, "initializing deployment")
-	if err != nil {
-		return fmt.Errorf("starting transaction: %w", err)
-	}
-
-	defer func() {
-		commitErr := w.Store.CommitTransaction(ctx)
-		if commitErr != nil {
-			log.Error("committing transaction", "error", commitErr)
-		}
-	}()
-
-	ri, err := w.GetReleaseInfo(ctx)
-	if err != nil {
-		return fmt.Errorf("getting release state: %w", err)
-	}
-
-	var task *sdk.Task
-	for _, phase := range ri.Package.Phases {
-		for _, w := range phase.Tasks {
-			if w.Deployment != nil && w.Deployment.Environment == sdk.EnvironmentName(env) {
-				task = &w
-				break
-			}
-		}
-		if task != nil {
-			break
-		}
-	}
-	if task == nil {
-		return fmt.Errorf("release is not configured for environment %s", env)
-	}
-
-	ref, run, fs, err := w.sdkTaskToRunAndFunction(ctx, *task)
-	if err != nil {
-		return fmt.Errorf("getting run: %w", err)
-	}
-	err = w.InitializeFunction(ctx, run, ref, fs)
-	if err != nil {
-		return fmt.Errorf("initializing function: %w", err)
-	}
-	return nil
-}
-
 func (w *releaseStore) InitDeploymentDown(ctx context.Context, env string) error {
 	// Get the current deployment
 	currentDeploymentRef := w.ReleaseRef.SetSubPathType(refs.SubPathTypeDeploy).SetSubPath(env)
