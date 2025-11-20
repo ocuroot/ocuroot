@@ -2,6 +2,7 @@
 
 export OCU_REPO_COMMIT_OVERRIDE=${OCU_REPO_COMMIT_OVERRIDE:-commitid}
 export OCUROOT_HOME=$(pwd)/$(dirname "$0")/.ocuroot
+#export OCUROOT_DEBUG=true
 
 source $(dirname "$0")/../test_helpers.sh
 source $(dirname "$0")/../git_helpers.sh

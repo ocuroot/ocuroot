@@ -115,8 +115,8 @@ test_multi_worker_push() {
     assert_ref_equals "push/-/b.ocu.star/@/deploy/production#output/message" "Message at commit 1"
 
     # Check there was only one deploy for each
-    check_file_count $DEPLOY_DIR/a/production 1 "after first commit"
-    check_file_count $DEPLOY_DIR/b/production 1 "after first commit"
+    check_file_count $DEPLOY_DIR/a/production/0 1 "after first commit"
+    check_file_count $DEPLOY_DIR/b/production/0 1 "after first commit"
 
     # Apply second commit
     cp ../../src/repo1/commit2/* "./"
@@ -154,8 +154,8 @@ test_multi_worker_push() {
         exit 1
     fi
 
-    check_file_count $DEPLOY_DIR/a/production 1 "after second commit"
-    check_file_count $DEPLOY_DIR/b/production 1 "after second commit"
+    check_file_count $DEPLOY_DIR/a/production/1 1 "after second commit"
+    check_file_count $DEPLOY_DIR/b/production/1 1 "after second commit"
 
     echo "Test succeeded"
     echo ""
