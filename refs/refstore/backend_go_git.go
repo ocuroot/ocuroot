@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"runtime/debug"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/charmbracelet/log"
@@ -44,6 +45,7 @@ func NewGoGitBackend(
 		repo:         r,
 		branch:       branch,
 		wt:           wt,
+		remoteURL:    remoteURL,
 		gitUserName:  gitUserName,
 		gitUserEmail: gitUserEmail,
 	}, nil
@@ -189,20 +191,54 @@ type goGitBackend struct {
 	branch string
 	wt     billy.Filesystem
 
+	remoteURL    string
 	gitUserName  string
 	gitUserEmail string
+
+	mu sync.Mutex // Protects all git operations
 }
 
-// Get implements DocumentBackend.
-func (g *goGitBackend) Get(ctx context.Context, paths []string) ([]GetResult, error) {
+// recreateRepo recreates the repository from scratch by cloning again.
+// Must be called with g.mu held.
+func (g *goGitBackend) recreateRepo() error {
+	log.Info("recreating repository from scratch", "branch", g.branch)
+
+	// Create new in-memory filesystem
+	newWt := memfs.New()
+
+	// Clone the repository again
+	r, err := cloneOrInitializeBranch(g.remoteURL, g.branch, newWt, g.gitUserName, g.gitUserEmail)
+	if err != nil {
+		return fmt.Errorf("recreating repo: %w", err)
+	}
+
+	// Replace the old repo and filesystem
+	g.repo = r
+	g.wt = newWt
+
+	return nil
+}
+
+// refresh pulls the latest changes from the remote branch.
+// Must be called with g.mu held.
+func (g *goGitBackend) refresh() error {
 	wt, err := g.repo.Worktree()
 	if err != nil {
-		return nil, fmt.Errorf("get worktree: %w", err)
+		return fmt.Errorf("get worktree: %w", err)
 	}
 
 	if err := wt.Pull(&git.PullOptions{
 		ReferenceName: plumbing.NewBranchReferenceName(g.branch),
 	}); err != nil && !errors.Is(err, git.NoErrAlreadyUpToDate) {
+
+		// Check for pipe errors - recreate the repo from scratch
+		if strings.Contains(err.Error(), "closed pipe") || strings.Contains(err.Error(), "broken pipe") {
+			log.Warn("detected pipe error during pull, recreating repository", "error", err)
+			if recreateErr := g.recreateRepo(); recreateErr != nil {
+				return fmt.Errorf("failed to recreate repo after pipe error: %w", recreateErr)
+			}
+			return nil
+		}
 
 		if errors.Is(err, git.ErrNonFastForwardUpdate) {
 			log.Info("non-fast-forward update", "stack", string(debug.Stack()))
@@ -260,7 +296,24 @@ func (g *goGitBackend) Get(ctx context.Context, paths []string) ([]GetResult, er
 			}
 		}
 
-		return nil, fmt.Errorf("pulling: %w", err)
+		return fmt.Errorf("pulling: %w", err)
+	}
+
+	return nil
+}
+
+// Get implements DocumentBackend.
+func (g *goGitBackend) Get(ctx context.Context, paths []string) ([]GetResult, error) {
+	g.mu.Lock()
+	defer g.mu.Unlock()
+
+	if err := g.refresh(); err != nil {
+		return nil, err
+	}
+
+	wt, err := g.repo.Worktree()
+	if err != nil {
+		return nil, fmt.Errorf("get worktree: %w", err)
 	}
 
 	var out []GetResult
@@ -295,15 +348,11 @@ func (g *goGitBackend) Get(ctx context.Context, paths []string) ([]GetResult, er
 
 // GetBytes implements DocumentBackend.
 func (g *goGitBackend) GetBytes(ctx context.Context, path string) ([]byte, error) {
-	wt, err := g.repo.Worktree()
-	if err != nil {
-		return nil, fmt.Errorf("get worktree: %w", err)
-	}
+	g.mu.Lock()
+	defer g.mu.Unlock()
 
-	if err := wt.Pull(&git.PullOptions{
-		ReferenceName: plumbing.NewBranchReferenceName(g.branch),
-	}); err != nil && !errors.Is(err, git.NoErrAlreadyUpToDate) {
-		return nil, fmt.Errorf("pull: %w", err)
+	if err := g.refresh(); err != nil {
+		return nil, err
 	}
 
 	f, err := g.wt.Open(path)
@@ -324,15 +373,11 @@ func (g *goGitBackend) GetBytes(ctx context.Context, path string) ([]byte, error
 
 // Match implements DocumentBackend.
 func (g *goGitBackend) Match(ctx context.Context, reqs []MatchRequest) ([]string, error) {
-	wt, err := g.repo.Worktree()
-	if err != nil {
-		return nil, fmt.Errorf("worktree: %w", err)
-	}
+	g.mu.Lock()
+	defer g.mu.Unlock()
 
-	if err := wt.Pull(&git.PullOptions{
-		ReferenceName: plumbing.NewBranchReferenceName(g.branch),
-	}); err != nil && !errors.Is(err, git.NoErrAlreadyUpToDate) {
-		return nil, fmt.Errorf("pull: %w", err)
+	if err := g.refresh(); err != nil {
+		return nil, err
 	}
 
 	compiledReqs, err := compileMatchRequests(reqs)
@@ -387,25 +432,29 @@ func (g *goGitBackend) Match(ctx context.Context, reqs []MatchRequest) ([]string
 
 // Set implements DocumentBackend.
 func (g *goGitBackend) Set(ctx context.Context, message string, reqs []SetRequest) error {
-	var w *git.Worktree
+	g.mu.Lock()
+	defer g.mu.Unlock()
+
+	// Retry refresh on non-fast-forward errors
 	var err error
-
 	for i := 0; i < 3; i++ {
-		w, err = g.repo.Worktree()
-		if err != nil {
-			return fmt.Errorf("getting worktree: %w", err)
+		err = g.refresh()
+		if err == nil {
+			break
 		}
+		if errors.Is(err, git.ErrNonFastForwardUpdate) {
+			time.Sleep(time.Millisecond)
+			continue
+		}
+		return err
+	}
+	if err != nil {
+		return err
+	}
 
-		if err := w.Pull(&git.PullOptions{
-			ReferenceName: plumbing.NewBranchReferenceName(g.branch),
-		}); err != nil && !errors.Is(err, git.NoErrAlreadyUpToDate) {
-			if errors.Is(err, git.ErrNonFastForwardUpdate) {
-				time.Sleep(time.Millisecond)
-				continue
-			}
-			return fmt.Errorf("pulling: %w", err)
-		}
-		break
+	w, err := g.repo.Worktree()
+	if err != nil {
+		return fmt.Errorf("getting worktree: %w", err)
 	}
 
 	for _, req := range reqs {
@@ -467,10 +516,21 @@ func (g *goGitBackend) Set(ctx context.Context, message string, reqs []SetReques
 	}
 
 	err = g.repo.Push(&git.PushOptions{})
-	if err != nil && !strings.Contains(err.Error(), "non-fast-forward update") {
-		return fmt.Errorf("pushing: %w", err)
-	}
-	if err != nil && strings.Contains(err.Error(), "non-fast-forward update") {
+	if err != nil {
+		// Check for pipe errors - recreate and retry
+		if strings.Contains(err.Error(), "closed pipe") || strings.Contains(err.Error(), "broken pipe") {
+			log.Warn("detected pipe error during push, recreating repository", "error", err)
+			if recreateErr := g.recreateRepo(); recreateErr != nil {
+				return fmt.Errorf("failed to recreate repo after pipe error: %w", recreateErr)
+			}
+			// After recreating, we need to refresh and retry the whole operation
+			return fmt.Errorf("repository recreated due to pipe error, please retry operation")
+		}
+
+		if !strings.Contains(err.Error(), "non-fast-forward update") {
+			return fmt.Errorf("pushing: %w", err)
+		}
+
 		if err := g.rebaseAndPushWithRetry(w); err != nil {
 			return fmt.Errorf("retry push: %w", err)
 		}
@@ -649,15 +709,16 @@ func (g *goGitBackend) rebaseAndPush(w *git.Worktree) error {
 
 // SetBytes implements DocumentBackend.
 func (g *goGitBackend) SetBytes(ctx context.Context, path string, content []byte) error {
+	g.mu.Lock()
+	defer g.mu.Unlock()
+
+	if err := g.refresh(); err != nil {
+		return err
+	}
+
 	w, err := g.repo.Worktree()
 	if err != nil {
 		return fmt.Errorf("getting worktree: %w", err)
-	}
-
-	if err := w.Pull(&git.PullOptions{
-		ReferenceName: plumbing.NewBranchReferenceName(g.branch),
-	}); err != nil && !errors.Is(err, git.NoErrAlreadyUpToDate) {
-		return fmt.Errorf("pulling: %w", err)
 	}
 
 	if content != nil {
@@ -708,10 +769,21 @@ func (g *goGitBackend) SetBytes(ctx context.Context, path string, content []byte
 	}
 
 	err = g.repo.Push(&git.PushOptions{})
-	if err != nil && !strings.Contains(err.Error(), "non-fast-forward update") {
-		return fmt.Errorf("pushing: %w", err)
-	}
-	if err != nil && strings.Contains(err.Error(), "non-fast-forward update") {
+	if err != nil {
+		// Check for pipe errors - recreate and retry
+		if strings.Contains(err.Error(), "closed pipe") || strings.Contains(err.Error(), "broken pipe") {
+			log.Warn("detected pipe error during push, recreating repository", "error", err)
+			if recreateErr := g.recreateRepo(); recreateErr != nil {
+				return fmt.Errorf("failed to recreate repo after pipe error: %w", recreateErr)
+			}
+			// After recreating, we need to refresh and retry the whole operation
+			return fmt.Errorf("repository recreated due to pipe error, please retry operation")
+		}
+
+		if !strings.Contains(err.Error(), "non-fast-forward update") {
+			return fmt.Errorf("pushing: %w", err)
+		}
+
 		if err := g.rebaseAndPushWithRetry(w); err != nil {
 			return fmt.Errorf("retry push: %w", err)
 		}
