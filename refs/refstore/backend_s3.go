@@ -73,11 +73,6 @@ func (s *s3Backend) GetBytes(ctx context.Context, path string) ([]byte, error) {
 	return body, nil
 }
 
-// Marker implements DocumentBackend.
-func (s *s3Backend) Marker() ([]byte, error) {
-	return nil, nil
-}
-
 // Match implements DocumentBackend.
 func (s *s3Backend) Match(ctx context.Context, reqs []MatchRequest) ([]string, error) {
 	compiledReqs, err := compileMatchRequests(reqs)
@@ -152,7 +147,7 @@ func (s *s3Backend) Match(ctx context.Context, reqs []MatchRequest) ([]string, e
 }
 
 // Set implements DocumentBackend.
-func (s *s3Backend) Set(ctx context.Context, marker []byte, message string, reqs []SetRequest) error {
+func (s *s3Backend) Set(ctx context.Context, message string, reqs []SetRequest) error {
 	for _, req := range reqs {
 		if req.Doc == nil {
 			_, err := s.client.DeleteObject(ctx, &s3.DeleteObjectInput{

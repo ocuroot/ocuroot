@@ -18,6 +18,10 @@ func TestFSBackend(t *testing.T) {
 		be := NewFsBackend(emptyTestDir("fs/info"))
 		return be
 	})
+	doTestMultipleClients(t, func() DocumentBackend {
+		be := NewFsBackend(emptyTestDir("fs/multiple-clients"))
+		return be
+	})
 }
 
 func emptyTestDir(dir string) string {

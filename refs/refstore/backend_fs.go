@@ -73,11 +73,6 @@ func (f *fsBackend) Get(ctx context.Context, paths []string) ([]GetResult, error
 	return out, nil
 }
 
-// Marker implements DocumentBackend.
-func (f *fsBackend) Marker() ([]byte, error) {
-	return nil, nil
-}
-
 // Match implements DocumentBackend.
 func (f *fsBackend) Match(ctx context.Context, reqs []MatchRequest) ([]string, error) {
 	compiledReqs, err := compileMatchRequests(reqs)
@@ -134,7 +129,7 @@ func (f *fsBackend) Match(ctx context.Context, reqs []MatchRequest) ([]string, e
 }
 
 // Set implements DocumentBackend.
-func (f *fsBackend) Set(ctx context.Context, marker []byte, message string, reqs []SetRequest) error {
+func (f *fsBackend) Set(ctx context.Context, message string, reqs []SetRequest) error {
 	for _, req := range reqs {
 		rPath := filepath.Join(f.root, req.Path)
 		if req.Doc == nil {

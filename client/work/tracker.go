@@ -207,10 +207,23 @@ func (w *InRepoWorker) InitTrackerFromSourceRepo(ctx context.Context, ref refs.R
 	w.Tracker = tc
 
 	if saveConfig && tc.Ref.Repo != "" {
-		err = saveRepoConfig(ctx, tc, repoRootPath, w.RepoName, tc.Commit, data)
+		var err error
+		var errors []error
+		var i = 0
+		for i = 0; i < 5; i++ {
+			err = saveRepoConfig(ctx, tc, repoRootPath, w.RepoName, tc.Commit, data)
+			if err != nil {
+				errors = append(errors, err)
+				log.Info("Failed to save repo config", "repo", tc.Ref.Repo, "repoRootPath", repoRootPath, "repoName", w.RepoName, "commit", tc.Commit, "err", err)
+				time.Sleep(time.Second)
+				continue
+			}
+			break
+		}
 		if err != nil {
-			log.Info("Failed to save repo config", "repo", tc.Ref.Repo, "repoRootPath", repoRootPath, "repoName", w.RepoName, "commit", tc.Commit, "err", err)
-			return fmt.Errorf("saving repo config: %w", err)
+			return fmt.Errorf("saving repo config (failed 4 times): %w\nall:%v", err, errors)
+		} else {
+			log.Info("Saving repo config succeeded", "attempts", i, "errors", errors)
 		}
 	}
 

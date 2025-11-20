@@ -8,6 +8,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/charmbracelet/log"
 	"github.com/ocuroot/ocuroot/refs"
 )
 
@@ -28,7 +29,7 @@ func NewRefStore(ctx context.Context, backend DocumentBackend, tags map[string]s
 	// Read store info using GetBytes
 	infoBytes, err := backend.GetBytes(ctx, storeInfoFile)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("read info file: %w", err)
 	}
 
 	var info *StoreInfo
@@ -49,7 +50,7 @@ func NewRefStore(ctx context.Context, backend DocumentBackend, tags map[string]s
 				return nil, err
 			}
 			if err := backend.SetBytes(ctx, storeInfoFile, updatedBytes); err != nil {
-				return nil, err
+				return nil, fmt.Errorf("update storeinfo: %w", err)
 			}
 		}
 
@@ -61,10 +62,18 @@ func NewRefStore(ctx context.Context, backend DocumentBackend, tags map[string]s
 		info := StoreInfo{Version: stateVersion, Tags: tags}
 		infoBytes, err := json.Marshal(&info)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("marshaling store info: %w", err)
 		}
 		if err := backend.SetBytes(ctx, storeInfoFile, infoBytes); err != nil {
-			return nil, err
+			// May have been a collision during the write
+			// If so, check if the file now exists
+			infoBytes, err := backend.GetBytes(ctx, storeInfoFile)
+			if err != nil {
+				return nil, fmt.Errorf("retrying read info file: %w", err)
+			}
+			if infoBytes == nil {
+				return nil, fmt.Errorf("retrying new store info: %w", err)
+			}
 		}
 	}
 
@@ -88,6 +97,8 @@ type TransactionAction struct {
 
 // Info implements Store.
 func (r *RefStore) Info() StoreInfo {
+	log.Debug("refstore.Info")
+
 	infoBytes, err := r.Backend.GetBytes(context.Background(), storeInfoFile)
 	if err != nil {
 		panic(err)
@@ -105,6 +116,8 @@ func (r *RefStore) Info() StoreInfo {
 
 // StartTransaction implements Store.
 func (r *RefStore) StartTransaction(ctx context.Context, message string) error {
+	log.Debug("refstore.StartTransaction", "message", message)
+
 	r.TransactionMessage = message
 	r.InTransaction = true
 	return nil
@@ -112,6 +125,8 @@ func (r *RefStore) StartTransaction(ctx context.Context, message string) error {
 
 // CommitTransaction implements Store.
 func (r *RefStore) CommitTransaction(ctx context.Context) error {
+	log.Debug("refstore.CommitTransaction")
+
 	if !r.InTransaction {
 		return nil
 	}
@@ -128,7 +143,7 @@ func (r *RefStore) CommitTransaction(ctx context.Context) error {
 		requests = append(requests, req)
 	}
 
-	if err := r.Backend.Set(ctx, nil, r.TransactionMessage, requests); err != nil {
+	if err := r.Backend.Set(ctx, r.TransactionMessage, requests); err != nil {
 		return err
 	}
 
@@ -144,7 +159,16 @@ func (r *RefStore) handleRequest(ctx context.Context, reqs ...SetRequest) error 
 		return nil
 	}
 
-	return r.Backend.Set(ctx, nil, "", reqs)
+	message := ""
+	for _, req := range reqs {
+		if req.Doc != nil {
+			message = fmt.Sprintf("Update %s", req.Path)
+		} else {
+			message = fmt.Sprintf("Delete %s", req.Path)
+		}
+	}
+
+	return r.Backend.Set(ctx, message, reqs)
 }
 
 // Close implements Store.
@@ -159,6 +183,8 @@ func refContentPath(ref string) string {
 
 // Delete implements Store.
 func (r *RefStore) Delete(ctx context.Context, ref string) error {
+	log.Debug("refstore.Delete", "ref", ref)
+
 	// Resolve any links in the ref path
 	resolved, err := r.ResolveLink(ctx, ref)
 	if err != nil {
@@ -173,6 +199,8 @@ func (r *RefStore) Delete(ctx context.Context, ref string) error {
 
 // Get implements Store.
 func (r *RefStore) Get(ctx context.Context, ref string, v any) error {
+	log.Debug("refstore.Get", "ref", ref)
+
 	parsedRef, err := refs.Parse(ref)
 	if err != nil {
 		return fmt.Errorf("parsing ref: %w", err)
@@ -265,6 +293,8 @@ func (r *RefStore) getRef(ctx context.Context, ref string) (*StorageObject, erro
 
 // GetLinks implements Store.
 func (r *RefStore) GetLinks(ctx context.Context, ref string) ([]string, error) {
+	log.Debug("refstore.GetLinks", "ref", ref)
+
 	doc, err := r.getRef(ctx, ref)
 	if err != nil {
 		return nil, err
@@ -277,6 +307,8 @@ func (r *RefStore) GetLinks(ctx context.Context, ref string) ([]string, error) {
 
 // Link implements Store.
 func (r *RefStore) Link(ctx context.Context, ref string, target string) error {
+	log.Debug("refstore.Link", "ref", ref, "target", target)
+
 	var requests []SetRequest
 
 	targetDoc, err := r.getRef(ctx, target)
@@ -327,11 +359,15 @@ func (r *RefStore) Link(ctx context.Context, ref string, target string) error {
 
 // Match implements Store.
 func (r *RefStore) Match(ctx context.Context, glob ...string) ([]string, error) {
+	log.Debug("refstore.Match", "globs", glob)
+
 	return r.MatchOptions(ctx, MatchOptions{}, glob...)
 }
 
 // MatchOptions implements Store.
 func (r *RefStore) MatchOptions(ctx context.Context, options MatchOptions, glob ...string) ([]string, error) {
+	log.Debug("refstore.MatchOptions", "options", options, "globs", glob)
+
 	var requests []MatchRequest
 	for _, g := range glob {
 		requests = append(requests, MatchRequest{
@@ -407,6 +443,8 @@ func (r *RefStore) MatchOptions(ctx context.Context, options MatchOptions, glob 
 
 // ResolveLink implements Store.
 func (r *RefStore) ResolveLink(ctx context.Context, ref string) (string, error) {
+	log.Debug("refstore.ResolveLink", "ref", ref)
+
 	lt, err := r.getLinkTarget(ctx, ref)
 	if err != nil {
 		return "", err
@@ -472,6 +510,8 @@ func (r *RefStore) getLinkTarget(ctx context.Context, ref string) (*string, erro
 
 // Set implements Store.
 func (r *RefStore) Set(ctx context.Context, ref string, v any) error {
+	log.Debug("refstore.Set", "ref", ref, "v", v)
+
 	// Resolve any links in the ref path
 	resolved, err := r.ResolveLink(ctx, ref)
 	if err != nil {
@@ -508,6 +548,8 @@ func (r *RefStore) Set(ctx context.Context, ref string, v any) error {
 
 // Unlink implements Store.
 func (r *RefStore) Unlink(ctx context.Context, ref string) error {
+	log.Debug("refstore.Unlink", "ref", ref)
+
 	reqs, err := r.unlinkRequests(ctx, ref)
 	if err != nil {
 		return err

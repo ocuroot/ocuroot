@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
+
+	"github.com/charmbracelet/log"
 )
 
 var _ DocumentBackend = (*inMemoryBackend)(nil)
@@ -50,13 +52,10 @@ func (i *inMemoryBackend) Get(ctx context.Context, refs []string) ([]GetResult, 
 	return out, nil
 }
 
-// Marker implements DocumentBackend.
-func (i *inMemoryBackend) Marker() ([]byte, error) {
-	return nil, nil
-}
-
 // Match implements DocumentBackend.
 func (i *inMemoryBackend) Match(ctx context.Context, reqs []MatchRequest) ([]string, error) {
+	log.Info("inMemoryBackend.Match", "reqs", reqs)
+
 	var compiledReqs []compiledMatchReq
 	compiledReqs, err := compileMatchRequests(reqs)
 	if err != nil {
@@ -66,6 +65,7 @@ func (i *inMemoryBackend) Match(ctx context.Context, reqs []MatchRequest) ([]str
 	var out []string
 	for ref := range i.storage {
 		for _, req := range compiledReqs {
+			log.Info("inMemoryBackend.Match inner", "ref", ref, "req", req)
 			p := ref
 			if req.prefix != "" {
 				if !strings.HasPrefix(p, req.prefix) {
@@ -79,6 +79,7 @@ func (i *inMemoryBackend) Match(ctx context.Context, reqs []MatchRequest) ([]str
 			}
 
 			for _, suffix := range suffixes {
+				log.Info("inMemoryBackend.Match suffix check", "ref", ref, "req", req, "suffix", suffix, "trim_suffix", strings.TrimSuffix(p, suffix))
 				if strings.HasSuffix(p, suffix) && req.compiledGlob.Match(strings.TrimSuffix(p, suffix)) {
 					out = append(out, ref)
 				}
@@ -90,7 +91,7 @@ func (i *inMemoryBackend) Match(ctx context.Context, reqs []MatchRequest) ([]str
 }
 
 // Set implements DocumentBackend.
-func (i *inMemoryBackend) Set(ctx context.Context, marker []byte, message string, reqs []SetRequest) error {
+func (i *inMemoryBackend) Set(ctx context.Context, message string, reqs []SetRequest) error {
 	for _, req := range reqs {
 		if req.Doc == nil {
 			delete(i.storage, req.Path)
